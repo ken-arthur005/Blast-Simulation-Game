@@ -5,7 +5,7 @@ function App() {
 
   return (
     <>
-      <h1>WELCOME TO OUR MINERAL BLASTING SIMULATOR</h1>
+      <h1 className='text-2xl font-extrabold text-blue-950'>WELCOME TO OUR MINERAL BLASTING SIMULATOR</h1>
       
     </>
   )
