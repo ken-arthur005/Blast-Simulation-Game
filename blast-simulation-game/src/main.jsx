@@ -4,12 +4,17 @@ import App from './App.jsx'
 import './App.css'
 import {createBrowserRouter, RouterProvider} from 'react-router-dom'
 import HomePage from './Pages/HomePage.jsx';
+import CsvParse from './Components/CsvParse.jsx'
 
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <HomePage/>
+  },
+  {
+    path: '/csvfile',
+    element: <CsvParse/>
   }
 ]);
 
