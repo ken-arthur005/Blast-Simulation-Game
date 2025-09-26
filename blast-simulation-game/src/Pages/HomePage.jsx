@@ -1,15 +1,9 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
 
 import { useState } from 'react';
 
 function HomePage() {
   const [clicked, setClicked] = useState(false)
-
-  const handleClicked = () => {
-    
-    console.log("clicked");
-  }
   
   return (
     <div className='background text-center absolute flex flex-col justify-between min-h-screen w-full p-4 sm:p-6 lg:p-8'>
@@ -61,7 +55,6 @@ function HomePage() {
             onClick={()=>{
               setClicked(true)
               setTimeout(()=>setClicked(false), 300)
-              handleClicked()
             }}
             className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
                         h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px] 
@@ -73,7 +66,7 @@ function HomePage() {
                         tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
                         transition transform ${clicked ? "scale-105" : ""} mb-7`} 
             type='submit'>
-            <Link to='/csvfile'> Continue </Link>
+            Continue
           </button>
         </div>
       </div>
