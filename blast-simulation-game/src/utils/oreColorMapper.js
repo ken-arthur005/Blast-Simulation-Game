@@ -59,6 +59,25 @@ class OreColorMapper {
       return this.colorMap[normalizedOreType];
     }
   }
+
+  /**
+   * Gets colors for multiple ore types
+   * @param {string[]} oreTypes - Array of ore types
+   * @returns {Object} - Object mapping ore types to colors
+   */
+  static getColorsForOreTypes(oreTypes) {
+    if (!Array.isArray(oreTypes)) {
+      console.error("oreTypes must be an array");
+      return {};
+    }
+
+    const colorMapping = {};
+    oreTypes.forEach((oreType) => {
+      colorMapping[oreType] = this.getColor(oreType);
+    });
+
+    return colorMapping;
+  }
 }
 
 export default OreColorMapper;
