@@ -40,6 +40,25 @@ class OreColorMapper {
     empty: "#F5F5F5",
     void: "#000000",
   };
+
+  // Cache for assigned fallback colors
+  static assignedColors = new Map();
+
+  // Gets the color for a specific ore type
+  static getColor(oreType) {
+    if (!oreType || typeof oreType !== "string") {
+      console.warn("Invalid ore type provided:", oreType);
+      return this.colorMap.void;
+    }
+
+    // Normalize ore type (lowercase, trimmed)
+    const normalizedOreType = oreType.toLowerCase().trim();
+
+    // Check if we have a predefined color
+    if (this.colorMap.hasOwnProperty(normalizedOreType)) {
+      return this.colorMap[normalizedOreType];
+    }
+  }
 }
 
 export default OreColorMapper;
