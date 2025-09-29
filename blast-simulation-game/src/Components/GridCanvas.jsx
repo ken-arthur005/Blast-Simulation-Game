@@ -8,7 +8,6 @@ const GridCanvas = ({
   gridData, 
   canvasSize, 
   blockSize, 
-  onBlockClick,
   className = ""
 }) => {
   const canvasRef = useRef(null);
@@ -45,45 +44,42 @@ const GridCanvas = ({
     if (!canvas || !gridData) return;
 
     const ctx = canvas.getContext('2d');
+    const { grid } = gridData;
 
     // Clear and set background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#f0f0f0';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Render all blocks
+    // Calculate actual grid dimensions
+    const actualGridWidth = grid[0].length * blockSize;
+    const actualGridHeight = grid.length * blockSize;
+
+    // Calculate centering offsets
+    const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
+    const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
+
+    // Save the context state
+    ctx.save();
+    
+    // Translate to center the grid
+    ctx.translate(offsetX, offsetY);
+
+    // Render all blocks (they'll now be centered)
     blocksRef.current.forEach(block => {
       block.render(ctx);
     });
 
-    console.log(`Canvas rendered: ${blocksRef.current.length} blocks`);
-  }, [gridData]);
+    // Restore the context state
+    ctx.restore();
+
+    console.log(`Canvas rendered: ${blocksRef.current.length} blocks, centered with offset (${offsetX}, ${offsetY})`);
+  }, [gridData, blockSize]);
 
   // Re-render when dependencies change
   useEffect(() => {
     renderCanvas();
   }, [renderCanvas]);
-
-  // Handle canvas click events
-  const handleCanvasClick = useCallback((event) => {
-    if (!gridData || !onBlockClick) return;
-
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const pixelX = event.clientX - rect.left;
-    const pixelY = event.clientY - rect.top;
-
-    // Find the clicked block
-    const clickedBlock = blocksRef.current.find(block => 
-      block.containsPoint(pixelX, pixelY)
-    );
-
-    if (clickedBlock) {
-      const blockInfo = clickedBlock.getBlockInfo();
-      onBlockClick(blockInfo);
-      // ❌ REMOVED: console.log('Block clicked:', blockInfo);
-    }
-  }, [gridData, onBlockClick]);
 
   if (!gridData) {
     return (
@@ -100,8 +96,7 @@ const GridCanvas = ({
         ref={canvasRef}
         width={canvasSize.width}
         height={canvasSize.height}
-        onClick={handleCanvasClick}
-        className={`cursor-crosshair ${className}`}
+        className={`${className}`}
         style={{ display: 'block' }}
       />
     </div>
