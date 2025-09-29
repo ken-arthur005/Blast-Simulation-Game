@@ -189,6 +189,17 @@ const CsvParse = () => {
             </>
           )}
         </CSVReader>
+
+
+        {/* Grid Visualization Section */}
+        {validatedData && (
+          <OreGridVisualization 
+            csvData={validatedData} 
+            onGridProcessed={(gridData) => {
+              console.log('Grid processed in CsvParse:', gridData);
+            }}
+          />
+        )}
       </div>
     )
 }
