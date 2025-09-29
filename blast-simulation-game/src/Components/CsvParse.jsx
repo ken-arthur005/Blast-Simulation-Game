@@ -8,6 +8,7 @@ import {
 import { AiOutlineCloudUpload } from "react-icons/ai";
 import CsvDataValidation from './CsvDataValidation';
 import CsvFileValidation from './CsvFileValidation';
+import OreGridVisualization from './OreGridVisualization';
 
 const CsvParse = () => {
     const { CSVReader } = useCSVReader();
