@@ -107,7 +107,29 @@ class GridDataProcessor {
     return gridData;
   }
 
-  
+  /**
+   * Validates that the grid data is properly structured
+   */
+  static validateGridData(gridData) {
+    if (!gridData || !gridData.grid || !gridData.dimensions || !gridData.metadata) {
+      return false;
+    }
+
+    const { grid, dimensions } = gridData;
+    
+    // Check if grid dimensions match the actual grid array
+    if (grid.length !== dimensions.height) {
+      console.error('Grid height mismatch');
+      return false;
+    }
+
+    if (grid[0] && grid[0].length !== dimensions.width) {
+      console.error('Grid width mismatch');
+      return false;
+    }
+
+    return true;
+  }
 }
 
 export default GridDataProcessor;
