@@ -19,26 +19,43 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   // Calculate optimal sizing for the canvas and blocks
   const calculateOptimalSizing = useCallback((processedGrid) => {
     const { dimensions } = processedGrid;
-    const maxCanvasWidth = 1000;
-    const maxCanvasHeight = 700;
-    const minBlockSize = 8;
-    const maxBlockSize = 60;
+    
+    // Preferred canvas size
+    const preferredWidth = 576;
+    const preferredHeight = 456;
+    
+    // Calculate what block size would be needed for preferred size
+    const blockSizeByWidth = Math.floor(preferredWidth / dimensions.width);
+    const blockSizeByHeight = Math.floor(preferredHeight / dimensions.height);
+    let blockSize = Math.min(blockSizeByWidth, blockSizeByHeight);
+    
+    // Size constraints for readability
+    const minBlockSize = 6;
+    const maxBlockSize = 80;
+    
+    if (blockSize < minBlockSize || blockSize > maxBlockSize) {
+      // Fall back to adaptive sizing if fixed size doesn't work well
+      blockSize = Math.max(minBlockSize, Math.min(maxBlockSize, blockSize));
+      
+      // Use adaptive canvas size
+      const canvasWidth = Math.min(dimensions.width * blockSize, 800);
+      const canvasHeight = Math.min(dimensions.height * blockSize, 600);
+      
+      setCanvasSize({ width: canvasWidth, height: canvasHeight });
+      
+      console.log(`Using adaptive canvas: ${canvasWidth}x${canvasHeight} for extreme grid size`);
+    } else {
+      // Calculate exact canvas size to fit the grid perfectly
+      const exactWidth = dimensions.width * blockSize;
+      const exactHeight = dimensions.height * blockSize;
+      
+      setCanvasSize({ width: exactWidth, height: exactHeight });
+      console.log(`Using exact fit canvas: ${exactWidth}x${exactHeight}`);
+    }
+    
+    setBlockSize(blockSize);
 
-    // Calculate block size based on grid dimensions
-    const blockSizeByWidth = Math.floor(maxCanvasWidth / dimensions.width);
-    const blockSizeByHeight = Math.floor(maxCanvasHeight / dimensions.height);
-    const optimalBlockSize = Math.max(
-      minBlockSize,
-      Math.min(maxBlockSize, Math.min(blockSizeByWidth, blockSizeByHeight))
-    );
-
-    const canvasWidth = dimensions.width * optimalBlockSize;
-    const canvasHeight = dimensions.height * optimalBlockSize;
-
-    setBlockSize(optimalBlockSize);
-    setCanvasSize({ width: canvasWidth, height: canvasHeight });
-
-    console.log(`Canvas sizing: ${canvasWidth}x${canvasHeight}, Block size: ${optimalBlockSize}`);
+    console.log(`Block size: ${blockSize}px for ${dimensions.width}x${dimensions.height} grid`);
   }, []);
 
   // Process CSV data when it changes
@@ -72,15 +89,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }
   }, [csvData, onGridProcessed, calculateOptimalSizing]);
 
-
-  // Handle block click events from canvas
-  const handleBlockClick = useCallback((blockInfo) => {
-    if (blockInfo.oreType !== 'empty') {
-      // Future: Add blast simulation logic here
-    } else {
-      // Handle empty cell click
-    }
-  }, []);
 
   // Loading state
   if (!csvData) {
@@ -118,7 +126,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           gridData={gridData}
           canvasSize={canvasSize}
           blockSize={blockSize}
-          onBlockClick={handleBlockClick}
         />
 
         {/* Legend */}
