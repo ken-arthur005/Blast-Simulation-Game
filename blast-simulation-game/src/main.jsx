@@ -13,7 +13,7 @@ const router = createBrowserRouter([
     element: <HomePage/>
   },
   {
-    path: '/csvfile',
+    path: '/simulation-screen',
     element: <CsvParse/>
   }
 ]);
