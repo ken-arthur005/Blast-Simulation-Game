@@ -1,9 +1,10 @@
-import React, {useState} from 'react'
+import React, {useEffect, useState} from 'react'
 import Toast from './Toast';
 import {
   useCSVReader,
   formatFileSize,
 } from 'react-papaparse'
+import Papa from 'papaparse';
 
 import { AiOutlineCloudUpload } from "react-icons/ai";
 import CsvDataValidation from './CsvDataValidation';
@@ -23,6 +24,28 @@ const CsvParse = () => {
       
       setTimeout(() => setToast(null), 5000);
     };
+
+    //automatically load default CSV file
+
+    useEffect(() => {
+      const loadDefaultCsv = async () => {
+        try {
+          const response = await fetch('/sample-ore.csv');
+          if (!response.ok) {
+            throw new Error('Failed to fetch default CSV file');
+          }
+          const csvText = await response.text();
+          // Parse the CSV text
+          const results = Papa.parse(csvText, { header: false });
+          setValidatedData(results);
+          console.log('Default CSV file loaded:', results);
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      loadDefaultCsv();
+    }, []);
 
    
     return (
@@ -59,7 +82,7 @@ const CsvParse = () => {
             }
 
             // If all validations pass
-            setValidatedData(dataValidation.data);
+            setValidatedData(results); // <-- pass the whole results object
             showToast(`CSV file validated successfully! Found ${results.data.length - 1} data rows.`, 'success');
             console.log('Validated CSV data:', dataValidation.data);
             setZoneHover(false);
