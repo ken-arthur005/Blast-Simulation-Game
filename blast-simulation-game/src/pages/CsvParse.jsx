@@ -1,14 +1,14 @@
 import React, {useState} from 'react'
-import Toast from './Toast';
+import Toast from '../Components/Toast';
 import {
   useCSVReader,
   formatFileSize,
 } from 'react-papaparse'
 
 import { AiOutlineCloudUpload } from "react-icons/ai";
-import CsvDataValidation from './CsvDataValidation';
-import CsvFileValidation from './CsvFileValidation';
-import OreGridVisualization from './OreGridVisualization';
+import CsvDataValidation from '../Components/CsvDataValidation';
+import CsvFileValidation from '../Components/CsvFileValidation';
+import OreGridVisualization from '../Components/OreGridVisualization';
 
 const CsvParse = () => {
     const { CSVReader } = useCSVReader();
