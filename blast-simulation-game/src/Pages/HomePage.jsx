@@ -1,6 +1,7 @@
 import React from 'react'
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 function HomePage() {
   const [clicked, setClicked] = useState(false)
@@ -66,7 +67,7 @@ function HomePage() {
                         tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
                         transition transform ${clicked ? "scale-105" : ""} mb-7`} 
             type='submit'>
-            Continue
+            <Link to='/simulation-screen'>Start Game</Link>
           </button>
         </div>
       </div>
