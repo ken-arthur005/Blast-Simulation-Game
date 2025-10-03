@@ -5,6 +5,7 @@ import './App.css'
 import {createBrowserRouter, RouterProvider} from 'react-router-dom'
 import HomePage from './Pages/HomePage.jsx';
 import CsvParse from './Components/CsvParse.jsx'
+import {GameProvider } from './Components/GameContext.jsx'
 
 
 const router = createBrowserRouter([
@@ -15,11 +16,13 @@ const router = createBrowserRouter([
   {
     path: '/simulation-screen',
     element: <CsvParse/>
-  }
+  }, 
 ]);
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RouterProvider router={router} />
+<GameProvider>
+      <RouterProvider router={router} />
+</GameProvider>
   </StrictMode>,
 )
