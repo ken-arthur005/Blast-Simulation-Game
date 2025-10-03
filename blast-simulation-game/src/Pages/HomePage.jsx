@@ -1,9 +1,18 @@
 import React from 'react'
+import { GameContext } from '../Components/GameContext.jsx';
 
-import { useState } from 'react';
+import { useState, useContext } from 'react';
+
 
 function HomePage() {
-  const [clicked, setClicked] = useState(false)
+  const [clicked, setClicked] = useState(false);
+  const {gameState, setGameState} = useContext(GameContext);
+  // const navigate = useNavigate();
+
+  // const handleContinue = () => {
+  //   console.log('Player name: ', gameState.playerName);
+  //   navigate('/name');
+  // }
   
   return (
     <div className='background text-center absolute flex flex-col justify-between min-h-screen w-full p-4 sm:p-6 lg:p-8'>
@@ -37,13 +46,21 @@ function HomePage() {
                          text-stroke mb-3 sm:mb-4 lg:mb-5'>
             What is your name?
           </h2>
-          <input className='w-full max-w-[280px] sm:max-w-[400px] md:max-w-[550px] lg:max-w-[680px] xl:max-w-[782px] 
+          <input 
+          type="text"
+          onChange={(e)=>{
+            setGameState({...gameState, playerName: e.target.value});
+          }}
+          value={gameState.playerName}
+          
+          className='w-full max-w-[280px] sm:max-w-[400px] md:max-w-[550px] lg:max-w-[680px] xl:max-w-[782px] 
                             h-[35px] sm:h-[42px] lg:h-[48px] xl:h-[55px] 
                             rounded-[15px] sm:rounded-[20px] lg:rounded-[25px] 
                             bg-[#F6DBA3] opacity-75
                             text-lg sm:text-xl lg:text-2xl xl:text-3xl 
                             px-3 sm:px-4 lg:px-5 
                             font-semibold placeholder:text-[#7A6F6F] text-[#3B2F2F] text-center uppercase' 
+                            
           />
         </div>
         
@@ -54,6 +71,7 @@ function HomePage() {
           <button 
             onClick={()=>{
               setClicked(true)
+            //  handleContinue();
               setTimeout(()=>setClicked(false), 300)
             }}
             className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
@@ -67,6 +85,7 @@ function HomePage() {
                         transition transform ${clicked ? "scale-105" : ""} mb-7`} 
             type='submit'>
             Continue
+         
           </button>
         </div>
       </div>
