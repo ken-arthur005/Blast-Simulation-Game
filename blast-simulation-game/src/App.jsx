@@ -1,4 +1,4 @@
-import MainUi from './Pages/HomePage'
+import MainUi from './pages/HomePage'
 import './App.css'
 
 

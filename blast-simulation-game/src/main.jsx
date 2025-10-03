@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import './App.css'
 import {createBrowserRouter, RouterProvider} from 'react-router-dom'
-import HomePage from './Pages/HomePage.jsx';
+import HomePage from './pages/HomePage.jsx';
 import CsvParse from './Components/CsvParse.jsx'
 
 
