@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router';
 import { FaTrophy } from "react-icons/fa";
+import { GameContext } from '../Components/GameContext.jsx';
+import React, { useState, useContext } from 'react';
+import { Link } from 'react-router-dom';
 
 function HomePage() {
   const [clicked, setClicked] = useState(false);
@@ -56,28 +57,29 @@ function HomePage() {
             placeholder="Enter name"
           />
         </div>
-
-        {/* Continue button box */}
-        <div
-          className="w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[320px] md:max-w-[400px] lg:max-w-[500px] xl:max-w-[580px]  h-[36px] xs:h-[38px] sm:h-[48px] lg:h-[58px] xl:h-[68px] 
-                     rounded-b-[12px] sm:rounded-b-[16px] lg:rounded-b-[20px] 
-                     bg-[#9E61C9] mx-auto flex items-center justify-center ui-font pb-3">
-          <Link to="/csvfile" className="w-full flex justify-center">
-            <button
-              onClick={() => {
-                setClicked(true);
-                setTimeout(() => setClicked(false), 300);
-              }}
-              className={`w-full max-w-[200px] xs:max-w-[220px] sm:max-w-[260px] md:max-w-[300px] lg:max-w-[340px] xl:max-w-[380px] 
-                          bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)] 
-                          backdrop-blur-[2px] rounded-[12px] sm:rounded-[16px] lg:rounded-[20px] 
-                          text-center text-[#5A3C62] 
-                          text-[14px] xs:text-[16px] sm:text-[24px] md:text-[30px] lg:text-[36px] xl:text-[42px] 
-                          tracking-wide 
-                          transition transform ${clicked ? "scale-105" : ""} `}>
-              Continue
-            </button>
-          </Link>
+        
+        <div className='w-full max-w-[280px] sm:max-w-[350px] md:max-w-[450px] lg:max-w-[550px] xl:max-w-[621px] 
+                        h-[45px] sm:h-[55px] lg:h-[65px] xl:h-[75px] 
+                        rounded-b-[15px] sm:rounded-b-[20px] lg:rounded-b-[25px] 
+                        bg-[#9E61C9] mx-auto box-shadow flex items-center justify-center z-10 ui-font '>
+          <button 
+            onClick={()=>{
+              setClicked(true)
+            //  handleContinue();
+              setTimeout(()=>setClicked(false), 300)
+            }}
+            className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
+                        h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px] 
+                        bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)] 
+                        backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px] 
+                        text-center text-[#5A3C62] 
+                        text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px] 
+                        font-[400px] 
+                        tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
+                        transition transform ${clicked ? "scale-105" : ""} mb-7`} 
+            type='submit'>
+            <Link to='/simulation-screen'>Start Game</Link>
+          </button>
         </div>
       </div>
 

@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import { useCSVReader, formatFileSize } from "react-papaparse";
+import React, { useEffect, useState } from "react";
 import Toast from "./Toast";
 import { useCSVReader, formatFileSize } from "react-papaparse";
+import Papa from "papaparse";
+import { Gamepad2 } from "lucide-react";
 import { AiOutlineCloudUpload } from "react-icons/ai";
 import CsvDataValidation from "./CsvDataValidation";
 import CsvFileValidation from "./CsvFileValidation";
@@ -9,18 +12,40 @@ import OreGridVisualization from "./OreGridVisualization";
 const CsvParse = () => {
   const { CSVReader } = useCSVReader();
   const [zoneHover, setZoneHover] = useState(false);
+  const [removeHoverColor, setRemoveHoverColor] = useState();
   const [toast, setToast] = useState(null);
   const [validatedData, setValidatedData] = useState(null);
 
   const showToast = (message, type = "error") => {
     setToast({ message, type });
+
     setTimeout(() => setToast(null), 5000);
   };
 
+  //automatically load default CSV file
+
+  useEffect(() => {
+    const loadDefaultCsv = async () => {
+      try {
+        const response = await fetch("/sample-ore.csv");
+        if (!response.ok) {
+          throw new Error("Failed to fetch default CSV file");
+        }
+        const csvText = await response.text();
+        // Parse the CSV text
+        const results = Papa.parse(csvText, { header: false });
+        setValidatedData(results);
+        console.log("Default CSV file loaded:", results);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    loadDefaultCsv();
+  }, []);
+
   return (
-    // background
-    <div className="w-full h-screen p-6 flex flex-col  fixed">
-      {/* Toast notifications */}
+    <div className="w-full max-w-2xl mx-auto py-8 px-2">
       {toast && (
         <Toast
           message={toast.message}
@@ -28,108 +53,213 @@ const CsvParse = () => {
           onClose={() => setToast(null)}
         />
       )}
-     <div className="flex items-center justify-between">
-       <div>
-        <h1 className="bg-clip-text bg-linear-to-r from-[#4E3063] to-[#C19A88] text-stroke text-[32px]">ROCK BLASTERZ</h1>
-        <p>Welcome, Suraiya! Design your blast pattern to maximize ore recovery and achieve the highest score</p>
+      <div className="flex flex-row justify-between items-center mb-4">
+        <div></div>
+        <div className="flex flex-row items-center space-x-2 text-gray-600">
+          <Gamepad2 />
+          <p>welcome, Clara!</p>
+        </div>
       </div>
+      <CSVReader
+        onUploadAccepted={(results, file) => {
+          console.log("---------------------------");
+          console.log("Upload accepted, validating...");
+          console.log("Results:", results);
+          console.log("File:", file);
+          console.log("---------------------------");
 
-      {/* Import CSV button - top right */}
-      <div className="flex justify-end mb-6">
-        <CSVReader
-          onUploadAccepted={(results, file) => {
-            const fileValidation = CsvFileValidation(file);
-            if (!fileValidation.isValid) {
-              showToast(fileValidation.error, "error");
-              setZoneHover(false);
-              return;
-            }
-            const dataValidation = CsvDataValidation(results);
-            if (!dataValidation.isValid) {
-              showToast(dataValidation.error, "error");
-              setZoneHover(false);
-              return;
-            }
-            setValidatedData(dataValidation.data);
-            showToast(
-              `CSV file validated successfully! Found ${
-                results.data.length - 1
-              } data rows.`,
-              "success"
-            );
+          // First validate the file itself
+          const fileValidation = CsvFileValidation(file);
+          if (!fileValidation.isValid) {
+            Toast(fileValidation.error, "error");
             setZoneHover(false);
-          }}
-          onUploadRejected={(results, file) => {
-            console.log("Upload rejected:", results, file);
-            showToast("File upload was rejected. Please try again.", "error");
-          }}
-          config={{
-            header: false,
-            skipEmptyLines: true,
-            transform: (value) => value.trim(),
-          }}
-        >
-          {({ getRootProps, acceptedFile }) => (
+            return; // Don't proceed with data validation
+          }
+
+          // Then validate the CSV data
+          const dataValidation = CsvDataValidation(results);
+          if (!dataValidation.isValid) {
+            showToast(dataValidation.error, "error");
+            setZoneHover(false);
+            return; // Don't accept the file
+          }
+
+          // If all validations pass
+          setValidatedData(results); // <-- pass the whole results object
+          showToast(
+            `CSV file validated successfully! Found ${
+              results.data.length - 1
+            } data rows.`,
+            "success"
+          );
+          console.log("Validated CSV data:", dataValidation.data);
+          setZoneHover(false);
+        }}
+        onUploadRejected={(results, file) => {
+          console.log("Upload rejected:", results, file);
+          showToast("File upload was rejected. Please try again.", "error");
+        }}
+        config={{
+          header: false, // We'll handle headers manually for better validation
+          skipEmptyLines: true,
+          transform: (value) => value.trim(), // Trim whitespace from all values
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setZoneHover(true);
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setZoneHover(false);
+        }}
+      >
+        {({
+          getRootProps,
+          acceptedFile,
+          ProgressBar,
+          getRemoveFileProps,
+          Remove,
+        }) => (
+          <>
             <div
               {...getRootProps()}
               className={`
-                flex items-center gap-2 px-4 py-2 rounded-md cursor-pointer
-                transition-all duration-200 ease-in-out
-                border ${zoneHover ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-white hover:bg-gray-50"}
-                ${acceptedFile ? "border-green-500 bg-green-50" : ""}
-              `}
-              style={{ height: "48px", minWidth: "160px" }} // fixed height, smaller width
+                  relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+                  transition-all duration-200 ease-in-out
+                  ${
+                    zoneHover
+                      ? "border-blue-500 bg-blue-50 transform scale-105"
+                      : "border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50"
+                  }
+                  ${acceptedFile ? "border-green-500 bg-green-50" : ""}
+                `}
             >
-              <AiOutlineCloudUpload className="text-xl text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">
-                Import CSV
-              </span>
+              {acceptedFile ? (
+                <>
+                  {/* File accepted state */}
+                  <div className="space-y-4">
+                    {/* File info section */}
+                    <div className="flex items-center justify-center space-x-3">
+                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-green-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-gray-900">
+                          {acceptedFile.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(acceptedFile.size)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Progress bar section */}
+                    <div className="w-full">
+                      <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <ProgressBar style={{ backgroundColor: "#3B82F6" }} />
+                      </div>
+                    </div>
+
+                    {/* Remove button */}
+                    <div className="flex justify-center">
+                      <button
+                        {...getRemoveFileProps()}
+                        className={`
+                            inline-flex items-center px-4 py-2 text-sm font-medium rounded-md
+                            transition-colors duration-200
+                            ${
+                              removeHoverColor
+                                ? "bg-red-600 text-white"
+                                : "bg-red-100 text-red-700 hover:bg-red-200"
+                            }
+                            focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2
+                          `}
+                        onMouseOver={(event) => {
+                          event.preventDefault();
+                          setRemoveHoverColor(true);
+                        }}
+                        onMouseOut={(event) => {
+                          event.preventDefault();
+                          setRemoveHoverColor(false);
+                        }}
+                      >
+                        <svg
+                          className="w-4 h-4 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                        Remove File
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Upload prompt state */}
+                  <div className="space-y-4">
+                    {/* Upload icon */}
+                    <div className="flex justify-center">
+                      <AiOutlineCloudUpload
+                        className={`
+                            w-16 h-16 transition-colors duration-200
+                            ${zoneHover ? "text-blue-500" : "text-gray-400"}
+                          `}
+                      />
+                    </div>
+
+                    {/* Upload text */}
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-medium text-gray-900">
+                        Drop CSV file here
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        or{" "}
+                        <span className="text-blue-600 font-medium">
+                          click to browse
+                        </span>{" "}
+                        your files
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Supports CSV files up to 10MB
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-          )}
-        </CSVReader>
-      </div>
-     </div>
+          </>
+        )}
+      </CSVReader>
 
-      {/* Grid structure - main content */}
-      <div className="flex flex-1 justify-center items-center ">
-        <div className="grid w-full mx-auto">
-          {/* Left side - you can add other content later if needed */}
-          {/* <div className="flex flex-col justify-center items-center">
-            <p className="text-gray-600 text-center">
-              Upload a CSV file to visualize ore distribution.
-            </p>
-          </div> */}
-
-          {/* Right side - grid visualization & legend */}
-          <div className="flex flex-col items-center gap-6">
-            {validatedData && (
-              <OreGridVisualization
-                csvData={validatedData}
-                onGridProcessed={(gridData) => {
-                  console.log("Grid processed in CsvParse:", gridData);
-                }}
-              />
-            )}
-
-            {/* Text under visualization */}
-            {/* <p className="text-gray-600 text-sm">2D Ore Grid Visualization</p>
-
-            {/* Ore types legend (vertical) */}
-            {/* <div className="flex flex-col gap-2">
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 bg-yellow-400 rounded"></span> Gold
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 bg-gray-500 rounded"></span> Silver
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 bg-red-500 rounded"></span> Copper
-              </span> */}
-              {/* add more ore types here */}
-            {/* </div>  */}
-          </div>
-        </div>
-      </div>
+      {/* Grid Visualization Section */}
+      {validatedData && (
+        <OreGridVisualization
+          csvData={validatedData}
+          onGridProcessed={(gridData) => {
+            console.log("Grid processed in CsvParse:", gridData);
+          }}
+        />
+      )}
     </div>
   );
 };
