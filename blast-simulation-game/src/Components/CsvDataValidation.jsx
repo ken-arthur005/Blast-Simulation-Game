@@ -47,7 +47,7 @@ const CsvDataValidation = (results) => {
         console.log('Missing columns detected:', missingColumns);
         return { 
           isValid: false, 
-          error: `Missing required columns: ${missingColumns.join(', ')}. Required columns are: x, y, ore_type. Found columns: ${headers.join(', ')}.` 
+          error: `Missing required columns: ${missingColumns.join(', ')}.` 
         };
       }
 

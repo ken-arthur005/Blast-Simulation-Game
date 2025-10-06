@@ -18,7 +18,7 @@ const CsvParse = () => {
   const showToast = (message, type = "error") => {
     setToast({ message, type });
 
-    setTimeout(() => setToast(null), 5000);
+    setTimeout(() => setToast(null), 10000);
   };
 
   //automatically load default CSV file
@@ -115,8 +115,10 @@ const CsvParse = () => {
         {({
           getRootProps,
           acceptedFile,
+          // eslint-disable-next-line no-unused-vars
           ProgressBar,
           getRemoveFileProps,
+          // eslint-disable-next-line no-unused-vars
           Remove,
         }) => (
           <>
