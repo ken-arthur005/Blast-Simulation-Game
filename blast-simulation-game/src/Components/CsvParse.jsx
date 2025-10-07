@@ -1,20 +1,23 @@
 import { useCSVReader, formatFileSize } from "react-papaparse";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import Toast from "./Toast";
-import { useCSVReader, formatFileSize } from "react-papaparse";
+// import { useCSVReader, formatFileSize } from "react-papaparse";
 import Papa from "papaparse";
 import { Gamepad2 } from "lucide-react";
 import { AiOutlineCloudUpload } from "react-icons/ai";
 import CsvDataValidation from "./CsvDataValidation";
 import CsvFileValidation from "./CsvFileValidation";
 import OreGridVisualization from "./OreGridVisualization";
+import { GameContext } from "./GameContext";
 
 const CsvParse = () => {
   const { CSVReader } = useCSVReader();
   const [zoneHover, setZoneHover] = useState(false);
-  const [removeHoverColor, setRemoveHoverColor] = useState();
+  // const [removeHoverColor, setRemoveHoverColor] = useState();
   const [toast, setToast] = useState(null);
   const [validatedData, setValidatedData] = useState(null);
+  const {gameState} = useContext(GameContext);
+  const {playerName} = gameState;
 
   const showToast = (message, type = "error") => {
     setToast({ message, type });
@@ -57,7 +60,7 @@ const CsvParse = () => {
         <div></div>
         <div className="flex flex-row items-center space-x-2 text-gray-600">
           <Gamepad2 />
-          <p>welcome, Clara!</p>
+          <p>welcome, {playerName}!</p>
         </div>
       </div>
       <CSVReader
@@ -116,9 +119,9 @@ const CsvParse = () => {
         {({
           getRootProps,
           acceptedFile,
-          ProgressBar,
-          getRemoveFileProps,
-          Remove,
+          // ProgressBar,
+          // getRemoveFileProps,
+          // Remove,
         }) => (
           <>
             <div
@@ -166,14 +169,14 @@ const CsvParse = () => {
                     </div>
 
                     {/* Progress bar section */}
-                    <div className="w-full">
+                    {/* <div className="w-full">
                       <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
                         <ProgressBar style={{ backgroundColor: "#3B82F6" }} />
                       </div>
-                    </div>
+                    </div> */}
 
                     {/* Remove button */}
-                    <div className="flex justify-center">
+                    {/* <div className="flex justify-center">
                       <button
                         {...getRemoveFileProps()}
                         className={`
@@ -210,7 +213,7 @@ const CsvParse = () => {
                         </svg>
                         Remove File
                       </button>
-                    </div>
+                    </div> */}
                   </div>
                 </>
               ) : (

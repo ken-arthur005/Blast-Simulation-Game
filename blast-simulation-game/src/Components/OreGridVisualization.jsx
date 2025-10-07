@@ -110,10 +110,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   }
 
   return (
-    <div className="mx-auto flex justify-between items-start">
+    <div className="mx-auto flex justify-between items-start border w-full">
       
         {/* center container */}
-       <div className='max-w-[70%]'>
+       <div className='max-w-[70%] border'>
          <h2 className="text-xl font-bold mb-4">2D Ore Grid Visualization</h2>
         
         {/* Grid Information */}
@@ -132,7 +132,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
        </div>
 
         {/* Legend */}
-       <div className='w-60 ml-8' >
+       <div className='w-60 ml-8 border' >
          <GridLegend oreTypes={gridData.metadata.oreTypes} />
        </div>
       
