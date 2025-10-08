@@ -1,4 +1,4 @@
-import { useCSVReader, formatFileSize } from "react-papaparse";
+import { useCSVReader, } from "react-papaparse";
 import React, { useEffect, useState, useContext } from "react";
 import Toast from "./Toast";
 // import { useCSVReader, formatFileSize } from "react-papaparse";
@@ -15,6 +15,7 @@ const CsvParse = () => {
   const [zoneHover, setZoneHover] = useState(false);
   // const [removeHoverColor, setRemoveHoverColor] = useState();
   const [toast, setToast] = useState(null);
+  const [fileKey, setFileKey] = useState(Date.now()); 
   const [validatedData, setValidatedData] = useState(null);
   const { gameState } = useContext(GameContext);
   const { playerName } = gameState;
@@ -22,30 +23,38 @@ const CsvParse = () => {
   const showToast = (message, type = "error") => {
     setToast({ message, type });
 
-    setTimeout(() => setToast(null), 5000);
+    setTimeout(() => setToast(null), 10000);
   };
 
   //automatically load default CSV file
 
+  const resetFileVisuals = () => {
+        
+        setFileKey(Date.now());
+        
+    };
+
   useEffect(() => {
     const loadDefaultCsv = async () => {
-      try {
-        const response = await fetch("/sample-ore.csv");
-        if (!response.ok) {
-          throw new Error("Failed to fetch default CSV file");
-        }
-        const csvText = await response.text();
-        // Parse the CSV text
-        const results = Papa.parse(csvText, { header: false });
-        setValidatedData(results);
-        console.log("Default CSV file loaded:", results);
-      } catch (error) {
-        console.error(error);
-      }
+    try {
+    const response = await fetch("/sample-ore.csv");
+    if (!response.ok) {
+    throw new Error("Failed to fetch default CSV file");
+    }
+    const csvText = await response.text();
+    // Parse the CSV text
+    const results = Papa.parse(csvText, { header: false });
+    setValidatedData(results);
+    console.log("Default CSV file loaded:", results);
+    } catch (error) {
+    console.error(error);
+    }
     };
 
     loadDefaultCsv();
-  }, []);
+    }, []); 
+     
+  
 
   return (
     <div className="w-full h-screen p-6 flex flex-col fixed">
@@ -70,6 +79,7 @@ const CsvParse = () => {
         </div>
         <div className="flex justify-end mb-6">
           <CSVReader
+            key={fileKey}
             onUploadAccepted={(results, file) => {
               console.log("---------------------------");
               console.log("Upload accepted, validating...");
@@ -77,11 +87,14 @@ const CsvParse = () => {
               console.log("File:", file);
               console.log("---------------------------");
 
+              
+
               // First validate the file itself
               const fileValidation = CsvFileValidation(file);
               if (!fileValidation.isValid) {
-                Toast(fileValidation.error, "error");
+                showToast(fileValidation.error, "error");
                 setZoneHover(false);
+                resetFileVisuals()
                 return; // Don't proceed with data validation
               }
 
@@ -90,6 +103,7 @@ const CsvParse = () => {
               if (!dataValidation.isValid) {
                 showToast(dataValidation.error, "error");
                 setZoneHover(false);
+                resetFileVisuals()
                 return; // Don't accept the file
               }
 
