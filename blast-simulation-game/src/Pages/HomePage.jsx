@@ -86,35 +86,40 @@ function HomePage() {
                         rounded-b-[15px] sm:rounded-b-[20px] lg:rounded-b-[25px] 
                         bg-[#9E61C9] mx-auto box-shadow flex items-center justify-center z-10 ui-font '>
           {gameState.playerName && gameState.playerName.trim() ? (
-            <button 
-            onClick={handleStartGame}
-            className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
-                        h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px] 
-                        bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)] 
-                        backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px] 
-                        text-center text-[#5A3C62] 
-                        text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px] 
-                        font-[400px] 
-                        tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
-                        transition transform ${clicked ? "scale-105" : ""} mb-7`} 
-            type='submit'>
-            <Link to='/simulation-screen'>Start Game</Link>
-          </button>
+            <button>
+              <Link 
+              to='/simulation-screen'
+              onClick={handleStartGame}
+              className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
+                          h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px] 
+                          bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)] 
+                          backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px] 
+                          text-center text-[#5A3C62] 
+                          text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px] 
+                          font-[400px] 
+                          tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
+                          transition transform ${clicked ? "scale-105" : ""} 
+                          flex items-center justify-center`}
+              >
+                Start Game
+              </Link>
+            </button>
           ) : (
             <button 
-            onClick={handleStartGame}
-            className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
-                        h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px] 
-                        bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)] 
-                        backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px] 
-                        text-center text-[#5A3C62] 
-                        text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px] 
-                        font-[400px] 
-                        tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
-                        opacity-50 mb-7 cursor-not-allowed`} 
-            type='submit'>
-            <Link>Start Game</Link>
-          </button>
+              onClick={handleStartGame}
+              className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
+                          h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px] 
+                          bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)] 
+                          backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px] 
+                          text-center text-[#5A3C62] 
+                          text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px] 
+                          font-[400px] 
+                          tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
+                          opacity-50 cursor-not-allowed`}
+              type='button'
+            >
+              Start Game
+            </button>
           )}
         </div>
       </div>
