@@ -9,6 +9,7 @@ const CsvFileValidation = (file) => {
       // Check file size (10MB = 10 * 1024 * 1024 bytes)
       const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
+        // eslint-disable-next-line no-undef
         return { isValid: false, error: `File size (${formatFileSize(file.size)}) exceeds the 10MB limit.` };
       }
 

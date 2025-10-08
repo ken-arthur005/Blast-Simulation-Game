@@ -4,6 +4,7 @@ import React, { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 
 function HomePage() {
+  // eslint-disable-next-line no-unused-vars
   const [clicked, setClicked] = useState(false);
   const [error, setError] = useState('');
   const {gameState, setGameState} = useContext(GameContext);
