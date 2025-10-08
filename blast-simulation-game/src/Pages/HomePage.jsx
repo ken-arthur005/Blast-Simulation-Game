@@ -75,7 +75,7 @@ function HomePage() {
             placeholder="Enter name"
           />
           {error && (
-            <p className='text-[#FF6B6B] text-m mt-2 font-semibold'>
+            <p className='text-[#FF6B6B] text-sm mt-2 font-semibold'>
               {error}
             </p>
           )}
