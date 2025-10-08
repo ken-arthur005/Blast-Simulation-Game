@@ -34,7 +34,7 @@ const CsvDataValidation = (results) => {
       });
 
       console.log('Normalized headers:', normalizedHeaders);
-
+      
       // Check for required columns
       const requiredColumns = ['x', 'y', 'ore_type'];
       const missingColumns = requiredColumns.filter(col => {
