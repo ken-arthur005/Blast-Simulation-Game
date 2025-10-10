@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import OreBlock from './OreBlock';
+import {gsap} from 'gsap';
+
 
 /**
  * Canvas component that handles the rendering of the ore grid
@@ -8,10 +10,68 @@ const GridCanvas = ({
   gridData, 
   canvasSize, 
   blockSize, 
+  blastTrigger,
+  onBlastComplete,
   className = ""
 }) => {
   const canvasRef = useRef(null);
   const blocksRef = useRef([]);
+
+   useEffect(() => {
+    if (!blastTrigger || !blastTrigger.affectedCells) return;
+    
+    const animateExplosion = () => {
+      const { affectedCells } = blastTrigger;
+      
+      // Find the block objects that correspond to affected cells
+      const affectedBlocks = affectedCells.map(({ x, y }) => {
+        return blocksRef.current.find(block => 
+          block.gridX === x && block.gridY === y
+        );
+      }).filter(Boolean);
+      
+      // Sort by distance for staggered animation
+      affectedBlocks.sort((a, b) => {
+        const cellA = affectedCells.find(c => c.x === a.gridX && c.y === a.gridY);
+        const cellB = affectedCells.find(c => c.x === b.gridX && c.y === b.gridY);
+        return (cellA?.distance || 0) - (cellB?.distance || 0);
+      });
+      
+      // Create master timeline
+      const masterTL = gsap.timeline({
+        onComplete: () => {
+          onBlastComplete?.();
+        }
+      });
+      
+      // Animate each block
+      affectedBlocks.forEach((block, index) => {
+        const tl = gsap.timeline();
+        
+        // Flash and expand
+        tl.to(block, {
+          scale: 1.5,
+          duration: 0.15,
+          ease: "back.out(2)",
+          onUpdate: renderCanvas
+        })
+        // Shrink and fade
+        .to(block, {
+          scale: 0.3,
+          opacity: 0,
+          duration: 0.25,
+          ease: "power2.in",
+          onUpdate: renderCanvas
+        });
+        
+        // Add to master timeline with stagger delay
+        masterTL.add(tl, index * 0.03);
+      });
+    };
+    
+    animateExplosion();
+    
+  }, [blastTrigger, onBlastComplete]);
 
   // Create OreBlock instances for each cell in the grid
   const createBlocks = useCallback(() => {

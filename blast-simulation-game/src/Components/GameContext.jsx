@@ -7,6 +7,8 @@ export const GameProvider = ({ children }) => {
     playerName: "",
     score: 0,
     currentScenario: null,
+    grid: null,
+    blasts: [],
   });
 
   const setPlayerName = (name) => {
@@ -15,9 +17,16 @@ export const GameProvider = ({ children }) => {
       playerName: name,
     }));
   };
+  const updateGrid = (newGrid) => {
+    setGameState((prevState) => ({ ...prevState, grid: newGrid }));
+  };
+
+  const clearBlast = () => {
+    setGameState((prevState) => ({ ...prevState, blast: [] }));
+  };
 
   return (
-    <GameContext.Provider value={{ gameState, setGameState, setPlayerName }}>
+    <GameContext.Provider value={{ gameState, setGameState, setPlayerName, updateGrid, clearBlast }}>
       {children}
     </GameContext.Provider>
   );

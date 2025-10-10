@@ -1,10 +1,25 @@
-import React from "react";
+import {useContext} from "react";
 import OreColorMapper from "../utils/oreColorMapper";
+import {GameContext} from "./GameContext"
 
 /**
  * Legend component showing ore types and their colors
  */
-const GridLegend = ({ oreTypes, className = "" }) => {
+const GridLegend = ({ oreTypes, className = "", onTriggerBlast }) => {
+  const { gameState } = useContext(GameContext);
+
+ const handleTriggerBlast = () => {
+    // Check if there are any blasts placed
+    if (!gameState.blasts || gameState.blasts.length === 0) {
+      alert('Please place at least one explosive first!');
+      return;
+    }
+    
+    // Call the parent function to handle the blast
+    onTriggerBlast();
+  };
+
+
   if (!oreTypes || oreTypes.length === 0) {
     return null;
   }
@@ -31,7 +46,7 @@ const GridLegend = ({ oreTypes, className = "" }) => {
           ))}
         </div>
       </div>
-      <button className="mt-10 bg-red-500 text-white p-3 rounded">Trigger Blast</button>
+      <button className="mt-10 bg-red-500 text-white p-3 rounded hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed" onClick={handleTriggerBlast} disabled ={!gameState.blasts || gameState.blasts.length === 0}>Trigger Blast {gameState.blasts?.length > 0 && `(${gameState.blasts.length})`}</button>
     </div>
   );
 };
