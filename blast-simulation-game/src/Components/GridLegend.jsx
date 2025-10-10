@@ -13,7 +13,7 @@ const GridLegend = ({ oreTypes, className = "" }) => {
   //  md:grid-cols-3 lg:grid-cols-4
   return (
     <div>
-      <div className={`mt-4 p-4 bg-gray-100 rounded-lg ${className} border`}>
+      <div className={`mt-4 p-4 bg-gray-100 rounded-lg ${className}`}>
         <h3 className="text-lg font-semibold mb-3">Ore Types Legend</h3>
         <div
           className="grid grid-cols-2
@@ -31,9 +31,7 @@ const GridLegend = ({ oreTypes, className = "" }) => {
           ))}
         </div>
       </div>
-      <button className="mt-10 bg-red-500 text-white p-3 rounded">
-        Trigger Blast
-      </button>
+      <button className="mt-10 bg-red-500 text-white p-3 rounded">Trigger Blast</button>
     </div>
   );
 };
