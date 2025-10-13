@@ -74,21 +74,27 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   };
 
   //testing my blast logic
-  useEffect(() => {
-    if (gridData && gameState.blasts.length === 0) {
+  // useEffect(() => {
+  //   if (gridData && gameState.blasts.length === 0) {
     
-      setTimeout(() => {
-        setGameState((prev) => ({
-          ...prev,
-          blasts: [
-            { x: 5, y: 5, radius: 3 }, 
-            { x: 10, y: 8, radius: 3 },
-          ],
-        }));
-        console.log("Test blasts added!");
-      }, 2000);
-    }
-  }, [gridData]);
+  //     setTimeout(() => {
+  //       setGameState((prev) => ({
+  //         ...prev,
+  //         blasts: [
+  //           { x: 5, y: 5, radius: 3 }, 
+  //           { x: 10, y: 8, radius: 3 },
+  //         ],
+  //       }));
+  //       console.log("Test blasts added!");
+  //     }, 2000);
+  //   }
+  // }, [gridData]);
+
+
+
+
+
+  const [blasts, setBlasts] = useState([]); 
 
   // Calculate optimal sizing for the canvas and blocks
   const calculateOptimalSizing = useCallback((processedGrid) => {
@@ -135,6 +141,42 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       `Block size: ${blockSize}px for ${dimensions.width}x${dimensions.height} grid`
     );
   }, []);
+
+  const MAX_BLASTS = 5; 
+
+// Handler for when a block is clicked
+const handleBlockClick = useCallback((gridX, gridY) => {
+  const newBlast = { x: gridX, y: gridY, radius:3 };
+
+  // 1. Check if the cell is already occupied
+  const isOccupied = blasts.some(
+    (blast) => blast.x === newBlast.x && blast.y === newBlast.y
+  );
+  if (isOccupied) {
+    console.log(`Cell (${gridX}, ${gridY}) already has a blast.`);
+    return;
+  }
+
+  setBlasts((prevBlasts) => {
+    // 2. Check maximum limit
+    if (prevBlasts.length >= MAX_BLASTS) {
+      console.warn(`Maximum of ${MAX_BLASTS} blasts reached.`);
+      return prevBlasts; // Do not update
+    }
+    
+    // 3. Add the new blast
+    const newBlasts = [...prevBlasts, newBlast];
+    console.log(`Blast placed at (${gridX}, ${gridY}). Total: ${newBlasts.length}`);
+
+// ✅ Sync to GameContext so button enables
+    setGameState((prev) => ({
+      ...prev,
+      blasts: newBlasts,
+    }));
+
+    return newBlasts;
+    });
+  }, [blasts, setGameState])
 
   // Process CSV data when it changes
   useEffect(() => {
@@ -207,6 +249,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           gridData={gridData}
           canvasSize={canvasSize}
           blockSize={blockSize}
+          blasts={blasts}
+          onBlockClick={handleBlockClick}
           blastTrigger={blastTrigger}
           onBlastComplete={handleBlastComplete}
         />

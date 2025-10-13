@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "./OreBlock";
 // import { gsap } from "gsap";
 
@@ -10,9 +10,13 @@ const GridCanvas = ({
   blastTrigger,
   onBlastComplete,
   className = "",
+  blasts = [], 
+  onBlockClick,
 }) => {
   const canvasRef = useRef(null);
   const blocksRef = useRef([]);
+  const [hoveredBlock, setHoveredBlock] = useState(null); 
+
 
   // Create OreBlock instances for each cell in the grid
   const createBlocks = useCallback(() => {
@@ -35,34 +39,149 @@ const GridCanvas = ({
 
   // Render all blocks on the canvas
   const renderCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !gridData) return;
-    const ctx = canvas.getContext("2d");
-    const { grid } = gridData;
+  const canvas = canvasRef.current;
+  if (!canvas || !gridData) return;
+  const ctx = canvas.getContext("2d");
+  const { grid } = gridData;
 
-    // Clear & fill background
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#f0f0f0";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Clear & fill background
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#f0f0f0";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate centering
-    const actualGridWidth = grid[0].length * blockSize;
-    const actualGridHeight = grid.length * blockSize;
-    const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
-    const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
+  // ... (Calculations for centering offsets: actualGridWidth, actualGridHeight, offsetX, offsetY)
+  const actualGridWidth = grid[0].length * blockSize;
+  const actualGridHeight = grid.length * blockSize;
+  const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
+  const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-    ctx.save();
-    ctx.translate(offsetX, offsetY);
+  // Save the context state
+  ctx.save();
+  
+  // Translate to center the grid
+  ctx.translate(offsetX, offsetY);
 
-    // Draw each block
-    blocksRef.current.forEach((block) => block.render(ctx));
+  // Render all blocks
+  blocksRef.current.forEach(block => {
+    block.render(ctx);
+  });
 
-    ctx.restore();
-  }, [gridData, blockSize]);
+  // NEW RENDERING LOGIC
+  
+  // 1. Draw Hover Highlight
+  if (hoveredBlock) {
+    const { x, y } = hoveredBlock;
+    // Highlight the block boundary
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(
+      x * blockSize + 1, // +1 for slight border padding
+      y * blockSize + 1,
+      blockSize - 2,
+      blockSize - 2
+    );
+  }
 
+  // 2. Draw Blast Markers
+  blasts.forEach(({ x, y }) => {
+    // Calculate center of the block
+    const centerX = x * blockSize + blockSize / 2;
+    const centerY = y * blockSize + blockSize / 2;
+
+    // Draw a red circle (blast icon)
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, blockSize * 0.3, 0, Math.PI * 2); // Radius 30% of block size
+    ctx.fillStyle = '#dc2626'; // Red
+    ctx.fill();
+    
+    // Optional: Add a white flash/dot for visibility
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, blockSize * 0.1, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff'; 
+    ctx.fill();
+  });
+  // END NEW RENDERING LOGIC
+
+  // Restore the context state
+  ctx.restore();
+
+  console.log(`Canvas rendered: ${blocksRef.current.length} blocks, centered with offset (${offsetX}, ${offsetY})`);
+}, [gridData, blockSize, blasts, hoveredBlock]); 
+  // Re-render when dependencies change
   useEffect(() => {
     renderCanvas();
   }, [renderCanvas]);
+
+  // GridCanvas.jsx
+
+// Helper function to convert pixel coords to grid coords
+const getGridCoords = useCallback((pixelX, pixelY) => {
+  const canvas = canvasRef.current;
+  if (!canvas || !gridData) return null;
+  
+  const { grid } = gridData;
+  
+  // Calculate centering offsets (same as in renderCanvas)
+  const actualGridWidth = grid[0].length * blockSize;
+  const actualGridHeight = grid.length * blockSize;
+  const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
+  const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
+  
+  // Adjust for centering translation
+  const relativeX = pixelX - offsetX;
+  const relativeY = pixelY - offsetY;
+
+  // Check if the click is within the actual grid
+  if (relativeX < 0 || relativeX >= actualGridWidth || 
+      relativeY < 0 || relativeY >= actualGridHeight) {
+    return null; // Clicked outside the centered grid area
+  }
+
+  // Convert relative pixel coords to grid coords
+  const gridX = Math.floor(relativeX / blockSize);
+  const gridY = Math.floor(relativeY / blockSize);
+
+  return { x: gridX, y: gridY };
+}, [gridData, blockSize]);
+
+// Click Handler
+const handleClick = useCallback((event) => {
+  if (!onBlockClick || !canvasRef.current) return;
+  
+  // Get canvas-relative click coordinates
+  const rect = canvasRef.current.getBoundingClientRect();
+  const pixelX = event.clientX - rect.left;
+  const pixelY = event.clientY - rect.top;
+  
+  const gridCoords = getGridCoords(pixelX, pixelY);
+
+  if (gridCoords) {
+    onBlockClick(gridCoords.x, gridCoords.y);
+  }
+}, [onBlockClick, getGridCoords]); // Dependency on 'onBlockClick' and 'getGridCoords'
+
+// Mouse Move Handler (for hover)
+  const handleMouseMove = useCallback((event) => {
+  const rect = canvasRef.current.getBoundingClientRect();
+  const pixelX = event.clientX - rect.left;
+  const pixelY = event.clientY - rect.top;
+
+  const gridCoords = getGridCoords(pixelX, pixelY);
+  
+  // Only update state if hover is over a new valid block
+  if (gridCoords && 
+      (!hoveredBlock || hoveredBlock.x !== gridCoords.x || hoveredBlock.y !== gridCoords.y)) {
+    setHoveredBlock(gridCoords);
+  } else if (!gridCoords && hoveredBlock) {
+    // Clear hover if mouse leaves the grid
+    setHoveredBlock(null);
+  }
+}, [getGridCoords, hoveredBlock]); // Dependency on 'getGridCoords' and 'hoveredBlock'
+
+// Mouse Leave Handler
+const handleMouseLeave = useCallback(() => {
+  setHoveredBlock(null);
+}, []);
 
   
   useEffect(() => {
@@ -131,6 +250,10 @@ const GridCanvas = ({
         height={canvasSize.height}
         className={`${className}`}
         style={{ display: "block" }}
+        // ATTACH HANDLERS HERE
+        onClick={handleClick}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       />
     </div>
   );
