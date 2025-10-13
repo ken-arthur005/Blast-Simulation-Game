@@ -1,16 +1,17 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import OreBlock from './OreBlock';
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import OreBlock from "./OreBlock";
+// import { gsap } from "gsap";
 
-/**
- * Canvas component that handles the rendering of the ore grid
- */
-const GridCanvas = ({ 
-  gridData, 
-  canvasSize, 
-  blockSize, 
+
+const GridCanvas = ({
+  gridData,
+  canvasSize,
+  blockSize,
+  blastTrigger,
+  onBlastComplete,
   className = "",
   blasts = [], 
-  onBlockClick
+  onBlockClick,
 }) => {
   const canvasRef = useRef(null);
   const blocksRef = useRef([]);
@@ -20,24 +21,18 @@ const GridCanvas = ({
   // Create OreBlock instances for each cell in the grid
   const createBlocks = useCallback(() => {
     if (!gridData) return [];
-
     const blocks = [];
     const { grid } = gridData;
-    const options = {
-      emptyColor: '#ffffff'
-    };
-
     grid.forEach((row, y) => {
       row.forEach((cell, x) => {
-        const block = new OreBlock(cell, x, y, blockSize, options);
+        const block = new OreBlock(cell, x, y, blockSize);
         blocks.push(block);
       });
     });
-
     return blocks;
   }, [gridData, blockSize]);
 
-  // Update blocks when dependencies change
+  // Initialize blocks when grid changes
   useEffect(() => {
     blocksRef.current = createBlocks();
   }, [createBlocks]);
@@ -46,13 +41,12 @@ const GridCanvas = ({
   const renderCanvas = useCallback(() => {
   const canvas = canvasRef.current;
   if (!canvas || !gridData) return;
-
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   const { grid } = gridData;
 
-  // Clear and set background
+  // Clear & fill background
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#f0f0f0';
+  ctx.fillStyle = "#f0f0f0";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // ... (Calculations for centering offsets: actualGridWidth, actualGridHeight, offsetX, offsetY)
@@ -189,10 +183,60 @@ const handleMouseLeave = useCallback(() => {
   setHoveredBlock(null);
 }, []);
 
+  
+  useEffect(() => {
+  if (!blastTrigger || !gridData) return;
+
+  const canvas = canvasRef.current;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  const { affectedCells } = blastTrigger;
+  let animationFrame;
+  const startTime = performance.now();
+  const duration = 800; // explosion duration (ms)
+
+  const animateExplosion = (time) => {
+    const elapsed = time - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+
+    // Redraw grid with animation
+    gridData.grid.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        const block = new OreBlock(cell, x, y, blockSize);
+        const hit = affectedCells.some(c => c.x === x && c.y === y);
+
+        if (hit) {
+          block.opacity = 1 - progress;      // fade out
+          block.scale = 1 + 0.3 * progress;  // slight pop
+        }
+
+        block.render(ctx);
+      });
+    });
+
+    if (progress < 1) {
+      animationFrame = requestAnimationFrame(animateExplosion);
+    } else {
+      cancelAnimationFrame(animationFrame);
+      onBlastComplete?.(); // grid update after animation
+    }
+  };
+
+  animationFrame = requestAnimationFrame(animateExplosion);
+  return () => cancelAnimationFrame(animationFrame);
+}, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete]);
+
+
   if (!gridData) {
     return (
-      <div className="flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50" 
-           style={{ width: canvasSize.width, height: canvasSize.height }}>
+      <div
+        className="flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50"
+        style={{ width: canvasSize.width, height: canvasSize.height }}
+      >
         <p className="text-gray-500">No grid data available</p>
       </div>
     );
@@ -205,7 +249,7 @@ const handleMouseLeave = useCallback(() => {
         width={canvasSize.width}
         height={canvasSize.height}
         className={`${className}`}
-        style={{ display: 'block' }}
+        style={{ display: "block" }}
         // ATTACH HANDLERS HERE
         onClick={handleClick}
         onMouseMove={handleMouseMove}
