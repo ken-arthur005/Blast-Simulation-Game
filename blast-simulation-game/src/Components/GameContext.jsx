@@ -21,12 +21,12 @@ export const GameProvider = ({ children }) => {
     setGameState((prevState) => ({ ...prevState, grid: newGrid }));
   };
 
-  const clearBlast = () => {
-    setGameState((prevState) => ({ ...prevState, blast: [] }));
+  const clearBlasts = () => {
+    setGameState((prevState) => ({ ...prevState, blasts: [] }));
   };
 
   return (
-    <GameContext.Provider value={{ gameState, setGameState, setPlayerName, updateGrid, clearBlast }}>
+    <GameContext.Provider value={{ gameState, setGameState, setPlayerName, updateGrid, clearBlasts }}>
       {children}
     </GameContext.Provider>
   );

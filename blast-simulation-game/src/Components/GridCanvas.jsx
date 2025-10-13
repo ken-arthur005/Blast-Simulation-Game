@@ -1,99 +1,34 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-import OreBlock from './OreBlock';
-import {gsap} from 'gsap';
+import React, { useRef, useEffect, useCallback } from "react";
+import OreBlock from "./OreBlock";
+// import { gsap } from "gsap";
 
 
-/**
- * Canvas component that handles the rendering of the ore grid
- */
-const GridCanvas = ({ 
-  gridData, 
-  canvasSize, 
-  blockSize, 
+const GridCanvas = ({
+  gridData,
+  canvasSize,
+  blockSize,
   blastTrigger,
   onBlastComplete,
-  className = ""
+  className = "",
 }) => {
   const canvasRef = useRef(null);
   const blocksRef = useRef([]);
 
-   useEffect(() => {
-    if (!blastTrigger || !blastTrigger.affectedCells) return;
-    
-    const animateExplosion = () => {
-      const { affectedCells } = blastTrigger;
-      
-      // Find the block objects that correspond to affected cells
-      const affectedBlocks = affectedCells.map(({ x, y }) => {
-        return blocksRef.current.find(block => 
-          block.gridX === x && block.gridY === y
-        );
-      }).filter(Boolean);
-      
-      // Sort by distance for staggered animation
-      affectedBlocks.sort((a, b) => {
-        const cellA = affectedCells.find(c => c.x === a.gridX && c.y === a.gridY);
-        const cellB = affectedCells.find(c => c.x === b.gridX && c.y === b.gridY);
-        return (cellA?.distance || 0) - (cellB?.distance || 0);
-      });
-      
-      // Create master timeline
-      const masterTL = gsap.timeline({
-        onComplete: () => {
-          onBlastComplete?.();
-        }
-      });
-      
-      // Animate each block
-      affectedBlocks.forEach((block, index) => {
-        const tl = gsap.timeline();
-        
-        // Flash and expand
-        tl.to(block, {
-          scale: 1.5,
-          duration: 0.15,
-          ease: "back.out(2)",
-          onUpdate: renderCanvas
-        })
-        // Shrink and fade
-        .to(block, {
-          scale: 0.3,
-          opacity: 0,
-          duration: 0.25,
-          ease: "power2.in",
-          onUpdate: renderCanvas
-        });
-        
-        // Add to master timeline with stagger delay
-        masterTL.add(tl, index * 0.03);
-      });
-    };
-    
-    animateExplosion();
-    
-  }, [blastTrigger, onBlastComplete]);
-
   // Create OreBlock instances for each cell in the grid
   const createBlocks = useCallback(() => {
     if (!gridData) return [];
-
     const blocks = [];
     const { grid } = gridData;
-    const options = {
-      emptyColor: '#ffffff'
-    };
-
     grid.forEach((row, y) => {
       row.forEach((cell, x) => {
-        const block = new OreBlock(cell, x, y, blockSize, options);
+        const block = new OreBlock(cell, x, y, blockSize);
         blocks.push(block);
       });
     });
-
     return blocks;
   }, [gridData, blockSize]);
 
-  // Update blocks when dependencies change
+  // Initialize blocks when grid changes
   useEffect(() => {
     blocksRef.current = createBlocks();
   }, [createBlocks]);
@@ -102,49 +37,87 @@ const GridCanvas = ({
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !gridData) return;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     const { grid } = gridData;
 
-    // Clear and set background
+    // Clear & fill background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#f0f0f0';
+    ctx.fillStyle = "#f0f0f0";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate actual grid dimensions
+    // Calculate centering
     const actualGridWidth = grid[0].length * blockSize;
     const actualGridHeight = grid.length * blockSize;
-
-    // Calculate centering offsets
     const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
     const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-    // Save the context state
     ctx.save();
-    
-    // Translate to center the grid
     ctx.translate(offsetX, offsetY);
 
-    // Render all blocks (they'll now be centered)
-    blocksRef.current.forEach(block => {
-      block.render(ctx);
-    });
+    // Draw each block
+    blocksRef.current.forEach((block) => block.render(ctx));
 
-    // Restore the context state
     ctx.restore();
-
-    console.log(`Canvas rendered: ${blocksRef.current.length} blocks, centered with offset (${offsetX}, ${offsetY})`);
   }, [gridData, blockSize]);
 
-  // Re-render when dependencies change
   useEffect(() => {
     renderCanvas();
   }, [renderCanvas]);
 
+  
+  useEffect(() => {
+  if (!blastTrigger || !gridData) return;
+
+  const canvas = canvasRef.current;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  const { affectedCells } = blastTrigger;
+  let animationFrame;
+  const startTime = performance.now();
+  const duration = 800; // explosion duration (ms)
+
+  const animateExplosion = (time) => {
+    const elapsed = time - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+
+    // Redraw grid with animation
+    gridData.grid.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        const block = new OreBlock(cell, x, y, blockSize);
+        const hit = affectedCells.some(c => c.x === x && c.y === y);
+
+        if (hit) {
+          block.opacity = 1 - progress;      // fade out
+          block.scale = 1 + 0.3 * progress;  // slight pop
+        }
+
+        block.render(ctx);
+      });
+    });
+
+    if (progress < 1) {
+      animationFrame = requestAnimationFrame(animateExplosion);
+    } else {
+      cancelAnimationFrame(animationFrame);
+      onBlastComplete?.(); // grid update after animation
+    }
+  };
+
+  animationFrame = requestAnimationFrame(animateExplosion);
+  return () => cancelAnimationFrame(animationFrame);
+}, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete]);
+
+
   if (!gridData) {
     return (
-      <div className="flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50" 
-           style={{ width: canvasSize.width, height: canvasSize.height }}>
+      <div
+        className="flex items-center justify-center border border-gray-300 rounded-lg bg-gray-50"
+        style={{ width: canvasSize.width, height: canvasSize.height }}
+      >
         <p className="text-gray-500">No grid data available</p>
       </div>
     );
@@ -157,7 +130,7 @@ const GridCanvas = ({
         width={canvasSize.width}
         height={canvasSize.height}
         className={`${className}`}
-        style={{ display: 'block' }}
+        style={{ display: "block" }}
       />
     </div>
   );

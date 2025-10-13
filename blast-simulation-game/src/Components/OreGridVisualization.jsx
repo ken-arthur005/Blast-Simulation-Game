@@ -10,12 +10,8 @@ import {
   applyBlastToGrid,
 } from "../utils/blastCalculator";
 
-/**
- * Main orchestrator component for ore grid visualization
- * This component coordinates all the sub-components and manages the overall state
- */
+
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
-  // State management
   const [gridData, setGridData] = useState(null);
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
   const [blockSize, setBlockSize] = useState(20);
@@ -25,6 +21,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [blastTrigger, setBlastTrigger] = useState(null);
 
   const handleTriggerBlast = () => {
+    console.log("Blasts before calculating:", gameState.blasts);
+
     if (isBlasting) return;
 
     setIsBlasting(true);
@@ -41,15 +39,24 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   };
 
   const handleBlastComplete = () => {
+  if (!gridData || !gridData.grid) {
+    console.error("Grid data not ready yet.");
+    return;
+  }
+
     const affectedCells = calculateAllAffectedCells(
       gridData.grid,
       gameState.blasts
+    
     );
 
     const updatedGrid = applyBlastToGrid(gridData.grid, affectedCells);
 
+    console.log("Grid dimensions:", gridData.grid.length, "x", gridData.grid[0]?.length);
+  if (gridData.grid[5] && gridData.grid[5][5]) {
     console.log("Original grid cell (5,5):", gridData.grid[5][5]);
     console.log("Updated grid cell (5,5):", updatedGrid[5][5]);
+  }
 
     updateGrid(updatedGrid);
 
@@ -62,18 +69,20 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     setIsBlasting(false);
     console.log("Blast complete! Grid updated.");
+    console.log("Affected:", affectedCells, "Grid size:", gridData.grid.length, gridData.grid[0].length);
+
   };
 
-  // ⚠️ TEMPORARY - Just for testing your blast logic
+  //testing my blast logic
   useEffect(() => {
     if (gridData && gameState.blasts.length === 0) {
-      // Add test blasts after 2 seconds
+    
       setTimeout(() => {
         setGameState((prev) => ({
           ...prev,
           blasts: [
-            { x: 5, y: 5, radius: 3 }, // Blast in middle
-            { x: 10, y: 8, radius: 3 }, // Another blast
+            { x: 5, y: 5, radius: 3 }, 
+            { x: 10, y: 8, radius: 3 },
           ],
         }));
         console.log("Test blasts added!");
