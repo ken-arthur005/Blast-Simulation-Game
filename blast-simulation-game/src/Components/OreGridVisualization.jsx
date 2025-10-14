@@ -10,13 +10,13 @@ import {
   applyBlastToGrid,
 } from "../utils/blastCalculator";
 
-
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [gridData, setGridData] = useState(null);
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
   const [blockSize, setBlockSize] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { gameState, updateGrid, clearBlasts, setGameState } = useContext(GameContext);
+  const { gameState, updateGrid, clearBlasts, setGameState } =
+    useContext(GameContext);
   const [isBlasting, setIsBlasting] = useState(false);
   const [blastTrigger, setBlastTrigger] = useState(null);
 
@@ -39,62 +39,55 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   };
 
   const handleBlastComplete = () => {
-  if (!gridData || !gridData.grid) {
-    console.error("Grid data not ready yet.");
-    return;
-  }
+    if (!gridData || !gridData.grid) {
+      console.error("Grid data not ready yet.");
+      return;
+    }
 
     const affectedCells = calculateAllAffectedCells(
       gridData.grid,
       gameState.blasts
-    
     );
 
     const updatedGrid = applyBlastToGrid(gridData.grid, affectedCells);
 
-    console.log("Grid dimensions:", gridData.grid.length, "x", gridData.grid[0]?.length);
-  if (gridData.grid[5] && gridData.grid[5][5]) {
-    console.log("Original grid cell (5,5):", gridData.grid[5][5]);
-    console.log("Updated grid cell (5,5):", updatedGrid[5][5]);
-  }
+      const totalBlocks = gridData.grid.flat().length;
+  const remainingBlocks = totalBlocks - affectedCells.length;
+    console.log("Remaining blocks:", remainingBlocks);
 
     updateGrid(updatedGrid);
 
     setGridData((prevState) => ({
       ...prevState,
       grid: updatedGrid,
+      remainingBlocks,
     }));
 
     clearBlasts();
+    setBlastTrigger(null);
 
     setIsBlasting(false);
-    console.log("Blast complete! Grid updated.");
-    console.log("Affected:", affectedCells, "Grid size:", gridData.grid.length, gridData.grid[0].length);
 
+    // short smoke/fade-in animation for destroyed blocks
+    // setTimeout(() => {
+    //   const canvas = document.querySelector("canvas");
+    //   if (canvas) {
+    //     canvas.style.transition = "opacity 0.8s ease-in-out";
+    //     canvas.style.opacity = "0.7";
+    //     setTimeout(() => (canvas.style.opacity = "1"), 800);
+    //   }
+    // }, 100);
+
+    console.log(
+      "Blast complete! Destroyed:",
+      affectedCells.length,
+      "Remaining:",
+      remainingBlocks,
+      'TotalBlocks: ', totalBlocks
+    );
   };
 
-  //testing my blast logic
-  // useEffect(() => {
-  //   if (gridData && gameState.blasts.length === 0) {
-    
-  //     setTimeout(() => {
-  //       setGameState((prev) => ({
-  //         ...prev,
-  //         blasts: [
-  //           { x: 5, y: 5, radius: 3 }, 
-  //           { x: 10, y: 8, radius: 3 },
-  //         ],
-  //       }));
-  //       console.log("Test blasts added!");
-  //     }, 2000);
-  //   }
-  // }, [gridData]);
-
-
-
-
-
-  const [blasts, setBlasts] = useState([]); 
+  const [blasts, setBlasts] = useState([]);
 
   // Calculate optimal sizing for the canvas and blocks
   const calculateOptimalSizing = useCallback((processedGrid) => {
@@ -142,41 +135,46 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     );
   }, []);
 
-  const MAX_BLASTS = 5; 
+  const MAX_BLASTS = 5;
 
-// Handler for when a block is clicked
-const handleBlockClick = useCallback((gridX, gridY) => {
-  const newBlast = { x: gridX, y: gridY, radius:3 };
+  // Handler for when a block is clicked
+  const handleBlockClick = useCallback(
+    (gridX, gridY) => {
+      const newBlast = { x: gridX, y: gridY, radius: 3 };
 
-  // 1. Check if the cell is already occupied
-  const isOccupied = blasts.some(
-    (blast) => blast.x === newBlast.x && blast.y === newBlast.y
+      // 1. Check if the cell is already occupied
+      const isOccupied = blasts.some(
+        (blast) => blast.x === newBlast.x && blast.y === newBlast.y
+      );
+      if (isOccupied) {
+        console.log(`Cell (${gridX}, ${gridY}) already has a blast.`);
+        return;
+      }
+
+      setBlasts((prevBlasts) => {
+        // 2. Check maximum limit
+        if (prevBlasts.length >= MAX_BLASTS) {
+          console.warn(`Maximum of ${MAX_BLASTS} blasts reached.`);
+          return prevBlasts; // Do not update
+        }
+
+        // 3. Add the new blast
+        const newBlasts = [...prevBlasts, newBlast];
+        console.log(
+          `Blast placed at (${gridX}, ${gridY}). Total: ${newBlasts.length}`
+        );
+
+        // ✅ Sync to GameContext so button enables
+        setGameState((prev) => ({
+          ...prev,
+          blasts: newBlasts,
+        }));
+
+        return newBlasts;
+      });
+    },
+    [blasts, setGameState]
   );
-  if (isOccupied) {
-    console.log(`Cell (${gridX}, ${gridY}) already has a blast.`);
-    return;
-  }
-
-  setBlasts((prevBlasts) => {
-    // 2. Check maximum limit
-    if (prevBlasts.length >= MAX_BLASTS) {
-      console.warn(`Maximum of ${MAX_BLASTS} blasts reached.`);
-      return prevBlasts; // Do not update
-    }
-    
-    // 3. Add the new blast
-    const newBlasts = [...prevBlasts, newBlast];
-    console.log(`Blast placed at (${gridX}, ${gridY}). Total: ${newBlasts.length}`);
-
-// ✅ Sync to GameContext so button enables
-    setGameState((prev) => ({
-      ...prev,
-      blasts: newBlasts,
-    }));
-
-    return newBlasts;
-    });
-  }, [blasts, setGameState])
 
   // Process CSV data when it changes
   useEffect(() => {

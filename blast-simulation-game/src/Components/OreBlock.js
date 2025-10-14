@@ -24,12 +24,14 @@ class OreBlock {
   getBlockColor() {
     // Check if block is destroyed
     if (this.cell && this.cell.oreType === "destroyed") {
-      return "#cccccc"; // Gray color for destroyed blocks
+      return "#9ca3af"; // Gray color for destroyed blocks
     }
 
     return this.cell && this.cell.oreType
       ? OreColorMapper.getColor(this.cell.oreType)
       : "#ffffff";
+      // your other ore color mappings
+  // return this.cell?.color || "#cccccc";
   }
 
   render(ctx) {
@@ -50,8 +52,9 @@ class OreBlock {
     ctx.rotate((this.rotation * Math.PI) / 180); // Convert degrees to radians
     ctx.scale(this.scale, this.scale);
     ctx.translate(-centerX, -centerY);
+     const color = this.cell.oreType === "destroyed" ? "#9ca3af" : this.getBlockColor();
 
-    ctx.fillStyle = this.getBlockColor();
+    ctx.fillStyle = color;
     ctx.fillRect(pixelX, pixelY, this.blockSize, this.blockSize);
 
     //border (helps see the blocks better)
