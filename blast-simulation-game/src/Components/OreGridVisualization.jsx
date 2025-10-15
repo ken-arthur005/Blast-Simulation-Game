@@ -51,8 +51,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     const updatedGrid = applyBlastToGrid(gridData.grid, affectedCells);
 
-      const totalBlocks = gridData.grid.flat().length;
-  const remainingBlocks = totalBlocks - affectedCells.length;
+    const totalBlocks = gridData.grid.flat().length;
+    const remainingBlocks = totalBlocks - affectedCells.length;
     console.log("Remaining blocks:", remainingBlocks);
 
     updateGrid(updatedGrid);
@@ -83,7 +83,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       affectedCells.length,
       "Remaining:",
       remainingBlocks,
-      'TotalBlocks: ', totalBlocks
+      "TotalBlocks: ",
+      totalBlocks
     );
   };
 
@@ -151,6 +152,14 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         return;
       }
 
+      // 2. Check if the cell is destroyed
+      if (gridData.grid[gridY][gridX].oreType === "destroyed") {
+        console.log(
+          `Cannot place blast on destroyed cell (${gridX}, ${gridY})`
+        );
+        return;
+      }
+
       setBlasts((prevBlasts) => {
         // 2. Check maximum limit
         if (prevBlasts.length >= MAX_BLASTS) {
@@ -173,7 +182,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         return newBlasts;
       });
     },
-    [blasts, setGameState]
+    [blasts, setGameState, gridData]
   );
 
   // Process CSV data when it changes
