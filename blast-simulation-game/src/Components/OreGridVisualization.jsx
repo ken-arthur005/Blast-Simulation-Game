@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useContext } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useContext,
+  useRef,
+} from "react";
 import GridDataProcessor from "../utils/gridDataProcessor";
 import printGridDebugInfo from "../utils/printGridDebugInfo";
 import GridCanvas from "./GridCanvas";
@@ -15,10 +21,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
   const [blockSize, setBlockSize] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { gameState, updateGrid, clearBlasts, setGameState } =
-    useContext(GameContext);
+  const { gameState, clearBlasts, setGameState } = useContext(GameContext);
   const [isBlasting, setIsBlasting] = useState(false);
   const [blastTrigger, setBlastTrigger] = useState(null);
+  const csvDataRef = useRef(null);
 
   const handleTriggerBlast = () => {
     console.log("Blasts before calculating:", gameState.blasts);
@@ -55,8 +61,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     const remainingBlocks = totalBlocks - affectedCells.length;
     console.log("Remaining blocks:", remainingBlocks);
 
-    updateGrid(updatedGrid);
-
+    // Don't store destroyed grid in GameContext - only update local state
     setGridData((prevState) => ({
       ...prevState,
       grid: updatedGrid,
@@ -64,12 +69,12 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }));
 
     setBlastTrigger(null);
-    
     setIsBlasting(false);
-    
-    // Add a delay to show the alert after the animation completes
+    clearBlasts();
+
+    // Add delay to ensure destroyed cells are rendered before showing alert
     setTimeout(() => {
-      // Show alert and prevent placing explosives after animation completes
+      // Show alert and prevent placing explosives after cells turn gray
       alert(
         "Please import a new CSV file or refresh the page to continue placing explosives."
       );
@@ -77,8 +82,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         ...prev,
         canPlaceExplosives: false,
       }));
-    }, 1000); // Wait 1 second for the animation to complete
-    
+    }, 1500); // Wait 1.5 seconds to ensure gray cells are visible
+
     console.log(
       "Blast complete! Destroyed:",
       affectedCells.length,
@@ -87,7 +92,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       "TotalBlocks: ",
       totalBlocks
     );
-    clearBlasts();
   };
 
   // Calculate optimal sizing for the canvas and blocks
@@ -175,7 +179,14 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
   // Process CSV data when it changes
   useEffect(() => {
-    if (csvData) {
+    if (csvData && csvData !== csvDataRef.current) {
+      csvDataRef.current = csvData;
+
+      // Immediately clear everything before processing
+      setBlastTrigger(null);
+      setIsBlasting(false);
+      setGridData(null); // Clear grid data first
+
       setIsProcessing(true);
       console.log("Processing CSV data for grid visualization...");
 
@@ -186,9 +197,20 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           processedGrid &&
           GridDataProcessor.validateGridData(processedGrid)
         ) {
+          // Set new grid data
           setGridData(processedGrid);
           calculateOptimalSizing(processedGrid);
           printGridDebugInfo(processedGrid);
+
+          // Reset game state with fresh grid
+          setGameState((prev) => ({
+            ...prev,
+            grid: processedGrid.grid, // Set fresh grid
+            blasts: [], // Clear all blasts
+            canPlaceExplosives: true, // Re-enable placing explosives
+          }));
+
+          console.log("New CSV imported - game state reset");
 
           // Notify parent component
           if (onGridProcessed) {
@@ -205,7 +227,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         setIsProcessing(false);
       }
     }
-  }, [csvData, onGridProcessed, calculateOptimalSizing]);
+  }, [csvData, onGridProcessed, calculateOptimalSizing, setGameState]);
 
   // Loading state
   if (!csvData) {
