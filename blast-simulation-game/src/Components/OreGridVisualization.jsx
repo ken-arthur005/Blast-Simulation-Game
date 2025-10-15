@@ -63,11 +63,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       remainingBlocks,
     }));
 
-    clearBlasts();
     setBlastTrigger(null);
-
+    
     setIsBlasting(false);
-
+    
     // Add a delay to show the alert after the animation completes
     setTimeout(() => {
       // Show alert and prevent placing explosives after animation completes
@@ -79,17 +78,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         canPlaceExplosives: false,
       }));
     }, 1000); // Wait 1 second for the animation to complete
-
-    // short smoke/fade-in animation for destroyed blocks
-    // setTimeout(() => {
-    //   const canvas = document.querySelector("canvas");
-    //   if (canvas) {
-    //     canvas.style.transition = "opacity 0.8s ease-in-out";
-    //     canvas.style.opacity = "0.7";
-    //     setTimeout(() => (canvas.style.opacity = "1"), 800);
-    //   }
-    // }, 100);
-
+    
     console.log(
       "Blast complete! Destroyed:",
       affectedCells.length,
@@ -98,6 +87,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       "TotalBlocks: ",
       totalBlocks
     );
+    clearBlasts();
   };
 
   // Calculate optimal sizing for the canvas and blocks
