@@ -9,6 +9,7 @@ export const GameProvider = ({ children }) => {
     currentScenario: null,
     grid: null,
     blasts: [],
+    canPlaceExplosives: true
   });
 
   const setPlayerName = (name) => {

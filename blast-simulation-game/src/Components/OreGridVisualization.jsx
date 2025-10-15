@@ -68,6 +68,18 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     setIsBlasting(false);
 
+    // Add a delay to show the alert after the animation completes
+    setTimeout(() => {
+      // Show alert and prevent placing explosives after animation completes
+      alert(
+        "Please import a new CSV file or refresh the page to continue placing explosives."
+      );
+      setGameState((prev) => ({
+        ...prev,
+        canPlaceExplosives: false,
+      }));
+    }, 1000); // Wait 1 second for the animation to complete
+
     // short smoke/fade-in animation for destroyed blocks
     // setTimeout(() => {
     //   const canvas = document.querySelector("canvas");
@@ -87,8 +99,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       totalBlocks
     );
   };
-
-  const [blasts, setBlasts] = useState([]);
 
   // Calculate optimal sizing for the canvas and blocks
   const calculateOptimalSizing = useCallback((processedGrid) => {
@@ -139,50 +149,38 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const MAX_BLASTS = 5;
 
   // Handler for when a block is clicked
-  const handleBlockClick = useCallback(
-    (gridX, gridY) => {
-      const newBlast = { x: gridX, y: gridY, radius: 3 };
+  const handleCellClick = useCallback(
+    (x, y) => {
+      if (!gameState.canPlaceExplosives) {
+        alert(
+          "Please import a new CSV file or refresh the page to continue placing explosives."
+        );
+        return;
+      }
 
-      // 1. Check if the cell is already occupied
-      const isOccupied = blasts.some(
-        (blast) => blast.x === newBlast.x && blast.y === newBlast.y
+      const newBlast = { x, y, radius: 3 };
+
+      // Check if cell already has a blast
+      const isOccupied = gameState.blasts.some(
+        (blast) => blast.x === x && blast.y === y
       );
       if (isOccupied) {
-        console.log(`Cell (${gridX}, ${gridY}) already has a blast.`);
+        console.log(`Cell (${x}, ${y}) already has a blast.`);
         return;
       }
 
-      // 2. Check if the cell is destroyed
-      if (gridData.grid[gridY][gridX].oreType === "destroyed") {
-        console.log(
-          `Cannot place blast on destroyed cell (${gridX}, ${gridY})`
-        );
+      // Check if we've reached the maximum number of blasts
+      if (gameState.blasts.length >= MAX_BLASTS) {
+        console.log(`Maximum number of blasts (${MAX_BLASTS}) reached.`);
         return;
       }
 
-      setBlasts((prevBlasts) => {
-        // 2. Check maximum limit
-        if (prevBlasts.length >= MAX_BLASTS) {
-          console.warn(`Maximum of ${MAX_BLASTS} blasts reached.`);
-          return prevBlasts; // Do not update
-        }
-
-        // 3. Add the new blast
-        const newBlasts = [...prevBlasts, newBlast];
-        console.log(
-          `Blast placed at (${gridX}, ${gridY}). Total: ${newBlasts.length}`
-        );
-
-        // ✅ Sync to GameContext so button enables
-        setGameState((prev) => ({
-          ...prev,
-          blasts: newBlasts,
-        }));
-
-        return newBlasts;
-      });
+      setGameState((prev) => ({
+        ...prev,
+        blasts: [...prev.blasts, newBlast],
+      }));
     },
-    [blasts, setGameState, gridData]
+    [gameState.blasts, gameState.canPlaceExplosives, setGameState]
   );
 
   // Process CSV data when it changes
@@ -256,8 +254,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           gridData={gridData}
           canvasSize={canvasSize}
           blockSize={blockSize}
-          blasts={blasts}
-          onBlockClick={handleBlockClick}
+          blasts={gameState.blasts}
+          onBlockClick={handleCellClick}
           blastTrigger={blastTrigger}
           onBlastComplete={handleBlastComplete}
         />
