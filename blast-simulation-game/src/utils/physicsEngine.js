@@ -2,13 +2,13 @@ import { Engine, Render, World, Bodies, Body, Events } from 'matter-js';
 
 /**
  * Create and initialize a Matter.js physics engine
- * @param {HTMLCanvasElement} canvas - The canvas element to render physics on
- * @param {Object} canvasSize - {width, height} of the canvas
- * @returns {Object} - {engine, render} Matter.js objects
+ * @param {HTMLCanvasElement} canvas 
+ * @param {Object} canvasSize
+ * @returns {Object}
  */
 export const createPhysicsEngine = (canvas, canvasSize) => {
   const engine = Engine.create({
-    gravity: { x: 0, y: 1 } // Standard gravity
+    gravity: { x: 0, y: 1 } 
   });
 
   const render = Render.create({
@@ -27,9 +27,9 @@ export const createPhysicsEngine = (canvas, canvasSize) => {
 
 /**
  * Create boundary walls (floor and sides) to contain debris
- * @param {Object} canvasSize - {width, height} of the canvas
- * @param {number} wallThickness - Thickness of the walls (default: 50)
- * @returns {Array} - Array of Matter.js bodies representing walls
+ * @param {Object} canvasSize 
+ * @param {number} wallThickness 
+ * @returns {Array} 
  */
 export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
   const { width, height } = canvasSize;
@@ -47,7 +47,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
         restitution: 0.3,
         render: {
           fillStyle: '#333333',
-          visible: true // Hidden but functional
+          visible: true 
         },
         label: 'floor'
       }
@@ -93,11 +93,11 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
 
 /**
  * Convert affected grid cells to Matter.js bodies
- * @param {Array} affectedCells - Array of {x, y, distance, oreType} from calculateAffectedCells
- * @param {number} blockSize - Size of each grid block in pixels
- * @param {Object} gridOffset - {x, y} offset for centering (from GridCanvas)
- * @param {Object} gridData - Grid data containing cell information
- * @returns {Array} - Array of Matter.js bodies with metadata
+ * @param {Array} affectedCells 
+ * @param {number} blockSize 
+ * @param {Object} gridOffset 
+ * @param {Object} gridData 
+ * @returns {Array}
  */
 export const createBlastBodies = (affectedCells, blockSize, gridOffset = { x: 0, y: 0 }, gridData) => {
   return affectedCells.map(cell => {
@@ -130,9 +130,9 @@ export const createBlastBodies = (affectedCells, blockSize, gridOffset = { x: 0,
   });
 };
 
-/**
- * Get ore color based on type
- */
+
+ //Get ore color based on type
+ 
 const getOreColor = (oreType) => {
   const colorMap = {
     gold: '#FFD700',
@@ -148,11 +148,11 @@ const getOreColor = (oreType) => {
 
 /**
  * Apply blast force to bodies based on distance from epicenter
- * @param {Array} bodies - Matter.js bodies created from createBlastBodies
- * @param {Array} blastCenters - Array of blast positions {x, y} in pixel coordinates
- * @param {number} blastForce - Base force magnitude (e.g., 0.05)
+ * @param {Array} bodies 
+ * @param {Array} blastCenters 
+ * @param {number} blastForce 
  */
-export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
+export const applyBlastForce = (bodies, blastCenters, blastForce = 0.05) => {
   bodies.forEach(body => {
     // Apply force from each blast center
     blastCenters.forEach(blastCenter => {
@@ -165,7 +165,7 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
       if (distance > 0) {
         const forceMagnitude = blastForce / (1 + body.blastDistance * 0.5);
         const forceX = (dx / distance) * forceMagnitude;
-        const forceY = (dy / distance) * forceMagnitude - 0.01; // Slight upward bias
+        const forceY = (dy / distance) * forceMagnitude - 0.01; 
         
         Body.applyForce(body, body.position, { x: forceX, y: forceY });
       }
@@ -178,8 +178,8 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
 
 /**
  * Clean up physics engine and renderer
- * @param {Object} engine - Matter.js engine
- * @param {Object} render - Matter.js render
+ * @param {Object} engine 
+ * @param {Object} render
  */
 export const cleanupPhysicsEngine = (engine, render) => {
   if (render) {

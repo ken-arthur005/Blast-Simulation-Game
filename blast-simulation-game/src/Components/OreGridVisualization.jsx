@@ -102,11 +102,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     );
   };
 
-  // Calculate optimal sizing for the canvas and blocks
   const calculateOptimalSizing = useCallback((processedGrid) => {
     const { dimensions } = processedGrid;
 
-    // Preferred canvas size
+  
     const preferredWidth = 576;
     const preferredHeight = 456;
 
@@ -213,9 +212,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           // Reset game state with fresh grid
           setGameState((prev) => ({
             ...prev,
-            grid: processedGrid.grid, // Set fresh grid
-            blasts: [], // Clear all blasts
-            canPlaceExplosives: true, // Re-enable placing explosives
+            grid: processedGrid.grid,
+            blasts: [], 
+            canPlaceExplosives: true,
           }));
 
           console.log("New CSV imported - game state reset");

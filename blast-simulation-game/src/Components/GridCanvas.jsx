@@ -37,7 +37,7 @@ const GridCanvas = ({
   useEffect(() => {
     if (gridData && gridData.grid) {
       blocksRef.current = createBlocks();
-      setDestroyedCells([]); // Clear destroyed cells when new grid is loaded
+      setDestroyedCells([]);
     }
   }, [createBlocks, gridData]);
 
@@ -253,7 +253,7 @@ const GridCanvas = ({
 
     // Create Matter.js physics engine
     const engine = Engine.create({
-      gravity: { x: 0, y: 0.5 }
+      gravity: { x: 0, y: 0.8 }
     });
 
     const runner = Runner.create();
@@ -284,13 +284,13 @@ const GridCanvas = ({
       });
     
     // Apply blast forces
-    applyBlastForce(bodies, blastCenters, 0.08);
+    applyBlastForce(bodies, blastCenters, 0.05);
     
     // Start physics simulation
     Runner.run(runner, engine);
 
     const startTime = performance.now();
-    const duration = 8000; // Physics simulation duration (ms)
+    const duration = 5000; 
     let animationFrame;
 
     const animatePhysics = (time) => {
@@ -365,8 +365,8 @@ const GridCanvas = ({
 
         // Allow time for destroyed cells to render before completion callback
         setTimeout(() => {
-          onBlastComplete?.(); // grid update after cells are visible
-        }, 200); // Small delay to ensure rendering completes
+          onBlastComplete?.(); 
+        }, 200); 
       }
     };
 
