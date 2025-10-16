@@ -4,7 +4,7 @@
  * Calculate which grid cells are affected by blast
  * @param {Array} grid - 2D array of grid cells
  * @param {Object} blast - {x, y, radius}
- * @returns {Array} - Array of affected cell coordinates [{x, y}, ...]
+ * @returns {Array} - Array of affected cell coordinates [{x, y, distance, blastX, blastY}, ...]
  */
 export const calculateAffectedCells = (grid, blast) => {
   const affected = [];
@@ -20,7 +20,7 @@ export const calculateAffectedCells = (grid, blast) => {
       
       // If within radius, add to affected cells
       if (distance <= radius) {
-        affected.push({ x, y, distance });
+        affected.push({ x, y, distance, blastX, blastY, oreType: grid[y][x]?.oreType });
       }
     }
   }

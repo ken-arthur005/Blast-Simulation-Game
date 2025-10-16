@@ -31,6 +31,12 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     if (isBlasting) return;
 
+    // Check if there are any blasts to trigger
+    if (!gameState.blasts || gameState.blasts.length === 0) {
+      console.log("No blasts to trigger");
+      return;
+    }
+
     setIsBlasting(true);
 
     const affectedCells = calculateAllAffectedCells(
@@ -40,9 +46,11 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     console.log("Affected cells count:", affectedCells.length);
     console.log("Affected cells:", affectedCells);
+    console.log("Blast centers:", gameState.blasts);
 
     setBlastTrigger({ affectedCells, timestamp: Date.now() });
   };
+  
 
   const handleBlastComplete = () => {
     if (!gridData || !gridData.grid) {
