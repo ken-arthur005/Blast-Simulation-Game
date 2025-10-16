@@ -1,5 +1,6 @@
 import React, { useState, createContext } from "react";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const GameContext = createContext();
 
 export const GameProvider = ({ children }) => {
@@ -9,6 +10,7 @@ export const GameProvider = ({ children }) => {
     currentScenario: null,
     grid: null,
     blasts: [],
+    canPlaceExplosives: true
   });
 
   const setPlayerName = (name) => {
