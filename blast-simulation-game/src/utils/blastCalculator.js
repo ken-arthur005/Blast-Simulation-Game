@@ -52,17 +52,29 @@ export const calculateAllAffectedCells = (grid, blasts) => {
 };
 
 
-export const applyBlastToGrid = (grid, affectedCells) => {
-  //a deep copy of the grid
-  const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
+// export const applyBlastToGrid = (grid, affectedCells) => {
+//   //a deep copy of the grid
+//   const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
   
-  //affected cells as destroyed
-  affectedCells.forEach(({ x, y }) => {
-    if (newGrid[y] && newGrid[y][x]) {
-      newGrid[y][x].oreType = 'destroyed';
+//   //affected cells as destroyed
+//   affectedCells.forEach(({ x, y }) => {
+//     if (newGrid[y] && newGrid[y][x]) {
+//       newGrid[y][x].oreType = 'destroyed';
 
-    }
-  });
+//     }
+//   });
   
-  return newGrid;
-};
+//   return newGrid;
+// };
+
+export function applyBlastToGrid(grid, affectedCells) {
+  grid.map((row, y) =>
+    row.map((cell, x) => {
+      const hit = affectedCells.some((c) => c.x === x && c.y === y);
+      if (hit) {
+        return { ...cell, oreType: "destroyed" }; // mark as destroyed
+      }
+      return cell;
+    })
+  );
+}

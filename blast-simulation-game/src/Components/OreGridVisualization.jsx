@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useContext } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useContext,
+  useRef,
+} from "react";
 import GridDataProcessor from "../utils/gridDataProcessor";
 import printGridDebugInfo from "../utils/printGridDebugInfo";
 import GridCanvas from "./GridCanvas";
@@ -10,15 +16,15 @@ import {
   applyBlastToGrid,
 } from "../utils/blastCalculator";
 
-
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [gridData, setGridData] = useState(null);
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
   const [blockSize, setBlockSize] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { gameState, updateGrid, clearBlasts, setGameState } = useContext(GameContext);
+  const { gameState, clearBlasts, setGameState } = useContext(GameContext);
   const [isBlasting, setIsBlasting] = useState(false);
   const [blastTrigger, setBlastTrigger] = useState(null);
+  const csvDataRef = useRef(null);
 
   const handleTriggerBlast = () => {
     console.log("Blasts before calculating:", gameState.blasts);
@@ -39,62 +45,54 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   };
 
   const handleBlastComplete = () => {
-  if (!gridData || !gridData.grid) {
-    console.error("Grid data not ready yet.");
-    return;
-  }
+    if (!gridData || !gridData.grid) {
+      console.error("Grid data not ready yet.");
+      return;
+    }
 
     const affectedCells = calculateAllAffectedCells(
       gridData.grid,
       gameState.blasts
-    
     );
 
     const updatedGrid = applyBlastToGrid(gridData.grid, affectedCells);
 
-    console.log("Grid dimensions:", gridData.grid.length, "x", gridData.grid[0]?.length);
-  if (gridData.grid[5] && gridData.grid[5][5]) {
-    console.log("Original grid cell (5,5):", gridData.grid[5][5]);
-    console.log("Updated grid cell (5,5):", updatedGrid[5][5]);
-  }
+    const totalBlocks = gridData.grid.flat().length;
+    const remainingBlocks = totalBlocks - affectedCells.length;
+    console.log("Remaining blocks:", remainingBlocks);
 
-    updateGrid(updatedGrid);
-
+    // Don't store destroyed grid in GameContext - only update local state
     setGridData((prevState) => ({
       ...prevState,
       grid: updatedGrid,
+      remainingBlocks,
     }));
 
+    setBlastTrigger(null);
+    setIsBlasting(false);
     clearBlasts();
 
-    setIsBlasting(false);
-    console.log("Blast complete! Grid updated.");
-    console.log("Affected:", affectedCells, "Grid size:", gridData.grid.length, gridData.grid[0].length);
+    // Add delay to ensure destroyed cells are rendered before showing alert
+    setTimeout(() => {
+      // Show alert and prevent placing explosives after cells turn gray
+      alert(
+        "Please import a new CSV file or refresh the page to continue placing explosives."
+      );
+      setGameState((prev) => ({
+        ...prev,
+        canPlaceExplosives: false,
+      }));
+    }, 1500); // Wait 1.5 seconds to ensure gray cells are visible
 
+    console.log(
+      "Blast complete! Destroyed:",
+      affectedCells.length,
+      "Remaining:",
+      remainingBlocks,
+      "TotalBlocks: ",
+      totalBlocks
+    );
   };
-
-  //testing my blast logic
-  // useEffect(() => {
-  //   if (gridData && gameState.blasts.length === 0) {
-    
-  //     setTimeout(() => {
-  //       setGameState((prev) => ({
-  //         ...prev,
-  //         blasts: [
-  //           { x: 5, y: 5, radius: 3 }, 
-  //           { x: 10, y: 8, radius: 3 },
-  //         ],
-  //       }));
-  //       console.log("Test blasts added!");
-  //     }, 2000);
-  //   }
-  // }, [gridData]);
-
-
-
-
-
-  const [blasts, setBlasts] = useState([]); 
 
   // Calculate optimal sizing for the canvas and blocks
   const calculateOptimalSizing = useCallback((processedGrid) => {
@@ -142,45 +140,53 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     );
   }, []);
 
-  const MAX_BLASTS = 5; 
+  const MAX_BLASTS = 5;
 
-// Handler for when a block is clicked
-const handleBlockClick = useCallback((gridX, gridY) => {
-  const newBlast = { x: gridX, y: gridY, radius:3 };
+  // Handler for when a block is clicked
+  const handleCellClick = useCallback(
+    (x, y) => {
+      if (!gameState.canPlaceExplosives) {
+        alert(
+          "Please import a new CSV file or refresh the page to continue placing explosives."
+        );
+        return;
+      }
 
-  // 1. Check if the cell is already occupied
-  const isOccupied = blasts.some(
-    (blast) => blast.x === newBlast.x && blast.y === newBlast.y
+      const newBlast = { x, y, radius: 3 };
+
+      // Check if cell already has a blast
+      const isOccupied = gameState.blasts.some(
+        (blast) => blast.x === x && blast.y === y
+      );
+      if (isOccupied) {
+        console.log(`Cell (${x}, ${y}) already has a blast.`);
+        return;
+      }
+
+      // Check if we've reached the maximum number of blasts
+      if (gameState.blasts.length >= MAX_BLASTS) {
+        console.log(`Maximum number of blasts (${MAX_BLASTS}) reached.`);
+        return;
+      }
+
+      setGameState((prev) => ({
+        ...prev,
+        blasts: [...prev.blasts, newBlast],
+      }));
+    },
+    [gameState.blasts, gameState.canPlaceExplosives, setGameState]
   );
-  if (isOccupied) {
-    console.log(`Cell (${gridX}, ${gridY}) already has a blast.`);
-    return;
-  }
-
-  setBlasts((prevBlasts) => {
-    // 2. Check maximum limit
-    if (prevBlasts.length >= MAX_BLASTS) {
-      console.warn(`Maximum of ${MAX_BLASTS} blasts reached.`);
-      return prevBlasts; // Do not update
-    }
-    
-    // 3. Add the new blast
-    const newBlasts = [...prevBlasts, newBlast];
-    console.log(`Blast placed at (${gridX}, ${gridY}). Total: ${newBlasts.length}`);
-
-// ✅ Sync to GameContext so button enables
-    setGameState((prev) => ({
-      ...prev,
-      blasts: newBlasts,
-    }));
-
-    return newBlasts;
-    });
-  }, [blasts, setGameState])
 
   // Process CSV data when it changes
   useEffect(() => {
-    if (csvData) {
+    if (csvData && csvData !== csvDataRef.current) {
+      csvDataRef.current = csvData;
+
+      // Immediately clear everything before processing
+      setBlastTrigger(null);
+      setIsBlasting(false);
+      setGridData(null); // Clear grid data first
+
       setIsProcessing(true);
       console.log("Processing CSV data for grid visualization...");
 
@@ -191,9 +197,20 @@ const handleBlockClick = useCallback((gridX, gridY) => {
           processedGrid &&
           GridDataProcessor.validateGridData(processedGrid)
         ) {
+          // Set new grid data
           setGridData(processedGrid);
           calculateOptimalSizing(processedGrid);
           printGridDebugInfo(processedGrid);
+
+          // Reset game state with fresh grid
+          setGameState((prev) => ({
+            ...prev,
+            grid: processedGrid.grid, // Set fresh grid
+            blasts: [], // Clear all blasts
+            canPlaceExplosives: true, // Re-enable placing explosives
+          }));
+
+          console.log("New CSV imported - game state reset");
 
           // Notify parent component
           if (onGridProcessed) {
@@ -210,7 +227,7 @@ const handleBlockClick = useCallback((gridX, gridY) => {
         setIsProcessing(false);
       }
     }
-  }, [csvData, onGridProcessed, calculateOptimalSizing]);
+  }, [csvData, onGridProcessed, calculateOptimalSizing, setGameState]);
 
   // Loading state
   if (!csvData) {
@@ -249,8 +266,8 @@ const handleBlockClick = useCallback((gridX, gridY) => {
           gridData={gridData}
           canvasSize={canvasSize}
           blockSize={blockSize}
-          blasts={blasts}
-          onBlockClick={handleBlockClick}
+          blasts={gameState.blasts}
+          onBlockClick={handleCellClick}
           blastTrigger={blastTrigger}
           onBlastComplete={handleBlastComplete}
         />
