@@ -3,6 +3,7 @@ const BlastResult = ({
   onClose,
   score,
   materialsDestroyed,
+  materialsRemained,
   blastRadiusUsed,
 }) => {
   if (!show) {
@@ -31,6 +32,9 @@ const BlastResult = ({
             <li className="me-15">Blast score: {score}</li>
             <li className="me-15">
               Number of materials destroyed: {materialsDestroyed}
+            </li>
+            <li>
+              Number of materials remained: {materialsRemained}
             </li>
             <li>Blast Radius used: {blastRadiusUsed}</li>
           </ul>
