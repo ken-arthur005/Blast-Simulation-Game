@@ -15,6 +15,7 @@ import {
   calculateAllAffectedCells,
   applyBlastToGrid,
 } from "../utils/blastCalculator";
+import BlastResults from "./BlastResults";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [gridData, setGridData] = useState(null);
@@ -25,6 +26,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [isBlasting, setIsBlasting] = useState(false);
   const [blastTrigger, setBlastTrigger] = useState(null);
   const csvDataRef = useRef(null);
+  const [showBlastResults, setShowBlastResults] = useState(false);
+  const handleCloseBlastResults = () => setShowBlastResults(false);
+  const handleOpenBlastResults = () => setShowBlastResults(true);
 
   const handleTriggerBlast = () => {
     console.log("Blasts before calculating:", gameState.blasts);
@@ -50,7 +54,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     setBlastTrigger({ affectedCells, timestamp: Date.now() });
   };
-  
 
   const handleBlastComplete = () => {
     if (!gridData || !gridData.grid) {
@@ -62,6 +65,11 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       gridData.grid,
       gameState.blasts
     );
+
+    setGameState({
+      ...gameState,
+      numberOfMaterialsDestroyed: affectedCells.length,
+    });
 
     const updatedGrid = applyBlastToGrid(gridData.grid, affectedCells);
 
@@ -82,10 +90,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     // Add delay to ensure destroyed cells are rendered before showing alert
     setTimeout(() => {
-      // Show alert and prevent placing explosives after cells turn gray
-      alert(
-        "Please import a new CSV file or refresh the page to continue placing explosives."
-      );
+      handleOpenBlastResults();
+
       setGameState((prev) => ({
         ...prev,
         canPlaceExplosives: false,
@@ -105,7 +111,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const calculateOptimalSizing = useCallback((processedGrid) => {
     const { dimensions } = processedGrid;
 
-  
     const preferredWidth = 576;
     const preferredHeight = 456;
 
@@ -159,7 +164,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         return;
       }
 
-      const newBlast = { x, y, radius: 3 };
+      const newBlast = { x, y, radius: gameState.blastRadius };
 
       // Check if cell already has a blast
       const isOccupied = gameState.blasts.some(
@@ -181,7 +186,12 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         blasts: [...prev.blasts, newBlast],
       }));
     },
-    [gameState.blasts, gameState.canPlaceExplosives, setGameState]
+    [
+      gameState.blasts,
+      gameState.canPlaceExplosives,
+      setGameState,
+      gameState.blastRadius,
+    ]
   );
 
   // Process CSV data when it changes
@@ -213,7 +223,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           setGameState((prev) => ({
             ...prev,
             grid: processedGrid.grid,
-            blasts: [], 
+            blasts: [],
             canPlaceExplosives: true,
           }));
 
@@ -287,6 +297,15 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           onTriggerBlast={handleTriggerBlast}
         />
       </div>
+
+      {/** BlastResults */}
+      <BlastResults
+        show={showBlastResults}
+        onClose={handleCloseBlastResults}
+        blastRadiusUsed={gameState.blastRadius}
+        materialsDestroyed={gameState.numberOfMaterialsDestroyed}
+        score={gameState.score}
+      />
     </div>
   );
 };
