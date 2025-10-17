@@ -77,6 +77,11 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     const remainingBlocks = totalBlocks - affectedCells.length;
     console.log("Remaining blocks:", remainingBlocks);
 
+    setGameState({
+      ...gameState,
+      materialsRemainedAfterDestroy: remainingBlocks,
+    });
+
     // Don't store destroyed grid in GameContext - only update local state
     setGridData((prevState) => ({
       ...prevState,
@@ -305,6 +310,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         blastRadiusUsed={gameState.blastRadius}
         materialsDestroyed={gameState.numberOfMaterialsDestroyed}
         score={gameState.score}
+        materialsRemained={gameState.materialsRemainedAfterDestroy}
       />
     </div>
   );
