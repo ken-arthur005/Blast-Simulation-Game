@@ -96,7 +96,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         ...prev,
         canPlaceExplosives: false,
       }));
-    }, 1500); // Wait 1.5 seconds to ensure gray cells are visible
+    }, 800); // Wait 0.8 seconds to ensure gray cells are visible
 
     console.log(
       "Blast complete! Destroyed:",
