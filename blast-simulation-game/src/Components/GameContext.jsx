@@ -12,6 +12,7 @@ export const GameProvider = ({ children }) => {
     blasts: [],
     canPlaceExplosives: true,
     numberOfMaterialsDestroyed: 0,
+    materialsRemainedAfterDestroy: 0,
     blastRadius: 3,
   });
 
