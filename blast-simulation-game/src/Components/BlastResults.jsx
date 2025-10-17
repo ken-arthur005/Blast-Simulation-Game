@@ -11,12 +11,8 @@ const BlastResult = ({
   }
 
   return (
-    <div
-      className="fixed inset-0 h-full bg-black/50 flex justify-center items-center z-[1000]"
-    >
-      <div
-        className="bg-white px-5 pt-3 pb-5 rounded-[8px] shadow-[0_4px_8px_rgba(0,0,0,0.2)] relative w-[60%]"
-      >
+    <div className="fixed inset-0 h-full bg-black/50 flex justify-center items-center z-[1000]">
+      <div className="bg-white px-5 pt-3 pb-5 rounded-[8px] shadow-[0_4px_8px_rgba(0,0,0,0.2)] relative w-[60%]">
         <div className="width-[100%] flex flex-row justify-end pr-3">
           <button
             onClick={onClose}
@@ -33,7 +29,7 @@ const BlastResult = ({
             <li className="me-15">
               Number of materials destroyed: {materialsDestroyed}
             </li>
-            <li>
+            <li className="me-15">
               Number of materials remained: {materialsRemained}
             </li>
             <li>Blast Radius used: {blastRadiusUsed}</li>
