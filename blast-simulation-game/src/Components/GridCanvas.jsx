@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "./OreBlock";
+import { Engine, World, Runner, Events } from "matter-js";
+import { createBlastBodies, applyBlastForce, cleanupPhysicsEngine, createBoundaryWalls } from "../utils/physicsEngine";
 // import { gsap } from "gsap";
 
 const GridCanvas = ({
@@ -35,7 +37,7 @@ const GridCanvas = ({
   useEffect(() => {
     if (gridData && gridData.grid) {
       blocksRef.current = createBlocks();
-      setDestroyedCells([]); // Clear destroyed cells when new grid is loaded
+      setDestroyedCells([]);
     }
   }, [createBlocks, gridData]);
 
@@ -242,63 +244,140 @@ const GridCanvas = ({
     const ctx = canvas.getContext("2d");
 
     const { affectedCells } = blastTrigger;
-    let animationFrame;
-    const startTime = performance.now();
-    const duration = 1000; // explosion duration (ms)
+    
+    // Calculate grid offset for centering (same as in renderCanvas)
+    const actualGridWidth = gridData.grid[0].length * blockSize;
+    const actualGridHeight = gridData.grid.length * blockSize;
+    const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
+    const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-    const animateExplosion = (time) => {
+    // Create Matter.js physics engine
+    const engine = Engine.create({
+      gravity: { x: 0, y: 0.8 }
+    });
+
+    const runner = Runner.create();
+    
+    // Create boundary walls to contain debris
+    const walls = createBoundaryWalls(canvasSize);
+    World.add(engine.world, walls);
+    
+    // Create bodies for affected cells
+    const bodies = createBlastBodies(
+      affectedCells, 
+      blockSize, 
+      { x: offsetX, y: offsetY },
+      gridData
+    );
+    
+    // Add bodies to the world
+    World.add(engine.world, bodies);
+    
+    // Calculate blast centers in pixel coordinates
+    const blastCenters = [...new Set(affectedCells.map(c => `${c.blastX},${c.blastY}`))]
+      .map(coord => {
+        const [x, y] = coord.split(',').map(Number);
+        return {
+          x: x * blockSize + offsetX + blockSize / 2,
+          y: y * blockSize + offsetY + blockSize / 2
+        };
+      });
+    
+    // Apply blast forces
+    applyBlastForce(bodies, blastCenters, 0.05);
+    
+    // Start physics simulation
+    Runner.run(runner, engine);
+
+    const startTime = performance.now();
+    const duration = 5000; 
+    let animationFrame;
+
+    const animatePhysics = (time) => {
       // Safety check - if grid data is gone, stop animation
       if (!gridData || !gridData.grid || !gridData.grid.length) {
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
         }
+        Runner.stop(runner);
+        cleanupPhysicsEngine(engine, null);
         return;
       }
 
       const elapsed = time - startTime;
       const progress = Math.min(elapsed / duration, 1);
 
-      // Clear canvas
+      // Clear canvas with background
       ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+      ctx.fillStyle = "#f0f0f0";
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
-      // Redraw grid with animation
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+
+      // Render static grid (non-affected cells)
       gridData.grid.forEach((row, y) => {
         row.forEach((cell, x) => {
-          const block = new OreBlock(cell, x, y, blockSize);
-          const hit = affectedCells.some((c) => c.x === x && c.y === y);
-
-          if (hit) {
-            // explosion effect update
-            block.scale = 1 + progress * 1.2; //expand outward
-            block.opacity = 1 - progress * 0.8; // fade out
-            block.rotation = progress * 180; // spin a bit
+          const isAffected = affectedCells.some((c) => c.x === x && c.y === y);
+          
+          if (!isAffected) {
+            const block = new OreBlock(cell, x, y, blockSize);
+            block.render(ctx);
           }
-
-          block.render(ctx);
         });
       });
 
+      ctx.restore();
+
+      // Render physics bodies (affected cells as debris)
+      bodies.forEach(body => {
+        const opacity = Math.max(0, 1 - progress * 0.8);
+        
+        ctx.save();
+        ctx.translate(body.position.x, body.position.y);
+        ctx.rotate(body.angle);
+        
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = body.render.fillStyle;
+        ctx.fillRect(-blockSize * 0.4, -blockSize * 0.4, blockSize * 0.8, blockSize * 0.8);
+        
+        // Add border
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-blockSize * 0.4, -blockSize * 0.4, blockSize * 0.8, blockSize * 0.8);
+        
+        ctx.restore();
+      });
+
       if (progress < 1) {
-        animationFrame = requestAnimationFrame(animateExplosion);
+        animationFrame = requestAnimationFrame(animatePhysics);
       } else {
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
         }
+        
+        // Stop physics simulation and cleanup
+        Runner.stop(runner);
+        cleanupPhysicsEngine(engine, null);
+        
         // Set destroyed cells first, then wait a bit before calling completion
         setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
         // Allow time for destroyed cells to render before completion callback
         setTimeout(() => {
-          onBlastComplete?.(); // grid update after cells are visible
-        }, 200); // Small delay to ensure rendering completes
+          onBlastComplete?.(); 
+        }, 200); 
       }
     };
 
-    animationFrame = requestAnimationFrame(animateExplosion);
+    animationFrame = requestAnimationFrame(animatePhysics);
+    
     return () => {
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }
+      Runner.stop(runner);
+      cleanupPhysicsEngine(engine, null);
     };
   }, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete]);
 

@@ -2,9 +2,9 @@
 
 /**
  * Calculate which grid cells are affected by blast
- * @param {Array} grid - 2D array of grid cells
- * @param {Object} blast - {x, y, radius}
- * @returns {Array} - Array of affected cell coordinates [{x, y}, ...]
+ * @param {Array} grid 
+ * @param {Object} blast 
+ * @returns {Array} 
  */
 export const calculateAffectedCells = (grid, blast) => {
   const affected = [];
@@ -20,7 +20,7 @@ export const calculateAffectedCells = (grid, blast) => {
       
       // If within radius, add to affected cells
       if (distance <= radius) {
-        affected.push({ x, y, distance });
+        affected.push({ x, y, distance, blastX, blastY, oreType: grid[y][x]?.oreType });
       }
     }
   }
@@ -36,8 +36,7 @@ export const calculateAllAffectedCells = (grid, blasts) => {
   //blasts is always an array
   const blastArray = Array.isArray(blasts) ? blasts : [blasts];
 
-  const allAffected = new Map(); // Use Map to avoid duplicates
-  
+  const allAffected = new Map();
   blastArray.forEach(blast => {
     const affected = calculateAffectedCells(grid, blast);
     affected.forEach(cell => {
@@ -52,27 +51,12 @@ export const calculateAllAffectedCells = (grid, blasts) => {
 };
 
 
-// export const applyBlastToGrid = (grid, affectedCells) => {
-//   //a deep copy of the grid
-//   const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
-  
-//   //affected cells as destroyed
-//   affectedCells.forEach(({ x, y }) => {
-//     if (newGrid[y] && newGrid[y][x]) {
-//       newGrid[y][x].oreType = 'destroyed';
-
-//     }
-//   });
-  
-//   return newGrid;
-// };
-
 export function applyBlastToGrid(grid, affectedCells) {
   grid.map((row, y) =>
     row.map((cell, x) => {
       const hit = affectedCells.some((c) => c.x === x && c.y === y);
       if (hit) {
-        return { ...cell, oreType: "destroyed" }; // mark as destroyed
+        return { ...cell, oreType: "destroyed" };
       }
       return cell;
     })
