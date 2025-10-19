@@ -5,6 +5,7 @@ const BlastResult = ({
   materialsDestroyed,
   materialsRemained,
   blastRadiusUsed,
+  resetCanvas,
 }) => {
   if (!show) {
     return null;
@@ -39,8 +40,15 @@ const BlastResult = ({
           <h3 className="text-l font-black mt-3">ACHIEVEMENTS UNLOCKED</h3>
           <div className="width-[100%] flex flex-row justify-end pr-10">
             <button
-              onClick={onClose}
+              onClick={() => resetCanvas()}
               className="cursor-pointer flex justify-between items-center px-2 py-1 border-blue-500 border-2 rounded-xl hover:bg-black hover:text-white"
+            >
+              <Trophy />
+              Reset Canvas
+            </button>
+            <button
+              onClick={onClose}
+              className="cursor-pointer flex justify-between items-center px-2 py-1 border-blue-500 border-2 rounded-xl hover:bg-black hover:text-white ml-3"
             >
               <Trophy />
               Close
@@ -65,7 +73,6 @@ const Trophy = () => {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      
       fill="currentColor"
       className="me-2 w-5 h-5"
       viewBox="0 0 16 16"
