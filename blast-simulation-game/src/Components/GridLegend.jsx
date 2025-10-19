@@ -10,6 +10,7 @@ const GridLegend = ({
   className = "",
   onTriggerBlast,
   resetCanvas,
+  isBlasting,
 }) => {
   const { gameState } = useContext(GameContext);
 
@@ -59,6 +60,7 @@ const GridLegend = ({
         {gameState.blasts?.length > 0 && `(${gameState.blasts.length})`}
       </button>
       <button
+        disabled={isBlasting}
         className="mt-10 ml-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed hover:cursor-pointer"
         onClick={() => resetCanvas()}
       >
