@@ -29,6 +29,34 @@ export const GameProvider = ({ children }) => {
     setGameState((prevState) => ({ ...prevState, grid: newGrid }));
   };
 
+  const setInitialGridFromCSV = (grid) => {
+    const clone = structuredClone
+      ? structuredClone(grid)
+      : JSON.parse(JSON.stringify(grid));
+
+    setInitialGrid(clone);
+    setGameState((prev) => ({
+      ...prev,
+      grid: structuredClone
+        ? structuredClone(grid)
+        : JSON.parse(JSON.stringify(grid)),
+    }));
+  };
+
+  const resetSimulation = () => {
+    if (!initialGrid) return;
+
+    const clone = structuredClone
+      ? structuredClone(initialGrid)
+      : JSON.parse(JSON.stringify(initialGrid));
+
+    setGameState((prev) => ({
+      ...prev,
+      blasts: [],
+      grid: clone,
+    }));
+  };
+
   const clearBlasts = () => {
     setGameState((prevState) => ({ ...prevState, blasts: [] }));
   };
