@@ -16,6 +16,9 @@ export const GameProvider = ({ children }) => {
     blastRadius: 3,
   });
 
+  // store the original grid as loaded from CSV so we can reset to it
+  const [initialGrid, setInitialGrid] = useState(null);
+
   const setPlayerName = (name) => {
     setGameState((prevState) => ({
       ...prevState,
