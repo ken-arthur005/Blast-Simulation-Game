@@ -98,7 +98,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         ...prev,
         canPlaceExplosives: false,
       }));
-    }, 800); // Wait 0.8 seconds to ensure gray cells are visible
+    }, 300); // Wait 0.3 seconds to ensure gray cells are visible
 
     console.log(
       "Blast complete! Destroyed:",
@@ -326,7 +326,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       </div>
 
       {/* Legend */}
-      <div className="absolute top-8 right-4 w-60">
+      <div className="absolute top-8 right-4 w-66">
         <GridLegend
           oreTypes={gridData.metadata.oreTypes}
           onTriggerBlast={handleTriggerBlast}
