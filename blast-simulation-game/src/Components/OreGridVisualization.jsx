@@ -19,6 +19,7 @@ import BlastResults from "./BlastResults";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [gridData, setGridData] = useState(null);
+  const [originalGridData, setOriginalGridData] = useState(null); // to keep an original deep copy of grid.
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
   const [blockSize, setBlockSize] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -220,6 +221,13 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           calculateOptimalSizing(processedGrid);
           printGridDebugInfo(processedGrid);
 
+          // set originalGridData with deep copy of processedGrid
+          setOriginalGridData(
+            structuredClone
+              ? structuredClone(processedGrid)
+              : JSON.parse(JSON.stringify(processedGrid))
+          );
+
           // Reset game state with fresh grid
           setGameState((prev) => ({
             ...prev,
@@ -246,6 +254,32 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       }
     }
   }, [csvData, onGridProcessed, calculateOptimalSizing, setGameState]);
+
+  const handleCanvasReset = () => {
+    if (!originalGridData) {
+      console.error("No original grid data to restore");
+      return;
+    }
+
+    // Deep clone to avoid reference issues
+    const restoredGrid = structuredClone
+      ? structuredClone(originalGridData)
+      : JSON.parse(JSON.stringify(originalGridData));
+
+    setGridData(restoredGrid);
+
+    // Reset game state
+    setGameState((prev) => ({
+      ...prev,
+      grid: restoredGrid.grid,
+      blasts: [],
+      canPlaceExplosives: true,
+      materialsRemainedAfterDestroy: 0,
+      numberOfMaterialsDestroyed: 0,
+    }));
+
+    console.log("Canvas reset to original state");
+  };
 
   // Loading state
   if (!csvData) {
@@ -307,6 +341,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         materialsDestroyed={gameState.numberOfMaterialsDestroyed}
         score={gameState.score}
         materialsRemained={gameState.materialsRemainedAfterDestroy}
+        resetCanvas={handleCanvasReset}
       />
     </div>
   );
