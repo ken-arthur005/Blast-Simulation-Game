@@ -331,6 +331,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           oreTypes={gridData.metadata.oreTypes}
           onTriggerBlast={handleTriggerBlast}
           resetCanvas={handleCanvasReset}
+          isBlasting={isBlasting}
         />
       </div>
 
