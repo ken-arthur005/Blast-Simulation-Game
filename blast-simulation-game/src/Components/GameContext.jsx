@@ -16,9 +16,6 @@ export const GameProvider = ({ children }) => {
     blastRadius: 3,
   });
 
-  // store the original grid as loaded from CSV so we can reset to it
-  const [initialGrid, setInitialGrid] = useState(null);
-
   const setPlayerName = (name) => {
     setGameState((prevState) => ({
       ...prevState,
@@ -27,34 +24,6 @@ export const GameProvider = ({ children }) => {
   };
   const updateGrid = (newGrid) => {
     setGameState((prevState) => ({ ...prevState, grid: newGrid }));
-  };
-
-  const setInitialGridFromCSV = (grid) => {
-    const clone = structuredClone
-      ? structuredClone(grid)
-      : JSON.parse(JSON.stringify(grid));
-
-    setInitialGrid(clone);
-    setGameState((prev) => ({
-      ...prev,
-      grid: structuredClone
-        ? structuredClone(grid)
-        : JSON.parse(JSON.stringify(grid)),
-    }));
-  };
-
-  const resetSimulation = () => {
-    if (!initialGrid) return;
-
-    const clone = structuredClone
-      ? structuredClone(initialGrid)
-      : JSON.parse(JSON.stringify(initialGrid));
-
-    setGameState((prev) => ({
-      ...prev,
-      blasts: [],
-      grid: clone,
-    }));
   };
 
   const clearBlasts = () => {
@@ -69,8 +38,6 @@ export const GameProvider = ({ children }) => {
         setPlayerName,
         updateGrid,
         clearBlasts,
-        setInitialGridFromCSV,
-        resetSimulation,
       }}
     >
       {children}
