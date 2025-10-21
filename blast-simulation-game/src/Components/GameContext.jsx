@@ -10,7 +10,10 @@ export const GameProvider = ({ children }) => {
     currentScenario: null,
     grid: null,
     blasts: [],
-    canPlaceExplosives: true
+    canPlaceExplosives: true,
+    numberOfMaterialsDestroyed: 0,
+    materialsRemainedAfterDestroy: 0,
+    blastRadius: 3,
   });
 
   const setPlayerName = (name) => {
@@ -28,7 +31,15 @@ export const GameProvider = ({ children }) => {
   };
 
   return (
-    <GameContext.Provider value={{ gameState, setGameState, setPlayerName, updateGrid, clearBlasts }}>
+    <GameContext.Provider
+      value={{
+        gameState,
+        setGameState,
+        setPlayerName,
+        updateGrid,
+        clearBlasts,
+      }}
+    >
       {children}
     </GameContext.Provider>
   );
