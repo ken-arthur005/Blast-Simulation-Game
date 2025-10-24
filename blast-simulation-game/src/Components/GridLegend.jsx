@@ -1,6 +1,7 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
+import ArrowButton from "./ArrowButton";
 
 /**
  * Legend component showing ore types and their colors
@@ -13,6 +14,7 @@ const GridLegend = ({
   isBlasting,
 }) => {
   const { gameState } = useContext(GameContext);
+  const [selectedDir, setSelectedDir] = useState(null);
 
   const handleTriggerBlast = () => {
     // Check if there are any blasts placed
@@ -30,16 +32,12 @@ const GridLegend = ({
   }
 
   const colorMapping = OreColorMapper.getColorsForOreTypes(oreTypes);
-  //  md:grid-cols-3 lg:grid-cols-4
+
   return (
     <div>
-      <div className={`mt-4 p-4 bg-gray-100 rounded-lg ${className}`}>
+      <div className={`mt-4 p-4 bg-gray-100 rounded-lg ${className} mb-3`}>
         <h3 className="text-lg font-semibold mb-3">Ore Types Legend</h3>
-        <div
-          className="grid grid-cols-2
-     
-       gap-3"
-        >
+        <div className="grid grid-cols-2 gap-3">
           {oreTypes.map((oreType) => (
             <div key={oreType} className="flex items-center space-x-2">
               <div
@@ -51,21 +49,74 @@ const GridLegend = ({
           ))}
         </div>
       </div>
-      <button
-        className="mt-10 bg-red-500 text-white p-3 rounded hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-        onClick={handleTriggerBlast}
-        disabled={!gameState.blasts || gameState.blasts.length === 0}
-      >
-        Trigger Blast{" "}
-        {gameState.blasts?.length > 0 && `(${gameState.blasts.length})`}
-      </button>
-      <button
-        disabled={isBlasting}
-        className="mt-10 ml-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed hover:cursor-pointer"
-        onClick={() => resetCanvas()}
-      >
-        Reset Canvas
-      </button>
+
+      <div>
+        <button
+          className="mt-2 bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          onClick={handleTriggerBlast}
+          disabled={!gameState.blasts || gameState.blasts.length === 0}
+        >
+          Trigger Blast{" "}
+          {gameState.blasts?.length > 0 && `(${gameState.blasts.length})`}
+        </button>
+
+        <button
+          disabled={isBlasting}
+          className="mt-2 ml-2 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed hover:cursor-pointer"
+          onClick={() => resetCanvas()}
+        >
+          Reset Canvas
+        </button>
+
+        <div className="mt-4 flex justify-center flex-col items-start">
+          <div className="mb-2 text-center text-sm text-gray-600">
+            {selectedDir ? `Direction: ${selectedDir}` : "Select a direction"}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <ArrowButton
+              dir="left"
+              selectedDir={selectedDir}
+              setSelectedDir={setSelectedDir}
+            />
+            <ArrowButton
+              dir="up"
+              selectedDir={selectedDir}
+              setSelectedDir={setSelectedDir}
+            />
+            <ArrowButton
+              dir="right"
+              selectedDir={selectedDir}
+              setSelectedDir={setSelectedDir}
+            />
+            <ArrowButton
+              dir="down"
+              selectedDir={selectedDir}
+              setSelectedDir={setSelectedDir}
+            />
+            <ArrowButton
+              dir="up-left"
+              selectedDir={selectedDir}
+              setSelectedDir={setSelectedDir}
+            />
+            <ArrowButton
+              dir="up-right"
+              selectedDir={selectedDir}
+              setSelectedDir={setSelectedDir}
+            />
+            <ArrowButton
+              dir="down-right"
+              selectedDir={selectedDir}
+              setSelectedDir={setSelectedDir}
+            />
+            <ArrowButton
+              dir="down-left"
+              selectedDir={selectedDir}
+              setSelectedDir={setSelectedDir}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
