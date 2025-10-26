@@ -79,14 +79,34 @@ export const calculateAllAffectedCells = (grid, blasts) => {
 };
 
 
+/**
+ * Apply blast result to grid by marking affected cells as destroyed.
+ * Returns a new grid (does NOT mutate the original).
+ * @param {Array} grid - 2D array
+ * @param {Array} affectedCells - array of {x, y, ...}
+ * @returns {Array} newGrid
+ */
 export function applyBlastToGrid(grid, affectedCells) {
-  grid.map((row, y) =>
+  if (!Array.isArray(grid)) return grid;
+  if (!Array.isArray(affectedCells) || affectedCells.length === 0) {
+    // return deep copy to avoid accidental mutation elsewhere
+    return grid.map(row => row.map(cell => ({ ...cell })));
+  }
+
+  const hitSet = new Set(affectedCells.map(c => `${c.x},${c.y}`));
+
+  // Create a new grid (map rows and cells)
+  const newGrid = grid.map((row, y) =>
     row.map((cell, x) => {
-      const hit = affectedCells.some((c) => c.x === x && c.y === y);
-      if (hit) {
-        return { ...cell, oreType: "destroyed" };
+      const key = `${x},${y}`;
+      if (hitSet.has(key)) {
+        // Return a new object with oreType marked destroyed
+        return { ...(cell || {}), oreType: "destroyed" };
       }
-      return cell;
+      // Return a shallow clone to preserve immutability guarantees
+      return { ...(cell || {}) };
     })
   );
+
+  return newGrid;
 }
