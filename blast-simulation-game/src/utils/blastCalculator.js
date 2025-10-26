@@ -1,5 +1,3 @@
-
-
 /**
  * Calculate which grid cells are affected by blast
  * @param {Array} grid 
@@ -10,17 +8,44 @@ export const calculateAffectedCells = (grid, blast) => {
   const affected = [];
   const { x: blastX, y: blastY, radius } = blast;
   
+  if (!grid || !Number.isFinite(radius) || radius <= 0) return affected;
+
   // Loop through all cells
   for (let y = 0; y < grid.length; y++) {
-    for (let x = 0; x < grid[y].length; x++) {
-      // distance from blast center
-      const distance = Math.sqrt(
-        Math.pow(x - blastX, 2) + Math.pow(y - blastY, 2)
-      );
+    for (let x = 0; x < (grid[y] || []).length; x++) {
+      // distance from blast center (grid coordinate space)
+      const dx = x - blastX;
+      const dy = y - blastY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
       
       // If within radius, add to affected cells
       if (distance <= radius) {
-        affected.push({ x, y, distance, blastX, blastY, oreType: grid[y][x]?.oreType });
+        // angle from blast center to cell (radians)
+        // Note: grid y increases downward which matches canvas coordinate system
+        const angle = Math.atan2(dy, dx); // dy first then dx
+
+        // Unit direction vector from blast center outward to cell
+        const magnitude = distance === 0 ? 1 : distance;
+        const dirX = dx / magnitude;
+        const dirY = dy / magnitude;
+
+        // Normalized closeness factor (1.0 at center, 0.0 at radius edge)
+        const normalizedDistance = Math.min(distance / radius, 1);
+        const forceFactor = Math.max(0, 1 - normalizedDistance); // 1 -> 0
+
+        affected.push({
+          x,
+          y,
+          distance,
+          normalizedDistance,
+          forceFactor,
+          angle,
+          dirX,
+          dirY,
+          blastX,
+          blastY,
+          oreType: grid[y][x]?.oreType
+        });
       }
     }
   }
