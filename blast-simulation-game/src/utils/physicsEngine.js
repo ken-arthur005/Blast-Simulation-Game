@@ -158,31 +158,66 @@ const getOreColor = (oreType) => {
 };
 
 /**
- * Apply blast force to bodies based on distance from epicenter
- * @param {Array} bodies 
- * @param {Array} blastCenters 
- * @param {number} blastForce 
+ * Apply blast force to bodies based on precomputed direction and forceFactor.
+ * If per-body direction metadata is missing, falls back to computing direction from nearest blast center.
+ * @param {Array} bodies - array of Matter bodies created by createBlastBodies
+ * @param {Array} blastCenters - array of pixel coordinates {x, y} for blast epicenters
+ * @param {number} baseForce - scalar base force, tuned by caller (typ. small like 0.02 - 0.12)
  */
-export const applyBlastForce = (bodies, blastCenters, blastForce = 0.05) => {
+export const applyBlastForce = (bodies, blastCenters, baseForce = 0.05) => {
+  if (!Array.isArray(bodies) || bodies.length === 0) return;
+
+  // Clamp utility
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
   bodies.forEach(body => {
-    // Apply force from each blast center
-    blastCenters.forEach(blastCenter => {
-      // Calculate direction from blast center to body
-      const dx = body.position.x - blastCenter.x;
-      const dy = body.position.y - blastCenter.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Normalize direction and apply force inversely proportional to distance
-      if (distance > 0) {
-        const forceMagnitude = blastForce / (1 + body.blastDistance * 0.5);
-        const forceX = (dx / distance) * forceMagnitude;
-        const forceY = (dy / distance) * forceMagnitude - 0.01; 
-        
-        Body.applyForce(body, body.position, { x: forceX, y: forceY });
-      }
-    });
-    
+    // Prefer per-body metadata attached earlier
+    const dirX_meta = body.blastDirX;
+    const dirY_meta = body.blastDirY;
+    const forceFactor_meta = typeof body.forceFactor === 'number' ? body.forceFactor : 0;
+
+    // If metadata present and valid direction, apply using it
+    if (dirX_meta !== null && dirY_meta !== null && (dirX_meta !== 0 || dirY_meta !== 0)) {
+      // Use forceFactor as primary scaler; also slightly attenuate by blastDistance if present
+      const distanceFactor = typeof body.blastDistance === 'number' ? (1 + body.blastDistance * 0.5) : 1;
+      const magnitude = baseForce * forceFactor_meta / distanceFactor;
+
+      // small upward bias for nicer visuals
+      const forceX = dirX_meta * magnitude;
+      const forceY = dirY_meta * magnitude - Math.abs(0.01 * forceFactor_meta);
+
+      // clamp forces to reasonable bounds to avoid physics explosions
+      const clampedForce = {
+        x: clamp(forceX, -0.5, 0.5),
+        y: clamp(forceY, -0.5, 0.5)
+      };
+
+      Body.applyForce(body, body.position, clampedForce);
+    } else {
+      // Fallback: apply forces from each blast center (legacy behavior)
+      blastCenters.forEach(blastCenter => {
+        const dx = body.position.x - blastCenter.x;
+        const dy = body.position.y - blastCenter.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 0) {
+          // Compute normalized direction
+          const ndx = dx / distance;
+          const ndy = dy / distance;
+
+          // force decays with distance and uses any body.forceFactor if present
+          const factor = (forceFactor_meta > 0 ? forceFactor_meta : 1 / (1 + distance * 0.1));
+          const magnitude = baseForce * factor;
+          const forceX = ndx * magnitude;
+          const forceY = ndy * magnitude - 0.01;
+
+          Body.applyForce(body, body.position, { x: forceX, y: forceY });
+        }
+      });
+    }
+
     // Add random rotation for visual interest
+    // keep angular velocities modest
     Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
   });
 };
