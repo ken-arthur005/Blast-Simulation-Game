@@ -93,6 +93,8 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
 
 /**
  * Convert affected grid cells to Matter.js bodies
+ * Now attaches directional metadata (dirX, dirY, forceFactor) to each body
+ * so applyBlastForce can use precomputed radial directions instead of recomputing.
  * @param {Array} affectedCells 
  * @param {number} blockSize 
  * @param {Object} gridOffset 
@@ -100,14 +102,16 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
  * @returns {Array}
  */
 export const createBlastBodies = (affectedCells, blockSize, gridOffset = { x: 0, y: 0 }, gridData) => {
+  if (!Array.isArray(affectedCells)) return [];
+
   return affectedCells.map(cell => {
-    // Convert grid coordinates to pixel coordinates
+    // Convert grid coordinates to pixel coordinates (center of block)
     const pixelX = cell.x * blockSize + gridOffset.x + blockSize / 2;
     const pixelY = cell.y * blockSize + gridOffset.y + blockSize / 2;
     
-    // Get the actual cell data from the grid
+    // Get the actual cell data from the grid if available
     const cellData = gridData?.grid?.[cell.y]?.[cell.x];
-    const oreType = cellData?.oreType || 'unknown';
+    const oreType = cellData?.oreType || cell.oreType || 'unknown';
     
     // Create rectangular body at block position
     const body = Bodies.rectangle(pixelX, pixelY, blockSize * 0.8, blockSize * 0.8, {
@@ -115,10 +119,17 @@ export const createBlastBodies = (affectedCells, blockSize, gridOffset = { x: 0,
       friction: 0.1,
       frictionAir: 0.02,
       density: 0.001,
-      // Store original grid data as metadata
+      // Store original grid data as metadata for later processing
       gridX: cell.x,
       gridY: cell.y,
-      blastDistance: cell.distance,
+      blastDistance: cell.distance ?? null,
+      blastX: cell.blastX ?? null,
+      blastY: cell.blastY ?? null,
+      // direction unit vector (grid-space) - may be undefined if not provided
+      blastDirX: typeof cell.dirX === 'number' ? cell.dirX : null,
+      blastDirY: typeof cell.dirY === 'number' ? cell.dirY : null,
+      // normalized strength (0..1) where 1 is at center, 0 at radius edge
+      forceFactor: typeof cell.forceFactor === 'number' ? cell.forceFactor : 0,
       oreType: oreType,
       isOreBlock: true,
       render: {
