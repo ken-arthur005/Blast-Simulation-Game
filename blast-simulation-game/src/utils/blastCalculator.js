@@ -55,23 +55,26 @@ export const calculateAffectedCells = (grid, blast) => {
 
 
 export const calculateAllAffectedCells = (grid, blasts) => {
+  if (!blasts) return [];
 
- if (!blasts) return [];
-
-  //blasts is always an array
+  // blasts is always an array
   const blastArray = Array.isArray(blasts) ? blasts : [blasts];
 
+  // We'll choose the strongest effect per cell when multiple blasts overlap.
   const allAffected = new Map();
-  blastArray.forEach(blast => {
+
+  blastArray.forEach((blast) => {
     const affected = calculateAffectedCells(grid, blast);
-    affected.forEach(cell => {
+    affected.forEach((cell) => {
       const key = `${cell.x},${cell.y}`;
-      if (!allAffected.has(key)) {
+      const existing = allAffected.get(key);
+      // If not seen yet, or this blast produces a stronger effect (higher forceFactor), replace
+      if (!existing || cell.forceFactor > existing.forceFactor) {
         allAffected.set(key, cell);
       }
     });
   });
-  
+
   return Array.from(allAffected.values());
 };
 
