@@ -284,7 +284,7 @@ const GridCanvas = ({
       });
     
     // Apply blast forces
-    applyBlastForce(bodies, blastCenters, 0.05);
+    applyBlastForce(bodies, blastCenters, 0.1);
     
     // Start physics simulation
     Runner.run(runner, engine);
