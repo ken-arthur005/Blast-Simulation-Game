@@ -1,4 +1,5 @@
 import { Engine, Render, World, Bodies, Body, Events } from 'matter-js';
+import OreColorMapper from './oreColorMapper.js';
 
 /**
  * Create and initialize a Matter.js physics engine
@@ -133,7 +134,7 @@ export const createBlastBodies = (affectedCells, blockSize, gridOffset = { x: 0,
       oreType: oreType,
       isOreBlock: true,
       render: {
-        fillStyle: getOreColor(oreType)
+        fillStyle: OreColorMapper.getColor(oreType) || '#999999'
       }
     });
     
@@ -142,20 +143,7 @@ export const createBlastBodies = (affectedCells, blockSize, gridOffset = { x: 0,
 };
 
 
- //Get ore color based on type
- 
-const getOreColor = (oreType) => {
-  const colorMap = {
-    gold: '#FFD700',
-    silver: '#C0C0C0',
-    copper: '#B87333',
-    iron: '#8B4513',
-    coal: '#2C2C2C',
-    destroyed: '#808080',
-    unknown: '#999999'
-  };
-  return colorMap[oreType?.toLowerCase()] || '#999999';
-};
+
 
 /**
  * Apply blast force to bodies based on precomputed direction and forceFactor.
