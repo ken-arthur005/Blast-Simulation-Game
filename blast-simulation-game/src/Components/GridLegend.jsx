@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import React, { useContext } from "react";
 import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
 import ArrowButton from "./ArrowButton";
@@ -12,10 +12,21 @@ const GridLegend = ({
   onTriggerBlast,
   resetCanvas,
   isBlasting,
+  selectedBlast = null,
+  onSelectDirection = null,
 }) => {
   const { gameState, pendingDirection, setPendingDirection } =
     useContext(GameContext);
-  const selectedDir = pendingDirection;
+  // If a blast is selected, show/edit its dirKey; otherwise use pendingDirection
+  const selectedDir = selectedBlast
+    ? gameState.blasts?.find(
+        (b) => b.x === selectedBlast.x && b.y === selectedBlast.y
+      )?.dirKey || "(none)"
+    : pendingDirection;
+
+  // When a blast is selected we allow the user to optionally apply the chosen
+  // direction to future placements as well. This flag controls that behaviour.
+  const [applyToNext, setApplyToNext] = React.useState(false);
 
   const handleTriggerBlast = () => {
     // Check if there are any blasts placed
@@ -70,61 +81,123 @@ const GridLegend = ({
         </button>
 
         <div className="mt-4 flex justify-center flex-col items-start">
-          <div className="mb-2 text-center text-sm text-gray-600">
-            {selectedDir ? `Direction: ${selectedDir}` : "Select a direction"}
-          </div>
+          {/* Show instructions and direction controls only after at least one explosive is placed */}
+          {gameState.blasts && gameState.blasts.length > 0 ? (
+            <>
+              <div className="mb-2 text-center text-sm text-gray-600">
+                {selectedBlast
+                  ? `Selected blast: (${selectedBlast.x}, ${
+                      selectedBlast.y
+                    }) — Direction: ${
+                      selectedDir === "(none)" ? "(none)" : selectedDir
+                    }`
+                  : "Click a placed explosive to select it and choose a direction for that explosive."}
+              </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Disable direction selection while blasting or when placement is locked (requires reset) */}
-            <ArrowButton
-              dir="left"
-              selectedDir={selectedDir}
-              setSelectedDir={setPendingDirection}
-              disabled={isBlasting || !gameState.canPlaceExplosives}
-            />
-            <ArrowButton
-              dir="up"
-              selectedDir={selectedDir}
-              setSelectedDir={setPendingDirection}
-              disabled={isBlasting || !gameState.canPlaceExplosives}
-            />
-            <ArrowButton
-              dir="right"
-              selectedDir={selectedDir}
-              setSelectedDir={setPendingDirection}
-              disabled={isBlasting || !gameState.canPlaceExplosives}
-            />
-            <ArrowButton
-              dir="down"
-              selectedDir={selectedDir}
-              setSelectedDir={setPendingDirection}
-              disabled={isBlasting || !gameState.canPlaceExplosives}
-            />
-            <ArrowButton
-              dir="up-left"
-              selectedDir={selectedDir}
-              setSelectedDir={setPendingDirection}
-              disabled={isBlasting || !gameState.canPlaceExplosives}
-            />
-            <ArrowButton
-              dir="up-right"
-              selectedDir={selectedDir}
-              setSelectedDir={setPendingDirection}
-              disabled={isBlasting || !gameState.canPlaceExplosives}
-            />
-            <ArrowButton
-              dir="down-right"
-              selectedDir={selectedDir}
-              setSelectedDir={setPendingDirection}
-              disabled={isBlasting || !gameState.canPlaceExplosives}
-            />
-            <ArrowButton
-              dir="down-left"
-              selectedDir={selectedDir}
-              setSelectedDir={setPendingDirection}
-              disabled={isBlasting || !gameState.canPlaceExplosives}
-            />
-          </div>
+              {selectedBlast && (
+                <label className="text-xs text-gray-500 mb-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={applyToNext}
+                    onChange={(e) => setApplyToNext(e.target.checked)}
+                    className="form-checkbox"
+                  />
+                  <span>
+                    Also set this direction as default for next placements
+                  </span>
+                </label>
+              )}
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Disable direction selection while blasting or when placement is locked (requires reset) */}
+                <ArrowButton
+                  dir="left"
+                  selectedDir={selectedDir}
+                  setSelectedDir={(dir) =>
+                    onSelectDirection
+                      ? onSelectDirection(dir, { applyToNext })
+                      : setPendingDirection(dir)
+                  }
+                  disabled={isBlasting || !gameState.canPlaceExplosives}
+                />
+                <ArrowButton
+                  dir="up"
+                  selectedDir={selectedDir}
+                  setSelectedDir={(dir) =>
+                    onSelectDirection
+                      ? onSelectDirection(dir, { applyToNext })
+                      : setPendingDirection(dir)
+                  }
+                  disabled={isBlasting || !gameState.canPlaceExplosives}
+                />
+                <ArrowButton
+                  dir="right"
+                  selectedDir={selectedDir}
+                  setSelectedDir={(dir) =>
+                    onSelectDirection
+                      ? onSelectDirection(dir, { applyToNext })
+                      : setPendingDirection(dir)
+                  }
+                  disabled={isBlasting || !gameState.canPlaceExplosives}
+                />
+                <ArrowButton
+                  dir="down"
+                  selectedDir={selectedDir}
+                  setSelectedDir={(dir) =>
+                    onSelectDirection
+                      ? onSelectDirection(dir, { applyToNext })
+                      : setPendingDirection(dir)
+                  }
+                  disabled={isBlasting || !gameState.canPlaceExplosives}
+                />
+                <ArrowButton
+                  dir="up-left"
+                  selectedDir={selectedDir}
+                  setSelectedDir={(dir) =>
+                    onSelectDirection
+                      ? onSelectDirection(dir, { applyToNext })
+                      : setPendingDirection(dir)
+                  }
+                  disabled={isBlasting || !gameState.canPlaceExplosives}
+                />
+                <ArrowButton
+                  dir="up-right"
+                  selectedDir={selectedDir}
+                  setSelectedDir={(dir) =>
+                    onSelectDirection
+                      ? onSelectDirection(dir, { applyToNext })
+                      : setPendingDirection(dir)
+                  }
+                  disabled={isBlasting || !gameState.canPlaceExplosives}
+                />
+                <ArrowButton
+                  dir="down-right"
+                  selectedDir={selectedDir}
+                  setSelectedDir={(dir) =>
+                    onSelectDirection
+                      ? onSelectDirection(dir, { applyToNext })
+                      : setPendingDirection(dir)
+                  }
+                  disabled={isBlasting || !gameState.canPlaceExplosives}
+                />
+                <ArrowButton
+                  dir="down-left"
+                  selectedDir={selectedDir}
+                  setSelectedDir={(dir) =>
+                    onSelectDirection
+                      ? onSelectDirection(dir, { applyToNext })
+                      : setPendingDirection(dir)
+                  }
+                  disabled={isBlasting || !gameState.canPlaceExplosives}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="mb-2 text-center text-sm text-gray-600">
+              Place an explosive first — after the first placement you'll be
+              able to select each explosive and choose a direction for it.
+            </div>
+          )}
         </div>
       </div>
     </div>

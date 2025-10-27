@@ -16,7 +16,8 @@ export const GameProvider = ({ children }) => {
     blastRadius: 3,
   });
   // pendingDirection stores the currently selected direction for the next blast placement
-  const [pendingDirection, setPendingDirection] = useState("right");
+  // If null, no default direction is applied; players must choose a direction explicitly or edit per-blast
+  const [pendingDirection, setPendingDirection] = useState(null);
 
   const setPlayerName = (name) => {
     setGameState((prevState) => ({

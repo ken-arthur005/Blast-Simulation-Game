@@ -20,7 +20,8 @@ export const calculateAffectedCells = (grid, blast) => {
       
       // If within radius, add to affected cells
       if (distance <= radius) {
-        affected.push({ x, y, distance, blastX, blastY, oreType: grid[y][x]?.oreType });
+        // include blast metadata (e.g., dirKey) so affected cells know which blast influenced them
+        affected.push({ x, y, distance, blastX, blastY, oreType: grid[y][x]?.oreType, dirKey: blast.dirKey || null });
       }
     }
   }
