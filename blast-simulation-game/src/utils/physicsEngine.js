@@ -117,8 +117,8 @@ export const createBlastBodies = (affectedCells, blockSize, gridOffset = { x: 0,
     const body = Bodies.rectangle(pixelX, pixelY, blockSize * 0.8, blockSize * 0.8, {
       restitution: 0.6,
       friction: 0.1,
-      frictionAir: 0.02,
-      density: 0.001,
+      frictionAir: 0.01,
+      density: 0.0005,
       // Store original grid data as metadata for later processing
       gridX: cell.x,
       gridY: cell.y,
@@ -168,6 +168,7 @@ export const applyBlastForce = (bodies, blastCenters, baseForce = 0.05) => {
   if (!Array.isArray(bodies) || bodies.length === 0) return;
 
   // Clamp utility
+  // Ensure physics stays stable, animation looks smoother or prevent matter.js from crashing
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   bodies.forEach(body => {
