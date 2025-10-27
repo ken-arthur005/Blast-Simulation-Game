@@ -23,7 +23,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
   const [blockSize, setBlockSize] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { gameState, clearBlasts, setGameState } = useContext(GameContext);
+  const { gameState, clearBlasts, setGameState, pendingDirection, setPendingDirection } = useContext(GameContext);
   const [isBlasting, setIsBlasting] = useState(false);
   const [blastTrigger, setBlastTrigger] = useState(null);
   const csvDataRef = useRef(null);
@@ -89,6 +89,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     setBlastTrigger(null);
     setIsBlasting(false);
     clearBlasts();
+  // reset pending direction for the next placement to default (right)
+  if (setPendingDirection) setPendingDirection("right");
 
     // Add delay to ensure destroyed cells are rendered before showing alert
     setTimeout(() => {
@@ -166,7 +168,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         return;
       }
 
-      const newBlast = { x, y, radius: gameState.blastRadius };
+  const newBlast = { x, y, radius: gameState.blastRadius, dirKey: pendingDirection || null };
 
       // Check if cell already has a blast
       const isOccupied = gameState.blasts.some(
@@ -193,6 +195,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       gameState.canPlaceExplosives,
       setGameState,
       gameState.blastRadius,
+      pendingDirection,
     ]
   );
 

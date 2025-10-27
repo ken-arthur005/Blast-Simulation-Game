@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
 import ArrowButton from "./ArrowButton";
@@ -13,8 +13,9 @@ const GridLegend = ({
   resetCanvas,
   isBlasting,
 }) => {
-  const { gameState } = useContext(GameContext);
-  const [selectedDir, setSelectedDir] = useState(null);
+  const { gameState, pendingDirection, setPendingDirection } =
+    useContext(GameContext);
+  const selectedDir = pendingDirection;
 
   const handleTriggerBlast = () => {
     // Check if there are any blasts placed
@@ -74,45 +75,54 @@ const GridLegend = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Disable direction selection while blasting or when placement is locked (requires reset) */}
             <ArrowButton
               dir="left"
               selectedDir={selectedDir}
-              setSelectedDir={setSelectedDir}
+              setSelectedDir={setPendingDirection}
+              disabled={isBlasting || !gameState.canPlaceExplosives}
             />
             <ArrowButton
               dir="up"
               selectedDir={selectedDir}
-              setSelectedDir={setSelectedDir}
+              setSelectedDir={setPendingDirection}
+              disabled={isBlasting || !gameState.canPlaceExplosives}
             />
             <ArrowButton
               dir="right"
               selectedDir={selectedDir}
-              setSelectedDir={setSelectedDir}
+              setSelectedDir={setPendingDirection}
+              disabled={isBlasting || !gameState.canPlaceExplosives}
             />
             <ArrowButton
               dir="down"
               selectedDir={selectedDir}
-              setSelectedDir={setSelectedDir}
+              setSelectedDir={setPendingDirection}
+              disabled={isBlasting || !gameState.canPlaceExplosives}
             />
             <ArrowButton
               dir="up-left"
               selectedDir={selectedDir}
-              setSelectedDir={setSelectedDir}
+              setSelectedDir={setPendingDirection}
+              disabled={isBlasting || !gameState.canPlaceExplosives}
             />
             <ArrowButton
               dir="up-right"
               selectedDir={selectedDir}
-              setSelectedDir={setSelectedDir}
+              setSelectedDir={setPendingDirection}
+              disabled={isBlasting || !gameState.canPlaceExplosives}
             />
             <ArrowButton
               dir="down-right"
               selectedDir={selectedDir}
-              setSelectedDir={setSelectedDir}
+              setSelectedDir={setPendingDirection}
+              disabled={isBlasting || !gameState.canPlaceExplosives}
             />
             <ArrowButton
               dir="down-left"
               selectedDir={selectedDir}
-              setSelectedDir={setSelectedDir}
+              setSelectedDir={setPendingDirection}
+              disabled={isBlasting || !gameState.canPlaceExplosives}
             />
           </div>
         </div>

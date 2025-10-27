@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 // Reusable arrow button component for GridLegend
-export default function ArrowButton({ dir, selectedDir, setSelectedDir }) {
+export default function ArrowButton({ dir, selectedDir, setSelectedDir, disabled = false }) {
   const icons = {
     left: ArrowLeft,
     right: ArrowRight,
@@ -31,13 +31,20 @@ export default function ArrowButton({ dir, selectedDir, setSelectedDir }) {
     "bg-indigo-600 text-white ring-2 ring-offset-2 ring-indigo-300";
   const defaultClass = "bg-gray-200 text-gray-800 hover:bg-gray-300";
 
+  const disabledClass = "opacity-50 cursor-not-allowed";
+
   return (
     <button
-      onClick={() => setSelectedDir(dir)}
+      onClick={() => {
+        if (disabled) return;
+        setSelectedDir(dir);
+      }}
       title={dir}
       aria-label={dir}
       aria-pressed={isSelected}
-      className={`${baseClass} ${isSelected ? selectedClass : defaultClass}`}
+      aria-disabled={disabled}
+      disabled={disabled}
+      className={`${baseClass} ${isSelected ? selectedClass : defaultClass} ${disabled ? disabledClass : ""}`}
     >
       <Icon className="w-4 h-4" />
     </button>
