@@ -128,7 +128,7 @@ export const createBlastBodies = (
       {
         restitution: 0.6,
         friction: 0.1,
-        frictionAir: 0.01,
+        frictionAir: 0.02,
         density: 0.0005,
         // Store original grid data as metadata for later processing
         gridX: cell.x,
