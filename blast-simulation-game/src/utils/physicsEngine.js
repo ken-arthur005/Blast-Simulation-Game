@@ -161,7 +161,7 @@ export const createBlastBodies = (
  * @param {Array} blastCenters - array of pixel coordinates {x, y} for blast epicenters
  * @param {number} baseForce - scalar base force, tuned by caller (typ. small like 0.02 - 0.12)
  */
-export const applyBlastForce = (bodies, blastCenters, baseForce = 0.05) => {
+export const applyBlastForce = (bodies, blastCenters, baseForce = 0.4, decayRate = 0.1) => {
   if (!Array.isArray(bodies) || bodies.length === 0) return;
 
   // Clamp utility
@@ -186,7 +186,12 @@ export const applyBlastForce = (bodies, blastCenters, baseForce = 0.05) => {
         typeof body.blastDistance === "number"
           ? 1 + body.blastDistance * 0.5
           : 1;
-      const magnitude = (baseForce * forceFactor_meta) / distanceFactor;
+
+          //compute exponential decay based on distance
+      const exponentialDecay = baseForce * Math.exp(-decayRate * distanceFactor);
+      
+      //combine exponential decay with force factor
+      const magnitude = baseForce * forceFactor_meta * exponentialDecay;
 
       // small upward bias for nicer visuals
       const forceX = dirX_meta * magnitude;
@@ -211,10 +216,12 @@ export const applyBlastForce = (bodies, blastCenters, baseForce = 0.05) => {
           const ndx = dx / distance;
           const ndy = dy / distance;
 
-          // force decays with distance and uses any body.forceFactor if present
+          // apply exponential decay instead of linear falloff
+          const exponentialDecay = baseForce * Math.exp(-decayRate * distance);
           const factor =
-            forceFactor_meta > 0 ? forceFactor_meta : 1 / (1 + distance * 0.1);
-          const magnitude = baseForce * factor;
+            forceFactor_meta > 0 ? forceFactor_meta : 1;
+          const magnitude = baseForce * factor * exponentialDecay;
+
           const forceX = ndx * magnitude;
           const forceY = ndy * magnitude - 0.01;
 
