@@ -1,6 +1,7 @@
 import { useContext } from "react";
 import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
+import Button from "./Button";
 
 /**
  * Legend component showing ore types and their colors
@@ -51,21 +52,21 @@ const GridLegend = ({
           ))}
         </div>
       </div>
-      <button
-        className="mt-10 bg-red-500 text-white p-3 rounded hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-        onClick={handleTriggerBlast}
-        disabled={!gameState.blasts || gameState.blasts.length === 0}
-      >
-        Trigger Blast{" "}
-        {gameState.blasts?.length > 0 && `(${gameState.blasts.length})`}
-      </button>
-      <button
-        disabled={isBlasting}
-        className="mt-10 ml-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed hover:cursor-pointer"
-        onClick={() => resetCanvas()}
-      >
-        Reset Canvas
-      </button>
+      <div className="flex space-x-2">
+        <Button
+          label={`Trigger Blast (${gameState.blasts.length})`}
+          color="red"
+          onClick={handleTriggerBlast}
+          disabled={!gameState.blasts || gameState.blasts.length === 0}
+        />
+
+        <Button
+          label="Reset Canvas"
+          color="blue"
+          onClick={() => resetCanvas()}
+          disabled={isBlasting}
+        />
+      </div>
     </div>
   );
 };
