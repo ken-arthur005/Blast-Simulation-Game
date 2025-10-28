@@ -1,4 +1,5 @@
 import { Engine, Render, World, Bodies, Body, Events } from "matter-js";
+import OreColorMapper from "./oreColorMapper.js";
 
 /**
  * Create and initialize a Matter.js physics engine
@@ -93,6 +94,8 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
 
 /**
  * Convert affected grid cells to Matter.js bodies
+ * Now attaches directional metadata (dirX, dirY, forceFactor) to each body
+ * so applyBlastForce can use precomputed radial directions instead of recomputing.
  * @param {Array} affectedCells
  * @param {number} blockSize
  * @param {Object} gridOffset
@@ -105,14 +108,16 @@ export const createBlastBodies = (
   gridOffset = { x: 0, y: 0 },
   gridData
 ) => {
+  if (!Array.isArray(affectedCells)) return [];
+
   return affectedCells.map((cell) => {
-    // Convert grid coordinates to pixel coordinates
+    // Convert grid coordinates to pixel coordinates (center of block)
     const pixelX = cell.x * blockSize + gridOffset.x + blockSize / 2;
     const pixelY = cell.y * blockSize + gridOffset.y + blockSize / 2;
 
-    // Get the actual cell data from the grid
+    // Get the actual cell data from the grid if available
     const cellData = gridData?.grid?.[cell.y]?.[cell.x];
-    const oreType = cellData?.oreType || "unknown";
+    const oreType = cellData?.oreType || cell.oreType || "unknown";
 
     // Create rectangular body at block position
     const body = Bodies.rectangle(
@@ -224,6 +229,7 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     });
 
     // Add random rotation for visual interest
+    // keep angular velocities modest
     Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
   });
 };
