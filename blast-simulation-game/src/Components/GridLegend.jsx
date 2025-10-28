@@ -1,6 +1,7 @@
 import React, { useContext } from "react";
 import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
+import Button from "./Button";
 import ArrowButton from "./ArrowButton";
 
 /**
