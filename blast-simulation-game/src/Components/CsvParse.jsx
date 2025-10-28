@@ -29,9 +29,17 @@ const CsvParse = () => {
   //automatically load default CSV file
 
   const resetFileVisuals = () => {
-        
+  
         setFileKey(Date.now());
         
+    };
+
+    const getInitials = (playerName) => {
+      if (!playerName) return "PL";
+      const names = playerName.split(" ");
+      if (names.length === 1) return names[0].charAt(0).toUpperCase();
+      const initials = names.map((name) => name.charAt(0).toUpperCase());
+      return initials.join("");
     };
 
   useEffect(() => {
@@ -77,7 +85,8 @@ const CsvParse = () => {
             recovery and achieve the highest score
           </p>
         </div>
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-end mb-6 gap-8 items-center">
+          
           <CSVReader
             key={fileKey}
             onUploadAccepted={(results, file) => {
@@ -210,6 +219,9 @@ const CsvParse = () => {
               </>
             )}
           </CSVReader>
+          <div className="p-2 mx-4 bg-gray-200 rounded-full border border-gray-400 w-12 h-12 flex items-center justify-center text-lg font-semibold text-gray-700">
+            <p className="flex flex-row items-center">{getInitials(playerName)}</p>
+          </div>
         </div>
       </div>
 
