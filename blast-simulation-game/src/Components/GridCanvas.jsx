@@ -1,7 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "./OreBlock";
 import { Engine, World, Runner, Events } from "matter-js";
-import { createBlastBodies, applyBlastForce, cleanupPhysicsEngine, createBoundaryWalls } from "../utils/physicsEngine";
+import {
+  createBlastBodies,
+  applyBlastForce,
+  cleanupPhysicsEngine,
+  createBoundaryWalls,
+} from "../utils/physicsEngine";
 // import { gsap } from "gsap";
 
 const GridCanvas = ({
@@ -13,6 +18,7 @@ const GridCanvas = ({
   className = "",
   blasts = [],
   onBlockClick,
+  selectedBlast = null,
 }) => {
   const canvasRef = useRef(null);
   const blocksRef = useRef([]);
@@ -109,7 +115,8 @@ const GridCanvas = ({
     }
 
     // 2. Draw Blast Markers
-    blasts.forEach(({ x, y }) => {
+    blasts.forEach((blast) => {
+      const { x, y } = blast;
       // Calculate center of the block
       const centerX = x * blockSize + blockSize / 2;
       const centerY = y * blockSize + blockSize / 2;
@@ -125,6 +132,46 @@ const GridCanvas = ({
       ctx.arc(centerX, centerY, blockSize * 0.1, 0, Math.PI * 2);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
+
+      // Draw direction overlay for this blast (small arrow) so users can see per-blast dirKey
+      if (blast.dirKey) {
+        const arrowLen = blockSize * 0.28;
+        const angleMap = {
+          left: Math.PI,
+          right: 0,
+          up: -Math.PI / 2,
+          down: Math.PI / 2,
+          "up-left": (-3 * Math.PI) / 4,
+          "up-right": -Math.PI / 4,
+          "down-right": Math.PI / 4,
+          "down-left": (3 * Math.PI) / 4,
+        };
+        const ang = angleMap[blast.dirKey] ?? 0;
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(ang);
+        ctx.beginPath();
+        ctx.moveTo(0, -arrowLen * 0.2);
+        ctx.lineTo(arrowLen, 0);
+        ctx.lineTo(0, arrowLen * 0.2);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // If this blast is selected, draw a selection ring
+      if (selectedBlast && selectedBlast.x === x && selectedBlast.y === y) {
+        ctx.beginPath();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(37, 99, 235, 0.9)"; // indigo-600
+        ctx.arc(centerX, centerY, blockSize * 0.42, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     });
     // END NEW RENDERING LOGIC
 
@@ -134,7 +181,14 @@ const GridCanvas = ({
     console.log(
       `Canvas rendered: ${blocksRef.current.length} blocks, centered with offset (${offsetX}, ${offsetY})`
     );
-  }, [gridData, blockSize, blasts, hoveredBlock, destroyedCells]);
+  }, [
+    gridData,
+    blockSize,
+    blasts,
+    hoveredBlock,
+    destroyedCells,
+    selectedBlast,
+  ]);
   // Re-render when dependencies change
   useEffect(() => {
     renderCanvas();
@@ -244,7 +298,7 @@ const GridCanvas = ({
     const ctx = canvas.getContext("2d");
 
     const { affectedCells } = blastTrigger;
-    
+
     // Calculate grid offset for centering (same as in renderCanvas)
     const actualGridWidth = gridData.grid[0].length * blockSize;
     const actualGridHeight = gridData.grid.length * blockSize;
@@ -253,44 +307,41 @@ const GridCanvas = ({
 
     // Create Matter.js physics engine
     const engine = Engine.create({
-      gravity: { x: 0, y: 0.8 }
+      gravity: { x: 0, y: 0.8 },
     });
 
     const runner = Runner.create();
-    
+
     // Create boundary walls to contain debris
     const walls = createBoundaryWalls(canvasSize);
     World.add(engine.world, walls);
-    
+
     // Create bodies for affected cells
     const bodies = createBlastBodies(
-      affectedCells, 
-      blockSize, 
+      affectedCells,
+      blockSize,
       { x: offsetX, y: offsetY },
       gridData
     );
-    
+
     // Add bodies to the world
     World.add(engine.world, bodies);
-    
-    // Calculate blast centers in pixel coordinates
-    const blastCenters = [...new Set(affectedCells.map(c => `${c.blastX},${c.blastY}`))]
-      .map(coord => {
-        const [x, y] = coord.split(',').map(Number);
-        return {
-          x: x * blockSize + offsetX + blockSize / 2,
-          y: y * blockSize + offsetY + blockSize / 2
-        };
-      });
-    
-    // Apply blast forces
-    applyBlastForce(bodies, blastCenters, 0.1);
-    
+
+    // Calculate blast centers in pixel coordinates including their dirKey (use blasts prop so dirKey is preserved)
+    const blastCenters = (blasts || []).map((b) => ({
+      x: b.x * blockSize + offsetX + blockSize / 2,
+      y: b.y * blockSize + offsetY + blockSize / 2,
+      dirKey: b.dirKey || null,
+    }));
+
+    // Apply blast forces with directional bias
+    applyBlastForce(bodies, blastCenters, 0.05);
+
     // Start physics simulation
     Runner.run(runner, engine);
 
     const startTime = performance.now();
-    const duration = 5000; 
+    const duration = 5000;
     let animationFrame;
 
     const animatePhysics = (time) => {
@@ -319,7 +370,7 @@ const GridCanvas = ({
       gridData.grid.forEach((row, y) => {
         row.forEach((cell, x) => {
           const isAffected = affectedCells.some((c) => c.x === x && c.y === y);
-          
+
           if (!isAffected) {
             const block = new OreBlock(cell, x, y, blockSize);
             block.render(ctx);
@@ -330,22 +381,32 @@ const GridCanvas = ({
       ctx.restore();
 
       // Render physics bodies (affected cells as debris)
-      bodies.forEach(body => {
+      bodies.forEach((body) => {
         const opacity = Math.max(0, 1 - progress * 0.8);
-        
+
         ctx.save();
         ctx.translate(body.position.x, body.position.y);
         ctx.rotate(body.angle);
-        
+
         ctx.globalAlpha = opacity;
         ctx.fillStyle = body.render.fillStyle;
-        ctx.fillRect(-blockSize * 0.4, -blockSize * 0.4, blockSize * 0.8, blockSize * 0.8);
-        
+        ctx.fillRect(
+          -blockSize * 0.4,
+          -blockSize * 0.4,
+          blockSize * 0.8,
+          blockSize * 0.8
+        );
+
         // Add border
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
         ctx.lineWidth = 1;
-        ctx.strokeRect(-blockSize * 0.4, -blockSize * 0.4, blockSize * 0.8, blockSize * 0.8);
-        
+        ctx.strokeRect(
+          -blockSize * 0.4,
+          -blockSize * 0.4,
+          blockSize * 0.8,
+          blockSize * 0.8
+        );
+
         ctx.restore();
       });
 
@@ -355,23 +416,23 @@ const GridCanvas = ({
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
         }
-        
+
         // Stop physics simulation and cleanup
         Runner.stop(runner);
         cleanupPhysicsEngine(engine, null);
-        
+
         // Set destroyed cells first, then wait a bit before calling completion
         setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
         // Allow time for destroyed cells to render before completion callback
         setTimeout(() => {
-          onBlastComplete?.(); 
-        }, 200); 
+          onBlastComplete?.();
+        }, 200);
       }
     };
 
     animationFrame = requestAnimationFrame(animatePhysics);
-    
+
     return () => {
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
@@ -379,7 +440,7 @@ const GridCanvas = ({
       Runner.stop(runner);
       cleanupPhysicsEngine(engine, null);
     };
-  }, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete]);
+  }, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete, blasts]);
 
   if (!gridData) {
     return (

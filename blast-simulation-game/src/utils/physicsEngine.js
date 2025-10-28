@@ -129,23 +129,15 @@ export const createBlastBodies = (
         restitution: 0.6,
         friction: 0.1,
         frictionAir: 0.02,
-        density: 0.0005,
-        // Store original grid data as metadata for later processing
+        density: 0.001,
+        // Store original grid data as metadata
         gridX: cell.x,
         gridY: cell.y,
-        blastDistance: cell.distance ?? null,
-        blastX: cell.blastX ?? null,
-        blastY: cell.blastY ?? null,
-        // direction unit vector (grid-space) - may be undefined if not provided
-        blastDirX: typeof cell.dirX === "number" ? cell.dirX : null,
-        blastDirY: typeof cell.dirY === "number" ? cell.dirY : null,
-        // normalized strength (0..1) where 1 is at center, 0 at radius edge
-        forceFactor:
-          typeof cell.forceFactor === "number" ? cell.forceFactor : 0,
+        blastDistance: cell.distance,
         oreType: oreType,
         isOreBlock: true,
         render: {
-          fillStyle: OreColorMapper.getColor(oreType) || "#999999",
+          fillStyle: getOreColor(oreType),
         },
       }
     );
@@ -154,81 +146,87 @@ export const createBlastBodies = (
   });
 };
 
-/**
- * Apply blast force to bodies based on precomputed direction and forceFactor.
- * If per-body direction metadata is missing, falls back to computing direction from nearest blast center.
- * @param {Array} bodies - array of Matter bodies created by createBlastBodies
- * @param {Array} blastCenters - array of pixel coordinates {x, y} for blast epicenters
- * @param {number} baseForce - scalar base force, tuned by caller (typ. small like 0.02 - 0.12)
- */
-export const applyBlastForce = (bodies, blastCenters, baseForce = 0.4, decayRate = 0.1) => {
-  if (!Array.isArray(bodies) || bodies.length === 0) return;
+//Get ore color based on type
 
-  // Clamp utility
-  // Ensure physics stays stable, animation looks smoother or prevent matter.js from crashing
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const getOreColor = (oreType) => {
+  const colorMap = {
+    gold: "#FFD700",
+    silver: "#C0C0C0",
+    copper: "#B87333",
+    iron: "#8B4513",
+    coal: "#2C2C2C",
+    destroyed: "#808080",
+    unknown: "#999999",
+  };
+  return colorMap[oreType?.toLowerCase()] || "#999999";
+};
+
+/**
+ * Apply blast force to bodies based on distance from epicenter
+ * @param {Array} bodies
+ * @param {Array} blastCenters
+ * @param {number} blastForce
+ */
+export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
+  // direction map for biasing debris movement
+  const dirMap = {
+    right: { x: 1, y: 0 },
+    left: { x: -1, y: 0 },
+    up: { x: 0, y: -1 },
+    down: { x: 0, y: 1 },
+    "up-right": { x: 0.7071, y: -0.7071 },
+    "up-left": { x: -0.7071, y: -0.7071 },
+    "down-right": { x: 0.7071, y: 0.7071 },
+    "down-left": { x: -0.7071, y: 0.7071 },
+  };
+
+  // Increase bias so directionality is more visible. Tune this number as needed.
+  const biasMultiplier = 1.8; // how strong the directional bias is relative to radial force
+
+  // Additional impulse factor — apply a small velocity bump along the chosen direction to make movement more immediately visible
+  const impulseMultiplier = 0.6;
 
   bodies.forEach((body) => {
-    // Prefer per-body metadata attached earlier
-    const dirX_meta = body.blastDirX;
-    const dirY_meta = body.blastDirY;
-    const forceFactor_meta =
-      typeof body.forceFactor === "number" ? body.forceFactor : 0;
+    // Apply force from each blast center
+    blastCenters.forEach((blastCenter) => {
+      // Calculate direction from blast center to body
+      const dx = body.position.x - blastCenter.x;
+      const dy = body.position.y - blastCenter.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // If metadata present and valid direction, apply using it
-    if (
-      dirX_meta !== null &&
-      dirY_meta !== null &&
-      (dirX_meta !== 0 || dirY_meta !== 0)
-    ) {
-      // Use forceFactor as primary scaler; also slightly attenuate by blastDistance if present
-      const distanceFactor =
-        typeof body.blastDistance === "number"
-          ? 1 + body.blastDistance * 0.5
-          : 1;
+      // Normalize direction and apply force inversely proportional to distance
+      if (distance > 0) {
+        const forceMagnitude = blastForce / (1 + body.blastDistance * 0.5);
 
-          //compute exponential decay based on distance
-      const exponentialDecay = baseForce * Math.exp(-decayRate * distanceFactor);
-      
-      //combine exponential decay with force factor
-      const magnitude = baseForce * forceFactor_meta * exponentialDecay;
+        // Radial force
+        let forceX = (dx / distance) * forceMagnitude;
+        let forceY = (dy / distance) * forceMagnitude - 0.01;
 
-      // small upward bias for nicer visuals
-      const forceX = dirX_meta * magnitude;
-      const forceY = dirY_meta * magnitude - Math.abs(0.01 * forceFactor_meta);
+        // If this blast center has a direction key, bias the force and add a small velocity impulse
+        if (blastCenter.dirKey) {
+          const bias = dirMap[blastCenter.dirKey] || { x: 0, y: 0 };
+          // scale bias by the same falloff factor so closer debris get stronger bias
+          const biasScale = forceMagnitude * biasMultiplier;
+          forceX += bias.x * biasScale;
+          forceY += bias.y * biasScale;
 
-      // clamp forces to reasonable bounds to avoid physics explosions
-      const clampedForce = {
-        x: clamp(forceX, -0.5, 0.5),
-        y: clamp(forceY, -0.5, 0.5),
-      };
-
-      Body.applyForce(body, body.position, clampedForce);
-    } else {
-      // Fallback: apply forces from each blast center (legacy behavior)
-      blastCenters.forEach((blastCenter) => {
-        const dx = body.position.x - blastCenter.x;
-        const dy = body.position.y - blastCenter.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance > 0) {
-          // Compute normalized direction
-          const ndx = dx / distance;
-          const ndy = dy / distance;
-
-          // apply exponential decay instead of linear falloff
-          const exponentialDecay = baseForce * Math.exp(-decayRate * distance);
-          const factor =
-            forceFactor_meta > 0 ? forceFactor_meta : 1;
-          const magnitude = baseForce * factor * exponentialDecay;
-
-          const forceX = ndx * magnitude;
-          const forceY = ndy * magnitude - 0.01;
-
-          Body.applyForce(body, body.position, { x: forceX, y: forceY });
+          // Small instantaneous velocity bump to visually emphasize direction
+          try {
+            // current velocity
+            const vx = body.velocity?.x || 0;
+            const vy = body.velocity?.y || 0;
+            const impulseScale = forceMagnitude * impulseMultiplier;
+            const newVx = vx + bias.x * impulseScale;
+            const newVy = vy + bias.y * impulseScale;
+            Body.setVelocity(body, { x: newVx, y: newVy });
+          } catch {
+            // setVelocity may fail in some runtimes; ignore and continue
+          }
         }
-      });
-    }
+
+        Body.applyForce(body, body.position, { x: forceX, y: forceY });
+      }
+    });
 
     // Add random rotation for visual interest
     // keep angular velocities modest

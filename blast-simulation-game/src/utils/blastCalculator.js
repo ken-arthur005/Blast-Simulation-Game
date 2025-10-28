@@ -20,32 +20,8 @@ export const calculateAffectedCells = (grid, blast) => {
       
       // If within radius, add to affected cells
       if (distance <= radius) {
-        // angle from blast center to cell (radians)
-        // Note: grid y increases downward which matches canvas coordinate system
-        const angle = Math.atan2(dy, dx); // dy first then dx
-
-        // Unit direction vector from blast center outward to cell
-        const magnitude = distance === 0 ? 1 : distance;
-        const dirX = dx / magnitude;
-        const dirY = dy / magnitude;
-
-        // Normalized closeness factor (1.0 at center, 0.0 at radius edge)
-        const normalizedDistance = Math.min(distance / radius, 1);
-        const forceFactor = Math.max(0, 1 - normalizedDistance); // 1 -> 0
-
-        affected.push({
-          x,
-          y,
-          distance,
-          normalizedDistance,
-          forceFactor,
-          angle,
-          dirX,
-          dirY,
-          blastX,
-          blastY,
-          oreType: grid[y][x]?.oreType
-        });
+        // include blast metadata (e.g., dirKey) so affected cells know which blast influenced them
+        affected.push({ x, y, distance, blastX, blastY, oreType: grid[y][x]?.oreType, dirKey: blast.dirKey || null });
       }
     }
   }
