@@ -1,6 +1,6 @@
 import { useCSVReader } from "react-papaparse";
 import React, { useEffect, useState, useContext } from "react";
-import Toast from "./Toast";
+import Toast from "../Components/Toast";
 // import { useCSVReader, formatFileSize } from "react-papaparse";
 import Papa from "papaparse";
 import { Gamepad2 } from "lucide-react";
@@ -65,7 +65,7 @@ const CsvParse = () => {
   }, []);
 
   return (
-    <div className="w-full h-screen p-6 flex flex-col fixed">
+    <div className="w-full h-screen p-6 flex flex-col fixed bg3">
       {toast && (
         <Toast
           message={toast.message}
@@ -75,11 +75,9 @@ const CsvParse = () => {
       )}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="bg-clip-text bg-linear-to-r from-[#4E3063] to-[#C19A88] text-stroke text-[32px]">
-            ROCK BLASTERZ
-          </h1>
+          <h1 className="ui-font text-white text-[32px] [-webkit-text-stroke:2px_#E7B32F]">ROCK BLASTERZ</h1>
 
-          <p className="flex gap-2">
+          <p className="flex gap-2 text-[#C6D662]">
             <Gamepad2 />
             Welcome, {playerName}! Design your blast pattern to maximize ore
             recovery and achieve the highest score

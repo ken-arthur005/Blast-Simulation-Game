@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import OreBlock from "./OreBlock";
+import OreBlock from "../utils/OreBlock";
 import { Engine, World, Runner, Events } from "matter-js";
 import {
   createBlastBodies,

@@ -1,4 +1,4 @@
-import OreColorMapper from "../utils/oreColorMapper";
+import OreColorMapper from "./oreColorMapper";
 
 class OreBlock {
   constructor(cell, x, y, blockSize) {
