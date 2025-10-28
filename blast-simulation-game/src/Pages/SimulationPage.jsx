@@ -1,21 +1,21 @@
-import { useCSVReader, } from "react-papaparse";
+import { useCSVReader } from "react-papaparse";
 import React, { useEffect, useState, useContext } from "react";
-import Toast from "./Toast";
+import Toast from "../Components/Toast";
 // import { useCSVReader, formatFileSize } from "react-papaparse";
 import Papa from "papaparse";
 import { Gamepad2 } from "lucide-react";
 import { AiOutlineCloudUpload } from "react-icons/ai";
-import CsvDataValidation from "./CsvDataValidation";
-import CsvFileValidation from "./CsvFileValidation";
-import OreGridVisualization from "./OreGridVisualization";
-import { GameContext } from "./GameContext";
+import CsvDataValidation from "../Components/CsvDataValidation";
+import CsvFileValidation from "../Components/CsvFileValidation";
+import OreGridVisualization from "../Components/OreGridVisualization";
+import { GameContext } from "../Components/GameContext";
 
 const CsvParse = () => {
   const { CSVReader } = useCSVReader();
   const [zoneHover, setZoneHover] = useState(false);
   // const [removeHoverColor, setRemoveHoverColor] = useState();
   const [toast, setToast] = useState(null);
-  const [fileKey, setFileKey] = useState(Date.now()); 
+  const [fileKey, setFileKey] = useState(Date.now());
   const [validatedData, setValidatedData] = useState(null);
   const { gameState } = useContext(GameContext);
   const { playerName } = gameState;
@@ -29,32 +29,28 @@ const CsvParse = () => {
   //automatically load default CSV file
 
   const resetFileVisuals = () => {
-        
-        setFileKey(Date.now());
-        
-    };
+    setFileKey(Date.now());
+  };
 
   useEffect(() => {
     const loadDefaultCsv = async () => {
-    try {
-    const response = await fetch("/sample-ore.csv");
-    if (!response.ok) {
-    throw new Error("Failed to fetch default CSV file");
-    }
-    const csvText = await response.text();
-    // Parse the CSV text
-    const results = Papa.parse(csvText, { header: false });
-    setValidatedData(results);
-    console.log("Default CSV file loaded:", results);
-    } catch (error) {
-    console.error(error);
-    }
+      try {
+        const response = await fetch("/sample-ore.csv");
+        if (!response.ok) {
+          throw new Error("Failed to fetch default CSV file");
+        }
+        const csvText = await response.text();
+        // Parse the CSV text
+        const results = Papa.parse(csvText, { header: false });
+        setValidatedData(results);
+        console.log("Default CSV file loaded:", results);
+      } catch (error) {
+        console.error(error);
+      }
     };
 
     loadDefaultCsv();
-    }, []); 
-     
-  
+  }, []);
 
   return (
     <div className="w-full h-screen p-6 flex flex-col fixed">
@@ -87,14 +83,12 @@ const CsvParse = () => {
               console.log("File:", file);
               console.log("---------------------------");
 
-              
-
               // First validate the file itself
               const fileValidation = CsvFileValidation(file);
               if (!fileValidation.isValid) {
                 showToast(fileValidation.error, "error");
                 setZoneHover(false);
-                resetFileVisuals()
+                resetFileVisuals();
                 return; // Don't proceed with data validation
               }
 
@@ -103,7 +97,7 @@ const CsvParse = () => {
               if (!dataValidation.isValid) {
                 showToast(dataValidation.error, "error");
                 setZoneHover(false);
-                resetFileVisuals()
+                resetFileVisuals();
                 return; // Don't accept the file
               }
 

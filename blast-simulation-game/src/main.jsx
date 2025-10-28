@@ -4,8 +4,8 @@ import App from './App.jsx'
 import './App.css'
 import {createBrowserRouter, RouterProvider} from 'react-router-dom'
 import HomePage from './Pages/HomePage.jsx';
-import CsvParse from './Components/CsvParse.jsx'
-import {GameProvider } from './Components/GameContext.jsx'
+import CsvParse from '../src/Pages/SimulationPage.jsx'
+import {GameProvider } from '../src/Components/GameContext.jsx'
 
 
 const router = createBrowserRouter([
