@@ -36,7 +36,7 @@ const CsvDataValidation = (results) => {
       console.log('Normalized headers:', normalizedHeaders);
       
       // Check for required columns
-      const requiredColumns = ['x', 'y', 'ore_type'];
+      const requiredColumns = ['x', 'y', 'ore_type', 'density', 'hardness', 'fragmentation_index'];
       const missingColumns = requiredColumns.filter(col => {
         const isPresent = normalizedHeaders.includes(col.toLowerCase());
         console.log(`Checking for column "${col}": ${isPresent ? 'FOUND' : 'MISSING'}`);
@@ -55,6 +55,9 @@ const CsvDataValidation = (results) => {
       const xIndex = normalizedHeaders.indexOf('x');
       const yIndex = normalizedHeaders.indexOf('y');
       const oreTypeIndex = normalizedHeaders.indexOf('ore_type');
+      const densityIndex = normalizedHeaders.indexOf('density');
+      const hardnessIndex = normalizedHeaders.indexOf('hardness');
+      const fragmentationIndex = normalizedHeaders.indexOf('fragmentation_index');
 
       console.log(`Column indices - X: ${xIndex}, Y: ${yIndex}, ore_type: ${oreTypeIndex}`);
 
