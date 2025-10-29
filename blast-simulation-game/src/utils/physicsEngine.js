@@ -192,27 +192,13 @@ export const createBlastBodies = (
         isOreBlock: true,
         cellData: cellData,
         render: {
-          fillStyle: getOreColor(oreType),
+          fillStyle: OreColorMapper.colorMap[oreType?.toLowerCase()],
         },
       }
     );
 
     return body;
   });
-};
-
-//Get ore color based on type
-const getOreColor = (oreType) => {
-  const colorMap = {
-    gold: "#FFD700",
-    silver: "#C0C0C0",
-    copper: "#B87333",
-    iron: "#8B4513",
-    coal: "#2C2C2C",
-    destroyed: "#808080",
-    unknown: "#999999",
-  };
-  return colorMap[oreType?.toLowerCase()] || "#999999";
 };
 
 /**
