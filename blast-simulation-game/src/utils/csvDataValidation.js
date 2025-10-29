@@ -224,7 +224,7 @@ const validateDataRow = (row, index, columnIndices) => {
   // Range validation for material properties (only if they're valid numbers)
   if (!densityError) {
     const density = Number(values.density);
-    if (density < 0.5 || density > 20) {
+    if (density < 0.001 || density > 25) {
       errors.push(
         `Row ${rowNum}: Density "${density}" must be between 0.5 and 20 g/cm³`
       );
