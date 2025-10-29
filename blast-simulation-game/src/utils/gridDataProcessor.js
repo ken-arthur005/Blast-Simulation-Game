@@ -19,6 +19,9 @@ class GridDataProcessor {
     const xIndex = normalizedHeaders.indexOf('x');
     const yIndex = normalizedHeaders.indexOf('y');
     const oreTypeIndex = normalizedHeaders.indexOf('ore_type');
+    const densityIndex = normalizedHeaders.indexOf('density');
+    const hardnessIndex = normalizedHeaders.indexOf('hardness');
+    const fragmentationIndex = normalizedHeaders.indexOf('fragmentation_index');
 
     if (xIndex === -1 || yIndex === -1 || oreTypeIndex === -1) {
       console.error('Required columns (x, y, ore_type) not found in CSV data');
@@ -35,6 +38,9 @@ class GridDataProcessor {
       const x = parseInt(row[xIndex]);
       const y = parseInt(row[yIndex]);
       const oreType = row[oreTypeIndex].toString().trim();
+      const density = parseFloat(row[densityIndex]);
+      const hardness = parseFloat(row[hardnessIndex]);
+      const fragmentation = parseFloat(row[fragmentationIndex]);
 
       // Skip invalid rows
       if (isNaN(x) || isNaN(y) || !oreType) {
