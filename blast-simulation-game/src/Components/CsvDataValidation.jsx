@@ -272,7 +272,7 @@ const validateDataRows = (data, columnIndices) => {
  * @param {Object} results - Papa Parse results object with data and errors
  * @returns {Object} - { isValid: boolean, error?: string, data?: Object }
  */
-const CsvDataValidation = (results) => {
+const csvDataValidation = (results) => {
   console.log("Starting CSV validation...");
   const { data, errors } = results;
 
@@ -306,4 +306,4 @@ const CsvDataValidation = (results) => {
   return { isValid: true, data: results };
 };
 
-export default CsvDataValidation;
+export default csvDataValidation;
