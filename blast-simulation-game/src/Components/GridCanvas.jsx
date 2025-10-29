@@ -415,6 +415,83 @@ const GridCanvas = ({
         shockwave.opacity = Math.max(0, 1 - shockwaveProgress);
         shockwave.flashOpacity = Math.max(0, 1 - flashProgress * 2);
 
+        // FIRE/EXPLOSION PARTICLES 🔥💥
+        if (elapsed < 800) { // Fire particles last 0.8s
+          const particleProgress = Math.min(elapsed / 800, 1);
+          const numParticles = 12;
+          
+          for (let p = 0; p < numParticles; p++) {
+            const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01;
+            const distance = particleProgress * blockSize * 2.5 * (1 + Math.sin(elapsed * 0.02 + p) * 0.3);
+            const particleX = center.x + Math.cos(angle) * distance;
+            const particleY = center.y + Math.sin(angle) * distance - particleProgress * blockSize * 0.5; // Rise up
+            
+            // Particle size shrinks over time
+            const particleSize = blockSize * 0.15 * (1 - particleProgress * 0.7);
+            
+            // Color shifts from white -> yellow -> orange -> red -> fade
+            let particleColor;
+            if (particleProgress < 0.2) {
+              particleColor = '#ffffff';
+            } else if (particleProgress < 0.4) {
+              particleColor = '#ffff00';
+            } else if (particleProgress < 0.6) {
+              particleColor = '#ff8800';
+            } else {
+              particleColor = '#ff3300';
+            }
+            
+            ctx.save();
+            ctx.globalAlpha = (1 - particleProgress) * 0.8;
+            
+            // Draw flame particle with glow
+            const particleGradient = ctx.createRadialGradient(
+              particleX, particleY, 0,
+              particleX, particleY, particleSize
+            );
+            particleGradient.addColorStop(0, particleColor);
+            particleGradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+            
+            ctx.fillStyle = particleGradient;
+            ctx.beginPath();
+            ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        // SMOKE PUFFS 💨
+        if (elapsed > 200 && elapsed < 1500) { // Smoke appears after initial flash
+          const smokeProgress = Math.min((elapsed - 200) / 1300, 1);
+          const numPuffs = 6;
+          
+          for (let s = 0; s < numPuffs; s++) {
+            const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005;
+            const distance = smokeProgress * blockSize * 1.8;
+            const puffX = center.x + Math.cos(angle) * distance;
+            const puffY = center.y + Math.sin(angle) * distance - smokeProgress * blockSize * 1.2; // Rise up more
+            
+            const puffSize = blockSize * 0.4 * (1 + smokeProgress);
+            
+            ctx.save();
+            ctx.globalAlpha = (1 - smokeProgress) * 0.4;
+            
+            // Gray smoke
+            const smokeGradient = ctx.createRadialGradient(
+              puffX, puffY, 0,
+              puffX, puffY, puffSize
+            );
+            smokeGradient.addColorStop(0, '#666666');
+            smokeGradient.addColorStop(1, 'rgba(50, 50, 50, 0)');
+            
+            ctx.fillStyle = smokeGradient;
+            ctx.beginPath();
+            ctx.arc(puffX, puffY, puffSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
         // Draw initial flash
         if (shockwave.flashOpacity > 0) {
           ctx.save();
