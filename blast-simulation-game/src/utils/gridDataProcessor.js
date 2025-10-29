@@ -53,7 +53,7 @@ class GridDataProcessor {
         console.warn(`Unexpected NaN in material properties for row ${index + 2} - this should not happen due to validation`);
       }
 
-      blocks.push({ x, y, oreType });
+      blocks.push({ x, y, oreType, density, hardness, fragmentation_index });
       
       // Update bounds
       minX = Math.min(minX, x);
