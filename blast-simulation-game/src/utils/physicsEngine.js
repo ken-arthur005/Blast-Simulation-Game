@@ -119,17 +119,25 @@ export const createBlastBodies = (
     const cellData = gridData?.grid?.[cell.y]?.[cell.x];
     const oreType = cellData?.oreType || cell.oreType || "unknown";
 
+    // Extract material properties (use defaults if missing for safety)
+    const density = cellData?.density ?? 0.001;   // Fallback to original default
+    const hardness = cellData?.hardness ?? 0.5;  // Fallback for hardness
+    const fragmentationIndex = cellData?.fragmentation_index ?? 0.5;  // Fallback for fragmentation
+
+    // Adjust body size based on fragmentation_index (higher = smaller pieces)
+    const adjustBlockSize = blockSize * 0.8 * (1 - fragmentationIndex * 0.3);   // Scale down for breakage
+
     // Create rectangular body at block position
     const body = Bodies.rectangle(
       pixelX,
       pixelY,
-      blockSize * 0.8,
-      blockSize * 0.8,
+      adjustBlockSize,
+      adjustBlockSize,
       {
-        restitution: 0.6,
+        restitution: 0.3 + hardness * 0.4,  // Harder materials bounce more (up to 0.7)
         friction: 0.1,
         frictionAir: 0.02,
-        density: 0.001,
+        density: density,   // Direct from material
         // Store original grid data as metadata
         gridX: cell.x,
         gridY: cell.y,
