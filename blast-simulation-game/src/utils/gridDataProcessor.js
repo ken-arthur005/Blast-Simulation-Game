@@ -40,12 +40,17 @@ class GridDataProcessor {
       const oreType = row[oreTypeIndex].toString().trim();
       const density = parseFloat(row[densityIndex]);
       const hardness = parseFloat(row[hardnessIndex]);
-      const fragmentation = parseFloat(row[fragmentationIndex]);
+      const fragmentation_index = parseFloat(row[fragmentationIndex]);
 
       // Skip invalid rows
       if (isNaN(x) || isNaN(y) || !oreType) {
         console.warn(`Skipping invalid row ${index + 2}: x=${row[xIndex]}, y=${row[yIndex]}, ore_type=${row[oreTypeIndex]}`);
         return;
+      }
+
+      // Log warnings for any NaN (shouldn't happen due to validation, but safety check)
+      if (isNaN(density) || isNaN(hardness) || isNaN(fragmentation_index)) {
+        console.warn(`Unexpected NaN in material properties for row ${index + 2} - this should not happen due to validation`);
       }
 
       blocks.push({ x, y, oreType });
