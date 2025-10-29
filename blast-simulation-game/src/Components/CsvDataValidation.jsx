@@ -59,7 +59,10 @@ const CsvDataValidation = (results) => {
       const hardnessIndex = normalizedHeaders.indexOf('hardness');
       const fragmentationIndex = normalizedHeaders.indexOf('fragmentation_index');
 
-      console.log(`Column indices - X: ${xIndex}, Y: ${yIndex}, ore_type: ${oreTypeIndex}`);
+      console.log(
+        `Column indices - X: ${xIndex}, Y: ${yIndex}, ore_type: ${oreTypeIndex}, density: ${densityIndex}, \
+        hardness: ${hardnessIndex}, fragmentation_index: ${fragmentationIndex}`
+      );
 
       // Validate data rows (skip header row)
       const dataRows = data.slice(1);
@@ -81,16 +84,25 @@ const CsvDataValidation = (results) => {
         }
         
         // Check if row has enough columns
-        if (row.length <= Math.max(xIndex, yIndex, oreTypeIndex)) {
-          invalidRows.push(`Row ${index + 2}: Insufficient columns (expected at least ${Math.max(xIndex, yIndex, oreTypeIndex) + 1}, got ${row.length})`);
+        if (row.length <= Math.max(xIndex, yIndex, oreTypeIndex, densityIndex, hardnessIndex, fragmentationIndex)) {
+          invalidRows.push(
+            `Row ${index + 2}: Insufficient columns (expected at least \
+            ${Math.max(xIndex, yIndex, oreTypeIndex, densityIndex, hardnessIndex, fragmentationIndex) + 1}, got ${row.length})`
+          );
           return;
         }
         
         const xValue = row[xIndex];
         const yValue = row[yIndex];
         const oreTypeValue = row[oreTypeIndex];
+        const densityValue = row[densityIndex];
+        const hardnessValue = row[hardnessIndex];
+        const fragmentationValue = row[fragmentationIndex];
         
-        console.log(`Row ${index + 2} values - X: "${xValue}", Y: "${yValue}", ore_type: "${oreTypeValue}"`);
+        console.log(
+          `Row ${index + 2} values - X: "${xValue}", Y: "${yValue}", ore_type: "${oreTypeValue}", Density: "${densityValue}", \
+          Hardness: "${hardnessValue}", Fragmentation Index: "${fragmentationValue}"`
+        );
         
         // Check if x value is a valid number
         if (xValue === undefined || xValue === null || xValue === '' || xValue.toString().trim() === '') {
@@ -116,6 +128,31 @@ const CsvDataValidation = (results) => {
         if (oreTypeValue === undefined || oreTypeValue === null || oreTypeValue.toString().trim() === '') {
           invalidRows.push(`Row ${index + 2}: ore_type value is empty`);
         }
+
+        // Check if density value is a valid number
+        if (densityValue === undefined && densityValue === null && densityValue === '') {
+          const densityNum = parseFloat(densityValue);
+          if (isNaN(densityNum)) {
+            invalidRows.push(`Row ${index + 2}: Density value "${densityValue}" is not a valid number`);
+          }
+        }
+
+        // Check if hardness value is a valid number
+        if (hardnessValue === undefined && hardnessValue === null && hardnessValue === '') {
+          const hardnessNum = parseFloat(hardnessValue);
+          if (isNaN(hardnessNum)) {
+            invalidRows.push(`Row ${index + 2}: Hardness value "${hardnessValue}" is not a valid number`);
+          }
+        }
+
+        // Check if fragmentation_index value is a valid number
+        if (fragmentationValue === undefined && fragmentationValue === null && fragmentationValue === '') {
+          const fragmentationNum = parseFloat(fragmentationValue);
+          if (isNaN(fragmentationNum)) {
+            invalidRows.push(`Row ${index + 2}: Fragmentation Index value "${fragmentationValue}" is not a valid number`);
+          }
+        }
+
       });
 
       if (invalidRows.length > 0) {
