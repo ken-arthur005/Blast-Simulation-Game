@@ -5,7 +5,7 @@ import Toast from "./Toast";
 import Papa from "papaparse";
 import { Gamepad2 } from "lucide-react";
 import { AiOutlineCloudUpload } from "react-icons/ai";
-import CsvDataValidation from "./CsvDataValidation";
+import csvDataValidation from "../utils/csvDataValidation";
 import CsvFileValidation from "./CsvFileValidation";
 import OreGridVisualization from "./OreGridVisualization";
 import { GameContext } from "./GameContext";
@@ -108,7 +108,7 @@ const CsvParse = () => {
               }
 
               // Then validate the CSV data
-              const dataValidation = CsvDataValidation(results);
+              const dataValidation = csvDataValidation(results);
               if (!dataValidation.isValid) {
                 showToast(dataValidation.error, "error");
                 setZoneHover(false);
