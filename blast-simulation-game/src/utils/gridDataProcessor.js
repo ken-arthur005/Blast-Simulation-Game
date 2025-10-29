@@ -87,6 +87,9 @@ class GridDataProcessor {
         x: block.x,
         y: block.y,
         oreType: block.oreType,
+        density: block.density,
+        hardness: block.hardness,
+        fragmentation_index: block.fragmentation_index,
         gridX,
         gridY
       };
