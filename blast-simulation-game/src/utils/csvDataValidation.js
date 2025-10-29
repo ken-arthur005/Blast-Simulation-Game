@@ -221,6 +221,33 @@ const validateDataRow = (row, index, columnIndices) => {
   );
   if (fragmentationError) errors.push(fragmentationError);
 
+  // Range validation for material properties (only if they're valid numbers)
+  if (!densityError) {
+    const density = Number(values.density);
+    if (density < 0.5 || density > 20) {
+      errors.push(
+        `Row ${rowNum}: Density "${density}" must be between 0.5 and 20 g/cm³`
+      );
+    }
+  }
+
+  if (!hardnessError) {
+    const hardness = Number(values.hardness);
+    if (hardness < 0 || hardness > 1) {
+      errors.push(
+        `Row ${rowNum}: Hardness "${hardness}" must be between 0.0 and 1.0`
+      );
+    }
+  }
+
+  if (!fragmentationError) {
+    const fragmentation = Number(values.fragmentation);
+    if (fragmentation < 0 || fragmentation > 1) {
+      errors.push(
+        `Row ${rowNum}: Fragmentation index "${fragmentation}" must be between 0.0 and 1.0`
+      );
+    }
+  }
   return errors;
 };
 
