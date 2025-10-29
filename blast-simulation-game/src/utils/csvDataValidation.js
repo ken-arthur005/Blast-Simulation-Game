@@ -131,18 +131,18 @@ const validateNumericField = (value, fieldName, rowNum) => {
 /**
  * Validate an optional numeric field (only checks if value is present)
  */
-const validateOptionalNumericField = (value, fieldName, rowNum) => {
-  if (isEmpty(value)) {
-    return null; // Optional field can be empty
-  }
+// const validateOptionalNumericField = (value, fieldName, rowNum) => {
+//   if (isEmpty(value)) {
+//     return null; // Optional field can be empty
+//   }
 
-  const numValue = parseFloat(value);
-  if (isNaN(numValue)) {
-    return `Row ${rowNum}: ${fieldName} value "${value}" is not a valid number`;
-  }
+//   const numValue = parseFloat(value);
+//   if (isNaN(numValue)) {
+//     return `Row ${rowNum}: ${fieldName} value "${value}" is not a valid number`;
+//   }
 
-  return null;
-};
+//   return null;
+// };
 
 /**
  * Validate a single data row
@@ -204,21 +204,17 @@ const validateDataRow = (row, index, columnIndices) => {
   }
 
   // Validate optional numeric fields
-  const densityError = validateOptionalNumericField(
-    values.density,
-    "Density",
-    rowNum
-  );
+  const densityError = validateNumericField(values.density, "Density", rowNum);
   if (densityError) errors.push(densityError);
 
-  const hardnessError = validateOptionalNumericField(
+  const hardnessError = validateNumericField(
     values.hardness,
     "Hardness",
     rowNum
   );
   if (hardnessError) errors.push(hardnessError);
 
-  const fragmentationError = validateOptionalNumericField(
+  const fragmentationError = validateNumericField(
     values.fragmentation,
     "Fragmentation Index",
     rowNum
