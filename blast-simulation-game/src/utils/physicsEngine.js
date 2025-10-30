@@ -1,6 +1,54 @@
 import { Engine, Render, World, Bodies, Body, Events } from "matter-js";
 import OreColorMapper from "./oreColorMapper.js";
 
+// Helper utils for safe scaling
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const mapRange = (v, inMin, inMax, outMin, outMax) => {
+  const t = (clamp(v, inMin, inMax) - inMin) / (inMax - inMin);
+  return outMin + t * (outMax - outMin);
+};
+
+// Centralize material-to-physics mapping
+// Assumptions:
+// - density in CSV ~ 1.0..8.0 (g/cm^3) typical rock/ore range
+// - hardness in CSV ~ 0.0..1.0 (soft..hard)
+// - fragmentation_index in CSV ~ 0.0..1.0 (cohesive..fragile)
+const computeMaterialScales = (cellData) => {
+  const rawDensity = Number.isFinite(cellData?.density)
+    ? cellData.density
+    : 2.5;
+  const rawHardness = Number.isFinite(cellData?.hardness)
+    ? cellData.hardness
+    : 0.5;
+  const frag = Number.isFinite(cellData?.fragmentation_index)
+    ? cellData.fragmentation_index
+    : 0.5;
+
+  // Displacement scale: light and soft → move more; heavy and hard → move less
+  const densityForceScale = mapRange(rawDensity, 1.0, 8.0, 1.2, 0.6);
+  const hardnessForceScale = mapRange(rawHardness, 0.0, 1.0, 1.25, 0.85);
+  const fragmentationForceScale = mapRange(frag, 0.0, 1.0, 0.95, 1.15);
+  const displacementScale =
+    densityForceScale * hardnessForceScale * fragmentationForceScale;
+
+  // Matter body properties tuned for stability
+  const restitution = mapRange(rawHardness, 0.0, 1.0, 0.25, 0.55);
+  const frictionAir = mapRange(rawDensity, 1.0, 8.0, 0.035, 0.02); // heavier -> less drag
+  const matterDensity = mapRange(rawDensity, 1.0, 8.0, 0.0007, 0.0012); // keep near Matter default range
+
+  // Visual size: fragile breaks smaller but still “a little bigger” than before
+  const sizeScale = mapRange(frag, 0.0, 1.0, 0.92, 0.65);
+
+  return {
+    displacementScale,
+    restitution,
+    frictionAir,
+    matterDensity,
+    sizeScale,
+    frag,
+  };
+};
+
 /**
  * Create and initialize a Matter.js physics engine
  * @param {HTMLCanvasElement} canvas
@@ -119,46 +167,38 @@ export const createBlastBodies = (
     const cellData = gridData?.grid?.[cell.y]?.[cell.x];
     const oreType = cellData?.oreType || cell.oreType || "unknown";
 
+    // Normalize material props → physics scales
+    const scales = computeMaterialScales(cellData);
+
+    // Adjust body size based on fragmentation (slightly bigger than before)
+    const adjustBlockSize = blockSize * scales.sizeScale;
+
     // Create rectangular body at block position
     const body = Bodies.rectangle(
       pixelX,
       pixelY,
-      blockSize * 0.8,
-      blockSize * 0.8,
+      adjustBlockSize,
+      adjustBlockSize,
       {
-        restitution: 0.6,
+        restitution: scales.restitution,
         friction: 0.1,
-        frictionAir: 0.02,
-        density: 0.001,
-        // Store original grid data as metadata
+        frictionAir: scales.frictionAir,
+        density: scales.matterDensity, // normalized for Matter.js stability
+        // Store metadata
         gridX: cell.x,
         gridY: cell.y,
         blastDistance: cell.distance,
         oreType: oreType,
         isOreBlock: true,
+        cellData: cellData,
         render: {
-          fillStyle: getOreColor(oreType),
+          fillStyle: OreColorMapper.colorMap[oreType?.toLowerCase()],
         },
       }
     );
 
     return body;
   });
-};
-
-//Get ore color based on type
-
-const getOreColor = (oreType) => {
-  const colorMap = {
-    gold: "#FFD700",
-    silver: "#C0C0C0",
-    copper: "#B87333",
-    iron: "#8B4513",
-    coal: "#2C2C2C",
-    destroyed: "#808080",
-    unknown: "#999999",
-  };
-  return colorMap[oreType?.toLowerCase()] || "#999999";
 };
 
 /**
@@ -174,63 +214,71 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     left: { x: -1, y: 0 },
     up: { x: 0, y: -1 },
     down: { x: 0, y: 1 },
-    "up-right": { x: 0.7071, y: -0.7071 },
-    "up-left": { x: -0.7071, y: -0.7071 },
-    "down-right": { x: 0.7071, y: 0.7071 },
-    "down-left": { x: -0.7071, y: 0.7071 },
+    "up-right": { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
+    "up-left": { x: -Math.SQRT1_2, y: -Math.SQRT1_2 },
+    "down-right": { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+    "down-left": { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
   };
 
-  // Increase bias so directionality is more visible. Tune this number as needed.
-  const biasMultiplier = 1.8; // how strong the directional bias is relative to radial force
+  // Calmer biasing
+  const biasMultiplier = 1.2;
+  const impulseMultiplier = 0.25;
+  const maxForcePerCall = 0.004; // clamp to avoid explosive impulses
 
-  // Additional impulse factor — apply a small velocity bump along the chosen direction to make movement more immediately visible
-  const impulseMultiplier = 0.6;
+  const clampVec = (vx, vy, maxMag) => {
+    const mag = Math.hypot(vx, vy);
+    if (mag <= maxMag || mag === 0) return { x: vx, y: vy };
+    const s = maxMag / mag;
+    return { x: vx * s, y: vy * s };
+  };
 
   bodies.forEach((body) => {
-    // Apply force from each blast center
     blastCenters.forEach((blastCenter) => {
       // Calculate direction from blast center to body
       const dx = body.position.x - blastCenter.x;
       const dy = body.position.y - blastCenter.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = Math.hypot(dx, dy);
+      if (distance === 0) return;
 
-      // Normalize direction and apply force inversely proportional to distance
-      if (distance > 0) {
-        const forceMagnitude = blastForce / (1 + body.blastDistance * 0.5);
+      const ux = dx / distance;
+      const uy = dy / distance;
 
-        // Radial force
-        let forceX = (dx / distance) * forceMagnitude;
-        let forceY = (dy / distance) * forceMagnitude - 0.01;
+      // Material scaling
+      const scales = computeMaterialScales(body.cellData);
 
-        // If this blast center has a direction key, bias the force and add a small velocity impulse
-        if (blastCenter.dirKey) {
-          const bias = dirMap[blastCenter.dirKey] || { x: 0, y: 0 };
-          // scale bias by the same falloff factor so closer debris get stronger bias
-          const biasScale = forceMagnitude * biasMultiplier;
-          forceX += bias.x * biasScale;
-          forceY += bias.y * biasScale;
+      // Distance falloff: use both grid blastDistance and pixel distance (gentle)
+      const gridFalloff = 1 / (1 + (body.blastDistance ?? 0) * 0.45);
+      const radialFalloff = 1 / (1 + distance * 0.002);
 
-          // Small instantaneous velocity bump to visually emphasize direction
-          try {
-            // current velocity
-            const vx = body.velocity?.x || 0;
-            const vy = body.velocity?.y || 0;
-            const impulseScale = forceMagnitude * impulseMultiplier;
-            const newVx = vx + bias.x * impulseScale;
-            const newVy = vy + bias.y * impulseScale;
-            Body.setVelocity(body, { x: newVx, y: newVy });
-          } catch {
-            // setVelocity may fail in some runtimes; ignore and continue
-          }
-        }
+      let forceMagnitude =
+        blastForce * gridFalloff * radialFalloff * scales.displacementScale;
 
-        Body.applyForce(body, body.position, { x: forceX, y: forceY });
+      // Radial force component
+      let forceX = ux * forceMagnitude;
+      let forceY = uy * forceMagnitude;
+
+      // Optional directional bias
+      if (blastCenter.dirKey) {
+        const bias = dirMap[blastCenter.dirKey] || { x: 0, y: 0 };
+        const biasScale = forceMagnitude * biasMultiplier; // no double material scaling
+        forceX += bias.x * biasScale;
+        forceY += bias.y * biasScale;
+
+        // Small extra "kick" as force (not velocity) so mass matters
+        const impulseScale = forceMagnitude * impulseMultiplier;
+        Body.applyForce(body, body.position, {
+          x: bias.x * impulseScale,
+          y: bias.y * impulseScale,
+        });
       }
+
+      // Clamp total force for stability
+      const clamped = clampVec(forceX, forceY, maxForcePerCall);
+      Body.applyForce(body, body.position, clamped);
     });
 
-    // Add random rotation for visual interest
-    // keep angular velocities modest
-    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
+    // Mild random rotation
+    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.12);
   });
 };
 

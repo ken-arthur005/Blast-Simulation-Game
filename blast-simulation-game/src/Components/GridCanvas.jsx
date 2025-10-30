@@ -289,15 +289,28 @@ const GridCanvas = ({
     setHoveredBlock(null);
   }, []);
 
+  // Add a ref to track if blast is already running
+  const isBlastRunningRef = useRef(false);
+
   useEffect(() => {
     if (!blastTrigger || !gridData || !gridData.grid || !gridData.grid.length)
       return;
+
+    // PREVENT DOUBLE EXECUTION
+    if (isBlastRunningRef.current) {
+      console.log("Blast already running, skipping duplicate trigger");
+      return;
+    }
 
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
     const { affectedCells } = blastTrigger;
+
+    // Mark blast as running
+    isBlastRunningRef.current = true;
+    console.log("Starting blast animation...");
 
     // Calculate grid offset for centering (same as in renderCanvas)
     const actualGridWidth = gridData.grid[0].length * blockSize;
@@ -352,6 +365,7 @@ const GridCanvas = ({
         }
         Runner.stop(runner);
         cleanupPhysicsEngine(engine, null);
+        isBlastRunningRef.current = false; // Reset flag
         return;
       }
 
@@ -426,6 +440,8 @@ const GridCanvas = ({
 
         // Allow time for destroyed cells to render before completion callback
         setTimeout(() => {
+          isBlastRunningRef.current = false; // Reset flag BEFORE callback
+          console.log("Blast animation completed");
           onBlastComplete?.();
         }, 200);
       }
@@ -439,8 +455,9 @@ const GridCanvas = ({
       }
       Runner.stop(runner);
       cleanupPhysicsEngine(engine, null);
+      isBlastRunningRef.current = false; // Reset on cleanup
     };
-  }, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete, blasts]);
+  }, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete]); // Remove 'blasts' from dependencies
 
   if (!gridData) {
     return (

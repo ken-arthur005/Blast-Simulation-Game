@@ -19,6 +19,9 @@ class GridDataProcessor {
     const xIndex = normalizedHeaders.indexOf('x');
     const yIndex = normalizedHeaders.indexOf('y');
     const oreTypeIndex = normalizedHeaders.indexOf('ore_type');
+    const densityIndex = normalizedHeaders.indexOf('density');
+    const hardnessIndex = normalizedHeaders.indexOf('hardness');
+    const fragmentationIndex = normalizedHeaders.indexOf('fragmentation_index');
 
     if (xIndex === -1 || yIndex === -1 || oreTypeIndex === -1) {
       console.error('Required columns (x, y, ore_type) not found in CSV data');
@@ -35,6 +38,9 @@ class GridDataProcessor {
       const x = parseInt(row[xIndex]);
       const y = parseInt(row[yIndex]);
       const oreType = row[oreTypeIndex].toString().trim();
+      const density = parseFloat(row[densityIndex]);
+      const hardness = parseFloat(row[hardnessIndex]);
+      const fragmentation_index = parseFloat(row[fragmentationIndex]);
 
       // Skip invalid rows
       if (isNaN(x) || isNaN(y) || !oreType) {
@@ -42,7 +48,12 @@ class GridDataProcessor {
         return;
       }
 
-      blocks.push({ x, y, oreType });
+      // Log warnings for any NaN (shouldn't happen due to validation, but safety check)
+      if (isNaN(density) || isNaN(hardness) || isNaN(fragmentation_index)) {
+        console.warn(`Unexpected NaN in material properties for row ${index + 2} - this should not happen due to validation`);
+      }
+
+      blocks.push({ x, y, oreType, density, hardness, fragmentation_index });
       
       // Update bounds
       minX = Math.min(minX, x);
@@ -76,6 +87,9 @@ class GridDataProcessor {
         x: block.x,
         y: block.y,
         oreType: block.oreType,
+        density: block.density,
+        hardness: block.hardness,
+        fragmentation_index: block.fragmentation_index,
         gridX,
         gridY
       };

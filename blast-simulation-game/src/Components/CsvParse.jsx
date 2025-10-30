@@ -1,11 +1,11 @@
-import { useCSVReader, } from "react-papaparse";
+import { useCSVReader } from "react-papaparse";
 import React, { useEffect, useState, useContext } from "react";
 import Toast from "./Toast";
 // import { useCSVReader, formatFileSize } from "react-papaparse";
 import Papa from "papaparse";
 import { Gamepad2 } from "lucide-react";
 import { AiOutlineCloudUpload } from "react-icons/ai";
-import CsvDataValidation from "./CsvDataValidation";
+import csvDataValidation from "../utils/csvDataValidation";
 import CsvFileValidation from "./CsvFileValidation";
 import OreGridVisualization from "./OreGridVisualization";
 import { GameContext } from "./GameContext";
@@ -15,7 +15,7 @@ const CsvParse = () => {
   const [zoneHover, setZoneHover] = useState(false);
   // const [removeHoverColor, setRemoveHoverColor] = useState();
   const [toast, setToast] = useState(null);
-  const [fileKey, setFileKey] = useState(Date.now()); 
+  const [fileKey, setFileKey] = useState(Date.now());
   const [validatedData, setValidatedData] = useState(null);
   const { gameState } = useContext(GameContext);
   const { playerName } = gameState;
@@ -29,40 +29,40 @@ const CsvParse = () => {
   //automatically load default CSV file
 
   const resetFileVisuals = () => {
-  
-        setFileKey(Date.now());
-        
-    };
+    setFileKey(Date.now());
+  };
 
-    const getInitials = (playerName) => {
-      if (!playerName) return "PL";
-      const names = playerName.split(" ");
-      if (names.length === 1) return names[0].charAt(0).toUpperCase();
-      const initials = names.map((name) => name.charAt(0).toUpperCase());
-      return initials.join("");
-    };
+  const getInitials = (playerName) => {
+    if (!playerName) return "PL";
+    const names = playerName.split(" ");
+    if (names.length === 1) return names[0].charAt(0).toUpperCase();
+    const initials = names.map((name) => name.charAt(0).toUpperCase());
+    return initials.join("");
+  };
 
   useEffect(() => {
     const loadDefaultCsv = async () => {
-    try {
-    const response = await fetch("/sample-ore.csv");
-    if (!response.ok) {
-    throw new Error("Failed to fetch default CSV file");
-    }
-    const csvText = await response.text();
-    // Parse the CSV text
-    const results = Papa.parse(csvText, { header: false });
-    setValidatedData(results);
-    console.log("Default CSV file loaded:", results);
-    } catch (error) {
-    console.error(error);
-    }
+      try {
+        const response = await fetch("/sample-ore-large.csv");
+        if (!response.ok) {
+          throw new Error("Failed to fetch default CSV file");
+        }
+        const csvText = await response.text();
+        // Parse the CSV text
+        const results = Papa.parse(csvText, {
+          header: false,
+          skipEmptyLines: true,
+          transform: (value) => value.trim(),
+        });
+        setValidatedData(results);
+        console.log("Default CSV file loaded:", results);
+      } catch (error) {
+        console.error(error);
+      }
     };
 
     loadDefaultCsv();
-    }, []); 
-     
-  
+  }, []);
 
   return (
     <div className="w-full h-screen p-6 flex flex-col fixed">
@@ -86,7 +86,6 @@ const CsvParse = () => {
           </p>
         </div>
         <div className="flex justify-end mb-6 gap-8 items-center">
-          
           <CSVReader
             key={fileKey}
             onUploadAccepted={(results, file) => {
@@ -96,23 +95,21 @@ const CsvParse = () => {
               console.log("File:", file);
               console.log("---------------------------");
 
-              
-
               // First validate the file itself
               const fileValidation = CsvFileValidation(file);
               if (!fileValidation.isValid) {
                 showToast(fileValidation.error, "error");
                 setZoneHover(false);
-                resetFileVisuals()
+                resetFileVisuals();
                 return; // Don't proceed with data validation
               }
 
               // Then validate the CSV data
-              const dataValidation = CsvDataValidation(results);
+              const dataValidation = csvDataValidation(results);
               if (!dataValidation.isValid) {
                 showToast(dataValidation.error, "error");
                 setZoneHover(false);
-                resetFileVisuals()
+                resetFileVisuals();
                 return; // Don't accept the file
               }
 
@@ -220,7 +217,9 @@ const CsvParse = () => {
             )}
           </CSVReader>
           <div className="p-2 mx-4 bg-gray-200 rounded-full border border-gray-400 w-12 h-12 flex items-center justify-center text-lg font-semibold text-gray-700">
-            <p className="flex flex-row items-center">{getInitials(playerName)}</p>
+            <p className="flex flex-row items-center">
+              {getInitials(playerName)}
+            </p>
           </div>
         </div>
       </div>
