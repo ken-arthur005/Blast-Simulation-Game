@@ -7,7 +7,7 @@ import {
   cleanupPhysicsEngine,
   createBoundaryWalls,
 } from "../utils/physicsEngine";
-// import { gsap } from "gsap";
+import { gsap } from "gsap";
 
 const GridCanvas = ({
   gridData,
@@ -21,6 +21,7 @@ const GridCanvas = ({
   selectedBlast = null,
 }) => {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const blocksRef = useRef([]);
   const [hoveredBlock, setHoveredBlock] = useState(null);
   const [destroyedCells, setDestroyedCells] = useState([]);
@@ -303,7 +304,8 @@ const GridCanvas = ({
     }
 
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
     const ctx = canvas.getContext("2d");
 
     const { affectedCells } = blastTrigger;
@@ -317,6 +319,19 @@ const GridCanvas = ({
     const actualGridHeight = gridData.grid.length * blockSize;
     const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
     const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
+
+    // VIOLENT CANVAS SHAKE 🔥
+    gsap.to(container, {
+      x: "random(-12, 12)",
+      y: "random(-12, 12)",
+      duration: 0.05,
+      repeat: 7,
+      yoyo: true,
+      ease: "power2.inOut",
+      onComplete: () => {
+        gsap.set(container, { x: 0, y: 0 });
+      }
+    });
 
     // Create Matter.js physics engine
     const engine = Engine.create({
@@ -347,14 +362,23 @@ const GridCanvas = ({
       dirKey: b.dirKey || null,
     }));
 
-    // Apply blast forces with directional bias
-    applyBlastForce(bodies, blastCenters, 0.05);
+    // Apply MORE POWERFUL blast forces 🔥
+    applyBlastForce(bodies, blastCenters, 0.08);
+
+    // Shockwave animation state
+    const shockwaves = blastCenters.map(() => ({
+      radius: 0,
+      opacity: 1,
+      flashOpacity: 1
+    }));
 
     // Start physics simulation
     Runner.run(runner, engine);
 
     const startTime = performance.now();
     const duration = 5000;
+    const shockwaveDuration = 500; // 0.5s for shockwave
+    const flashDuration = 150; // Quick flash
     let animationFrame;
 
     const animatePhysics = (time) => {
@@ -371,6 +395,8 @@ const GridCanvas = ({
 
       const elapsed = time - startTime;
       const progress = Math.min(elapsed / duration, 1);
+      const shockwaveProgress = Math.min(elapsed / shockwaveDuration, 1);
+      const flashProgress = Math.min(elapsed / flashDuration, 1);
 
       // Clear canvas with background
       ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
@@ -394,10 +420,170 @@ const GridCanvas = ({
 
       ctx.restore();
 
-      // Render physics bodies (affected cells as debris)
+      // RENDER SHOCKWAVES 🔥
+      blastCenters.forEach((center, i) => {
+        const shockwave = shockwaves[i];
+        
+        // Update shockwave properties
+        shockwave.radius = shockwaveProgress * blockSize * 4; // Expand to 4 block radius
+        shockwave.opacity = Math.max(0, 1 - shockwaveProgress);
+        shockwave.flashOpacity = Math.max(0, 1 - flashProgress * 2);
+
+        // FIRE/EXPLOSION PARTICLES 🔥💥
+        if (elapsed < 800) { // Fire particles last 0.8s
+          const particleProgress = Math.min(elapsed / 800, 1);
+          const numParticles = 12;
+          
+          for (let p = 0; p < numParticles; p++) {
+            const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01;
+            const distance = particleProgress * blockSize * 2.5 * (1 + Math.sin(elapsed * 0.02 + p) * 0.3);
+            const particleX = center.x + Math.cos(angle) * distance;
+            const particleY = center.y + Math.sin(angle) * distance - particleProgress * blockSize * 0.5; // Rise up
+            
+            // Particle size shrinks over time
+            const particleSize = blockSize * 0.15 * (1 - particleProgress * 0.7);
+            
+            // Color shifts from white -> yellow -> orange -> red -> fade
+            let particleColor;
+            if (particleProgress < 0.2) {
+              particleColor = '#ffffff';
+            } else if (particleProgress < 0.4) {
+              particleColor = '#ffff00';
+            } else if (particleProgress < 0.6) {
+              particleColor = '#ff8800';
+            } else {
+              particleColor = '#ff3300';
+            }
+            
+            ctx.save();
+            ctx.globalAlpha = (1 - particleProgress) * 0.8;
+            
+            // Draw flame particle with glow
+            const particleGradient = ctx.createRadialGradient(
+              particleX, particleY, 0,
+              particleX, particleY, particleSize
+            );
+            particleGradient.addColorStop(0, particleColor);
+            particleGradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+            
+            ctx.fillStyle = particleGradient;
+            ctx.beginPath();
+            ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        // SMOKE PUFFS 💨
+        if (elapsed > 200 && elapsed < 1500) { // Smoke appears after initial flash
+          const smokeProgress = Math.min((elapsed - 200) / 1300, 1);
+          const numPuffs = 6;
+          
+          for (let s = 0; s < numPuffs; s++) {
+            const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005;
+            const distance = smokeProgress * blockSize * 1.8;
+            const puffX = center.x + Math.cos(angle) * distance;
+            const puffY = center.y + Math.sin(angle) * distance - smokeProgress * blockSize * 1.2; // Rise up more
+            
+            const puffSize = blockSize * 0.4 * (1 + smokeProgress);
+            
+            ctx.save();
+            ctx.globalAlpha = (1 - smokeProgress) * 0.4;
+            
+            // Gray smoke
+            const smokeGradient = ctx.createRadialGradient(
+              puffX, puffY, 0,
+              puffX, puffY, puffSize
+            );
+            smokeGradient.addColorStop(0, '#666666');
+            smokeGradient.addColorStop(1, 'rgba(50, 50, 50, 0)');
+            
+            ctx.fillStyle = smokeGradient;
+            ctx.beginPath();
+            ctx.arc(puffX, puffY, puffSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        // Draw initial flash
+        if (shockwave.flashOpacity > 0) {
+          ctx.save();
+          ctx.globalAlpha = shockwave.flashOpacity;
+          const gradient = ctx.createRadialGradient(
+            center.x, center.y, 0,
+            center.x, center.y, blockSize * 1.5
+          );
+          gradient.addColorStop(0, '#ffffff');
+          gradient.addColorStop(0.3, '#ffff00');
+          gradient.addColorStop(1, 'rgba(255, 200, 0, 0)');
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(center.x, center.y, blockSize * 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw expanding shockwave rings
+        if (shockwave.opacity > 0 && shockwave.radius > 0) {
+          // Outer ring (red)
+          ctx.save();
+          ctx.globalAlpha = shockwave.opacity * 0.6;
+          ctx.strokeStyle = '#ff0000';
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          ctx.arc(center.x, center.y, shockwave.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+
+          // Middle ring (orange)
+          ctx.save();
+          ctx.globalAlpha = shockwave.opacity * 0.8;
+          ctx.strokeStyle = '#ff6600';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(center.x, center.y, shockwave.radius * 0.7, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+
+          // Inner ring (yellow-white)
+          ctx.save();
+          ctx.globalAlpha = shockwave.opacity;
+          ctx.strokeStyle = '#ffcc00';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(center.x, center.y, shockwave.radius * 0.4, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
+
+      // Render physics bodies (affected cells as debris) with motion trails 🔥
       bodies.forEach((body) => {
         const opacity = Math.max(0, 1 - progress * 0.8);
 
+        // Draw motion trail
+        if (body.velocity.x !== 0 || body.velocity.y !== 0) {
+          const trailLength = Math.sqrt(
+            body.velocity.x ** 2 + body.velocity.y ** 2
+          ) * 3;
+          
+          ctx.save();
+          ctx.globalAlpha = opacity * 0.3;
+          ctx.strokeStyle = body.render.fillStyle;
+          ctx.lineWidth = blockSize * 0.6;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(body.position.x, body.position.y);
+          ctx.lineTo(
+            body.position.x - body.velocity.x * 2,
+            body.position.y - body.velocity.y * 2
+          );
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Draw debris block
         ctx.save();
         ctx.translate(body.position.x, body.position.y);
         ctx.rotate(body.angle);
@@ -471,7 +657,10 @@ const GridCanvas = ({
   }
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden inline-block">
+    <div 
+      ref={containerRef}
+      className="border border-gray-300 rounded-lg overflow-hidden inline-block"
+    >
       <canvas
         ref={canvasRef}
         width={canvasSize.width}
