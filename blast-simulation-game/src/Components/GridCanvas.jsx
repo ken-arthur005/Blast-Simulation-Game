@@ -99,6 +99,46 @@ const GridCanvas = ({
       }
     });
 
+    // const cellSpacing = 1; // adjust to control spacing between cells
+    // const innerBlockSize = blockSize - cellSpacing;
+
+    // blocksRef.current.forEach((block) => {
+    //   const isDestroyed = destroyedCells.some(
+    //     (cell) => cell.x === block.gridX && cell.y === block.gridY
+    //   );
+
+    //   const renderX = block.gridX * blockSize + cellSpacing / 2;
+    //   const renderY = block.gridY * blockSize + cellSpacing / 2;
+
+    //   ctx.save();
+    //   ctx.translate(renderX, renderY);
+
+    //   // draw the glassy cell background (optional, for faint white cells)
+    //   ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+    //   ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    //   ctx.lineWidth = 1.5;
+    //   ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
+    //   ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
+
+    //   // render your block content (colored ore, etc.)
+    //   const blockToRender = isDestroyed
+    //     ? new OreBlock(
+    //         { ...block.cell, oreType: "destroyed" },
+    //         block.gridX,
+    //         block.gridY,
+    //         innerBlockSize
+    //       )
+    //     : block;
+
+    //   // Move drawing origin inside the cell
+    //   ctx.save();
+    //   ctx.translate(cellSpacing / 2, cellSpacing / 2);
+    //   blockToRender.render(ctx);
+    //   ctx.restore();
+
+    //   ctx.restore();
+    // });
+
     // NEW RENDERING LOGIC
 
     // 1. Draw Hover Highlight
@@ -362,7 +402,7 @@ const GridCanvas = ({
       dirKey: b.dirKey || null,
     }));
 
-    // Apply MORE POWERFUL blast forces 🔥
+    // Apply blast forces (tunable factor)
     applyBlastForce(bodies, blastCenters, 0.08);
 
     // Shockwave animation state
@@ -423,7 +463,7 @@ const GridCanvas = ({
       // RENDER SHOCKWAVES 🔥
       blastCenters.forEach((center, i) => {
         const shockwave = shockwaves[i];
-        
+
         // Update shockwave properties
         shockwave.radius = shockwaveProgress * blockSize * 4; // Expand to 4 block radius
         shockwave.opacity = Math.max(0, 1 - shockwaveProgress);
@@ -433,16 +473,16 @@ const GridCanvas = ({
         if (elapsed < 800) { // Fire particles last 0.8s
           const particleProgress = Math.min(elapsed / 800, 1);
           const numParticles = 12;
-          
+
           for (let p = 0; p < numParticles; p++) {
             const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01;
             const distance = particleProgress * blockSize * 2.5 * (1 + Math.sin(elapsed * 0.02 + p) * 0.3);
             const particleX = center.x + Math.cos(angle) * distance;
             const particleY = center.y + Math.sin(angle) * distance - particleProgress * blockSize * 0.5; // Rise up
-            
+
             // Particle size shrinks over time
             const particleSize = blockSize * 0.15 * (1 - particleProgress * 0.7);
-            
+
             // Color shifts from white -> yellow -> orange -> red -> fade
             let particleColor;
             if (particleProgress < 0.2) {
@@ -454,10 +494,10 @@ const GridCanvas = ({
             } else {
               particleColor = '#ff3300';
             }
-            
+
             ctx.save();
             ctx.globalAlpha = (1 - particleProgress) * 0.8;
-            
+
             // Draw flame particle with glow
             const particleGradient = ctx.createRadialGradient(
               particleX, particleY, 0,
@@ -465,7 +505,7 @@ const GridCanvas = ({
             );
             particleGradient.addColorStop(0, particleColor);
             particleGradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
-            
+
             ctx.fillStyle = particleGradient;
             ctx.beginPath();
             ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
@@ -478,18 +518,18 @@ const GridCanvas = ({
         if (elapsed > 200 && elapsed < 1500) { // Smoke appears after initial flash
           const smokeProgress = Math.min((elapsed - 200) / 1300, 1);
           const numPuffs = 6;
-          
+
           for (let s = 0; s < numPuffs; s++) {
             const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005;
             const distance = smokeProgress * blockSize * 1.8;
             const puffX = center.x + Math.cos(angle) * distance;
             const puffY = center.y + Math.sin(angle) * distance - smokeProgress * blockSize * 1.2; // Rise up more
-            
+
             const puffSize = blockSize * 0.4 * (1 + smokeProgress);
-            
+
             ctx.save();
             ctx.globalAlpha = (1 - smokeProgress) * 0.4;
-            
+
             // Gray smoke
             const smokeGradient = ctx.createRadialGradient(
               puffX, puffY, 0,
@@ -497,7 +537,7 @@ const GridCanvas = ({
             );
             smokeGradient.addColorStop(0, '#666666');
             smokeGradient.addColorStop(1, 'rgba(50, 50, 50, 0)');
-            
+
             ctx.fillStyle = smokeGradient;
             ctx.beginPath();
             ctx.arc(puffX, puffY, puffSize, 0, Math.PI * 2);
@@ -564,10 +604,6 @@ const GridCanvas = ({
 
         // Draw motion trail
         if (body.velocity.x !== 0 || body.velocity.y !== 0) {
-          const trailLength = Math.sqrt(
-            body.velocity.x ** 2 + body.velocity.y ** 2
-          ) * 3;
-          
           ctx.save();
           ctx.globalAlpha = opacity * 0.3;
           ctx.strokeStyle = body.render.fillStyle;
@@ -643,7 +679,7 @@ const GridCanvas = ({
       cleanupPhysicsEngine(engine, null);
       isBlastRunningRef.current = false; // Reset on cleanup
     };
-  }, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete]); // Remove 'blasts' from dependencies
+  }, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete, blasts]);
 
   if (!gridData) {
     return (
@@ -656,18 +692,32 @@ const GridCanvas = ({
     );
   }
 
+  // return (
+  //   <div className="border border-gray-300 rounded-lg overflow-hidden inline-block">
+  //     <canvas
+  //       ref={canvasRef}
+  //       width={canvasSize.width}
+  //       height={canvasSize.height}
+  //       className={`${className}`}
+  //       style={{ display: "block" }}
+  //       // ATTACH HANDLERS HERE
+  //       onClick={handleClick}
+  //       onMouseMove={handleMouseMove}
+  //       onMouseLeave={handleMouseLeave}
+  //     />
+  //   </div>
+  // );
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="border border-gray-300 rounded-lg overflow-hidden inline-block"
+      className={`border border-gray-300 rounded-lg overflow-hidden inline-block ${className}`}
+      style={{ width: canvasSize.width, height: canvasSize.height }}
     >
       <canvas
         ref={canvasRef}
         width={canvasSize.width}
         height={canvasSize.height}
-        className={`${className}`}
         style={{ display: "block" }}
-        // ATTACH HANDLERS HERE
         onClick={handleClick}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}

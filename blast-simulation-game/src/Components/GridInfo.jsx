@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 /**
  * Component displaying grid statistics and information
@@ -11,7 +11,7 @@ const GridInfo = ({ gridData, blockSize, canvasSize, className = "" }) => {
   const { dimensions, metadata } = gridData;
 
   return (
-    <div className={`mb-4 text-sm text-gray-600 ${className}`}>
+    <div className={`mb-4 text-sm text-[#E5E4E2] ${className}`}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
           <span className="font-medium">Grid Size:</span>
@@ -29,13 +29,14 @@ const GridInfo = ({ gridData, blockSize, canvasSize, className = "" }) => {
           {metadata.oreTypes.length}
         </div>
         <div>
-          <span className="font-medium">Block Size:</span>
+          <span className="font-medium ">Block Size:</span>
           <br />
           {blockSize}px
         </div>
       </div>
-      <div className="mt-2">
-        <span className="font-medium">Canvas Size:</span> {canvasSize.width} × {canvasSize.height}
+      <div className="mt-2 ">
+        <span className="font-medium ">Canvas Size:</span> {canvasSize.width} ×{" "}
+        {canvasSize.height}
       </div>
     </div>
   );

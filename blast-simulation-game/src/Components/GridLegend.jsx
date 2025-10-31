@@ -48,16 +48,20 @@ const GridLegend = ({
 
   return (
     <div>
-      <div className={`mt-4 p-4 bg-gray-100 rounded-lg ${className} mb-3`}>
+      <div className={`mt-4 p-4 bg-gray-100 rounded-lg ${className}`}>
         <h3 className="text-lg font-semibold mb-3">Ore Types Legend</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div
+          className="grid grid-cols-2
+     
+       gap-3"
+        >
           {oreTypes.map((oreType) => (
             <div key={oreType} className="flex items-center space-x-2">
               <div
                 className="w-5 h-5 border border-gray-400 rounded flex-shrink-0"
                 style={{ backgroundColor: colorMapping[oreType] }}
               />
-              <span className="text-sm capitalize truncate">{oreType}</span>
+              <span className="text-sm capitalize truncate ui-font">{oreType}</span>
             </div>
           ))}
         </div>

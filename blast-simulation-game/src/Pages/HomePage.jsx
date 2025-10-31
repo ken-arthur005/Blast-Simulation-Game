@@ -21,62 +21,74 @@ function HomePage() {
   };
 
   return (
-    <div className="background text-center fixed inset-0 flex flex-col justify-center h-screen w-full p-3 sm:p-4 lg:p-4 overflow-hidden">
+    <div className="bg3 text-center fixed inset-0 flex flex-col justify-center h-screen w-full p-3 sm:p-4 lg:p-4 overflow-hidden">
       {/* Title Section */}
       <div className="ui-font text-center flex-shrink-0 pt-1 sm:pt-12 lg:pt-24 ">
         <h1
-          className="text-[32px] xs:text-[40px] sm:text-[60px] md:text-[80px] lg:text-[100px] xl:text-[140px] 
-                     tracking-[3px] xs:tracking-[4px] sm:tracking-[6px] md:tracking-[8px] xl:tracking-[14px] 
-                     leading-[32px] xs:leading-[40px] sm:leading-[60px] md:leading-[80px] lg:leading-[120px] xl:leading-[120px] 
-                     font-[400px]"
+          className="text-white text-[32px]"
+          // className="text-[32px] xs:text-[40px] sm:text-[60px] md:text-[80px] lg:text-[100px] xl:text-[140px]
+          //            tracking-[3px] xs:tracking-[4px] sm:tracking-[6px] md:tracking-[8px] xl:tracking-[14px]
+          //            leading-[32px] xs:leading-[40px] sm:leading-[60px] md:leading-[80px] lg:leading-[120px] xl:leading-[120px]
+          //            font-[400px]"
         >
-          <span className="text-transparent bg-clip-text bg-linear-to-r from-[#3E1E68] to-[#C19A88] text-stroke block">
+          Welcome to <br /> <span className="text-[64px]">Rock Blasterz</span>
+          {/* <span c
+          lassName="text-transparent bg-clip-text bg-linear-to-r from-[#3E1E68] to-[#C19A88] text-stroke block">
             ROCK
           </span>
           <span className="text-transparent bg-clip-text bg-linear-to-r from-[#3E1E68] to-[#C19A88] text-stroke block">
             BLASTERZ
-          </span>
+          </span> */}
         </h1>
         <h2
-          className="ui-font text-[10px] xs:text-[12px] sm:text-[16px] md:text-[20px] lg:text-[24px] xl:text-[24px] 
-                     tracking-[1px] xs:tracking-[1.2px] sm:tracking-[1.6px] md:tracking-[2px] lg:tracking-[2.4px] xl:tracking-[2.8px] 
-                     text-center"
+          className="text-white text-[32px]"
+          // className="ui-font text-[10px] xs:text-[12px] sm:text-[16px] md:text-[20px] lg:text-[24px] xl:text-[24px]
+          //            tracking-[1px] xs:tracking-[1.2px] sm:tracking-[1.6px] md:tracking-[2px] lg:tracking-[2.4px] xl:tracking-[2.8px]
+          //            text-center"
         >
-          A realistic 2d rock blasting simulation
+          {/* A realistic 2d rock blasting simulation */}
+          Enter your name ☺️
         </h2>
       </div>
 
       {/* Form Section */}
       <div className="flex flex-col items-center w-full max-w-[872px] mx-auto sm:mt-2">
         <div
-          className="ui-font relative rounded-[12px] sm:rounded-[16px] lg:rounded-[20px] 
-                     bg-[radial-gradient(50%_50%_at_50%_50%,_#4E3063_0%,_#9E61C9_100%)] 
-                     w-full max-w-[280px] xs:max-w-[300px] sm:max-w-[400px] md:max-w-[500px] lg:max-w-[650px] xl:max-w-[720px] 
-                     min-h-[100px] xs:min-h-[110px] sm:min-h-[130px] lg:min-h-[150px] xl:min-h-[100px] 
-                     flex flex-col justify-center items-center sm:py-5 lg:py-6 "
+        // className="ui-font relative rounded-[12px] sm:rounded-[16px] lg:rounded-[20px]
+        //            bg-[radial-gradient(50%_50%_at_50%_50%,_#4E3063_0%,_#9E61C9_100%)]
+        //            w-full max-w-[280px] xs:max-w-[300px] sm:max-w-[400px] md:max-w-[500px] lg:max-w-[650px] xl:max-w-[720px]
+        //            min-h-[100px] xs:min-h-[110px] sm:min-h-[130px] lg:min-h-[150px] xl:min-h-[100px]
+        //            flex flex-col justify-center items-center sm:py-5 lg:py-6 "
         >
-          <h2
+          {/* <h2
             className="text-[#F6DBA3] text-center text-shadow 
                        text-[18px] xs:text-[20px] sm:text-[28px] md:text-[36px] lg:text-[44px] xl:text-[52px] 
                        tracking-[1.8px] xs:tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.4px] xl:tracking-[5.2px] 
                        text-stroke mb-2 sm:mb-2"
           >
             What is your name?
-          </h2>
+          </h2> */}
           <input
             type="text"
             onChange={(e) => {
               setGameState({ ...gameState, playerName: e.target.value });
             }}
             value={gameState.playerName}
-            className="w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[350px] md:max-w-[450px] lg:max-w-[580px] xl:max-w-[680px] 
-                       h-[28px] xs:h-[30px] sm:h-[38px] lg:h-[44px] xl:h-[50px] 
-                       rounded-[12px] sm:rounded-[16px] lg:rounded-[20px] 
-                       bg-[#F6DBA3] opacity-75
-                       text-sm xs:text-base sm:text-lg lg:text-xl xl:text-2xl 
-                       px-2 sm:px-3 lg:px-4 
-                       font-semibold placeholder:text-[#7A6F6F] text-[#3B2F2F] text-center uppercase"
-            placeholder="Enter name"
+            className="rounded-[10px] backdrop-blur-[12px] bg-[rgba(255,255,255,0.15)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] h-[80px] w-[600px] mb-7  text-center
+    text-white
+    placeholder:text-white/70
+    outline-none
+    focus:border-white/50
+    focus:ring-0"
+            placeholder="name"
+            // className="w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[350px] md:max-w-[450px] lg:max-w-[580px] xl:max-w-[680px]
+            //            h-[28px] xs:h-[30px] sm:h-[38px] lg:h-[44px] xl:h-[50px]
+            //            rounded-[12px] sm:rounded-[16px] lg:rounded-[20px]
+            //            bg-[#F6DBA3] opacity-75
+            //            text-sm xs:text-base sm:text-lg lg:text-xl xl:text-2xl
+            //            px-2 sm:px-3 lg:px-4
+            //            font-semibold placeholder:text-[#7A6F6F] text-[#3B2F2F] text-center uppercase"
+            // placeholder="Enter name"
           />
           {error && (
             <p className="text-[#FF6B6B] text-m mt-2 font-semibold">{error}</p>
@@ -84,51 +96,71 @@ function HomePage() {
         </div>
 
         <div
-          className="w-full max-w-[280px] sm:max-w-[350px] md:max-w-[450px] lg:max-w-[550px] xl:max-w-[621px] 
-                        h-[45px] sm:h-[55px] lg:h-[65px] xl:h-[75px] 
-                        rounded-b-[15px] sm:rounded-b-[20px] lg:rounded-b-[25px] 
-                        bg-[#9E61C9] mx-auto box-shadow flex items-center justify-center z-10 ui-font "
+        // className="w-full max-w-[280px] sm:max-w-[350px] md:max-w-[450px] lg:max-w-[550px] xl:max-w-[621px]
+        //               h-[45px] sm:h-[55px] lg:h-[65px] xl:h-[75px]
+        //               rounded-b-[15px] sm:rounded-b-[20px] lg:rounded-b-[25px]
+        //               bg-[#9E61C9] mx-auto box-shadow flex items-center justify-center z-10 ui-font "
         >
           {gameState.playerName && gameState.playerName.trim() ? (
             <button
               onClick={handleStartGame}
-              className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
-                        h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px] 
-                        bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)] 
-                        backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px] 
-                        text-center text-[#5A3C62] 
-                        text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px] 
-                        font-[400px] 
-                        tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
-                        transition transform ${
-                          clicked ? "scale-105" : ""
-                        } mb-7`}
+              className="
+    rounded-[10px]
+    backdrop-blur-[12px]
+    bg-[rgb(112,171,117)]
+    border-2
+    border-[rgba(255,255,255,0.3)]
+    shadow-[0_4px_30px_rgba(0,0,0,0.1)]
+    text-white
+    text-xl
+    font-semibold
+    px-8
+    py-4
+    hover:bg-[rgba(112,171,117,0.8)]
+    hover:scale-105
+    transition-all
+    duration-300
+  "
+              // className="mt-3.5"
+              // className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px]
+              //           h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px]
+              //           bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)]
+              //           backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px]
+              //           text-center text-[#5A3C62]
+              //           text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px]
+              //           font-[400px]
+              //           tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px]
+              //           transition transform ${
+              //             clicked ? "scale-105" : ""
+              //           } mb-7`}
               type="submit"
             >
-              <Link to="/simulation-screen">Start Game</Link>
+              <Link to="/simulation-screen">
+              Start Game
+              </Link>
             </button>
           ) : (
             <button
               onClick={handleStartGame}
-              className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px] 
-                        h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px] 
-                        bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)] 
-                        backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px] 
-                        text-center text-[#5A3C62] 
-                        text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px] 
-                        font-[400px] 
-                        tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px] 
-                        opacity-50 mb-7 cursor-not-allowed`}
-              type="submit"
+              // className={`w-full max-w-[220px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[360px] xl:max-w-[400px]
+              //           h-[35px] sm:h-[45px] lg:h-[52px] xl:h-[60px]
+              //           bg-[radial-gradient(339.72%_50%_at_50%_50%,_#D9D9D9_0%,_#737373_100%)]
+              //           backdrop-blur-[2px] rounded-[15px] sm:rounded-[20px] lg:rounded-[25px]
+              //           text-center text-[#5A3C62]
+              //           text-[20px] sm:text-[28px] md:text-[36px] lg:text-[42px] xl:text-[50px]
+              //           font-[400px]
+              //           tracking-[2px] sm:tracking-[2.8px] md:tracking-[3.6px] lg:tracking-[4.2px] xl:tracking-[6.4px]
+              //           opacity-50 mb-7 cursor-not-allowed`}
+              // type="submit"
             >
-              <Link>Start Game</Link>
+              {/* <Link>Start Game</Link> */}
             </button>
           )}
         </div>
       </div>
 
       {/* Leaderboard Button */}
-      <button
+      {/* <button
         className="w-full max-w-[200px] xs:max-w-[220px] sm:max-w-[250px] lg:max-w-[280px] 
                    h-[36px] xs:h-[38px] sm:h-[44px] lg:h-[52px] 
                    rounded-[16px] sm:rounded-[20px] lg:rounded-[25px] 
@@ -151,7 +183,7 @@ function HomePage() {
         <h3 className="leaderboard-font text-[12px] xs:text-[14px] sm:text-[18px] lg:text-[20px] font-bold tracking-wide">
           LeaderBoard
         </h3>
-      </button>
+      </button> */}
     </div>
   );
 }
