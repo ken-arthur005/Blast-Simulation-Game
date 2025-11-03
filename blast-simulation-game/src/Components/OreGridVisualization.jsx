@@ -17,6 +17,7 @@ import {
 } from "../utils/blastCalculator";
 import BlastResults from "./BlastResults";
 
+
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [gridData, setGridData] = useState(null);
   const [originalGridData, setOriginalGridData] = useState(null); // to keep an original deep copy of grid.
@@ -61,7 +62,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }
 
     // Use per-blast dirKey values (set at placement or via selection) when triggering.
+    // mark local blasting state and prevent further placements immediately
     setIsBlasting(true);
+    setGameState((prev) => ({ ...prev, canPlaceExplosives: false }));
 
     const affectedCells = calculateAllAffectedCells(
       gridData.grid,
@@ -472,7 +475,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       </div>
 
       {/* Legend */}
-      <div className="absolute top-8 right-4 w-66">
+      <div
+        className="absolute top-8 right-4 w-66 z-50"
+        style={{ zIndex: 50, pointerEvents: "auto" }}
+      >
         <GridLegend
           oreTypes={gridData.metadata.oreTypes}
           onTriggerBlast={handleTriggerBlast}

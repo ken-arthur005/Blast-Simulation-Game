@@ -152,16 +152,17 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
  */
 export const createBlastBodies = (
   affectedCells,
-  blockSize,
+  bodySizeParam,
   gridOffset = { x: 0, y: 0 },
-  gridData
+  gridData,
+  stride = bodySizeParam // stride is the distance between cell origins (inner size + spacing)
 ) => {
   if (!Array.isArray(affectedCells)) return [];
 
-  return affectedCells.map((cell) => {
-    // Convert grid coordinates to pixel coordinates (center of block)
-    const pixelX = cell.x * blockSize + gridOffset.x + blockSize / 2;
-    const pixelY = cell.y * blockSize + gridOffset.y + blockSize / 2;
+  const bodies = affectedCells.map((cell) => {
+    // Convert grid coordinates to pixel coordinates (center of cell using stride)
+    const pixelX = cell.x * stride + gridOffset.x + stride / 2;
+    const pixelY = cell.y * stride + gridOffset.y + stride / 2;
 
     // Get the actual cell data from the grid if available
     const cellData = gridData?.grid?.[cell.y]?.[cell.x];
@@ -170,8 +171,8 @@ export const createBlastBodies = (
     // Normalize material props → physics scales
     const scales = computeMaterialScales(cellData);
 
-    // Adjust body size based on fragmentation (slightly bigger than before)
-    const adjustBlockSize = blockSize * scales.sizeScale;
+    // Adjust body size based on fragmentation (scale relative to provided bodySizeParam)
+    const adjustBlockSize = bodySizeParam * scales.sizeScale;
 
     // Create rectangular body at block position
     const body = Bodies.rectangle(
@@ -192,13 +193,37 @@ export const createBlastBodies = (
         isOreBlock: true,
         cellData: cellData,
         render: {
-          fillStyle: OreColorMapper.colorMap[oreType?.toLowerCase()],
+          // fallback to a neutral gray if the mapper doesn't have the ore
+          fillStyle:
+            OreColorMapper.colorMap[oreType?.toLowerCase()] || "#999999",
         },
       }
     );
 
     return body;
   });
+
+  // Debug: log a small sample of created bodies when running in the browser
+  if (typeof window !== "undefined") {
+    try {
+      console.debug(
+        "physicsEngine.createBlastBodies -> created",
+        bodies.length,
+        "bodies. Sample:",
+        bodies.slice(0, 6).map((b) => ({
+          gridX: b.gridX,
+          gridY: b.gridY,
+          x: b.position?.x,
+          y: b.position?.y,
+          oreType: b.oreType,
+        }))
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return bodies;
 };
 
 /**
@@ -208,6 +233,18 @@ export const createBlastBodies = (
  * @param {number} blastForce
  */
 export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
+  if (typeof window !== "undefined") {
+    try {
+      console.debug(
+        "physicsEngine.applyBlastForce -> bodies:",
+        (bodies || []).length,
+        "blastCenters:",
+        blastCenters
+      );
+    } catch {
+      /* ignore */
+    }
+  }
   // direction map for biasing debris movement
   const dirMap = {
     right: { x: 1, y: 0 },
@@ -233,6 +270,20 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
   };
 
   bodies.forEach((body) => {
+    // debug: log initial body position for the first body sometimes
+    // (kept minimal to avoid overwhelming console)
+    if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
+      try {
+        console.debug("applyBlastForce: sample body", {
+          gridX: body.gridX,
+          gridY: body.gridY,
+          x: body.position?.x,
+          y: body.position?.y,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
     blastCenters.forEach((blastCenter) => {
       // Calculate direction from blast center to body
       const dx = body.position.x - blastCenter.x;

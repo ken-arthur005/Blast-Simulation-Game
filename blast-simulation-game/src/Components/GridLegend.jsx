@@ -30,6 +30,7 @@ const GridLegend = ({
   const [applyToNext, setApplyToNext] = React.useState(false);
 
   const handleTriggerBlast = () => {
+    console.debug("GridLegend: trigger clicked", { blasts: gameState.blasts });
     // Check if there are any blasts placed
     if (!gameState.blasts || gameState.blasts.length === 0) {
       alert("Please place at least one explosive first!");
@@ -48,7 +49,7 @@ const GridLegend = ({
 
   return (
     <div>
-      <div className={`mt-4 p-4 bg-gray-100 rounded-lg ${className}`}>
+      <div className={`mt-4 p-4 backdrop-blur-[20px] bg-[rgba(255,255,255,0.2)] rounded-lg ${className}`}>
         <h3 className="text-lg font-semibold mb-3">Ore Types Legend</h3>
         <div
           className="grid grid-cols-2
@@ -61,7 +62,9 @@ const GridLegend = ({
                 className="w-5 h-5 border border-gray-400 rounded flex-shrink-0"
                 style={{ backgroundColor: colorMapping[oreType] }}
               />
-              <span className="text-sm capitalize truncate ui-font">{oreType}</span>
+              <span className="text-sm capitalize truncate ui-font">
+                {oreType}
+              </span>
             </div>
           ))}
         </div>
@@ -71,15 +74,16 @@ const GridLegend = ({
         <button
           className="mt-2 bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
           onClick={handleTriggerBlast}
-          disabled={!gameState.blasts || gameState.blasts.length === 0}
+          disabled={
+            isBlasting || !gameState.blasts || gameState.blasts.length === 0
+          }
         >
           Trigger Blast{" "}
           {gameState.blasts?.length > 0 && `(${gameState.blasts.length})`}
         </button>
 
         <button
-          disabled={isBlasting}
-          className="mt-2 ml-2 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed hover:cursor-pointer"
+          className="mt-2 ml-2 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-500 hover:cursor-pointer"
           onClick={() => resetCanvas()}
         >
           Reset Canvas

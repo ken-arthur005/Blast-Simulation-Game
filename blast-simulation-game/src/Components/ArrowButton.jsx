@@ -29,7 +29,7 @@ export default function ArrowButton({ dir, selectedDir, setSelectedDir, disabled
   const baseClass = "w-10 h-10 rounded flex items-center justify-center";
   const selectedClass =
     "bg-indigo-600 text-white ring-2 ring-offset-2 ring-indigo-300";
-  const defaultClass = "bg-gray-200 text-gray-800 hover:bg-gray-300";
+  const defaultClass = "backdrop-blur-[20px] bg-[rgba(255,255,255,0.3)] text-white hover:bg-gray-300";
 
   const disabledClass = "opacity-50 cursor-not-allowed";
 

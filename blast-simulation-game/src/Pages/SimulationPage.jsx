@@ -6,9 +6,8 @@ import Papa from "papaparse";
 import { Gamepad2 } from "lucide-react";
 import { AiOutlineCloudUpload } from "react-icons/ai";
 import csvDataValidation from "../utils/csvDataValidation";
-import CsvFileValidation from "./CsvFileValidation";
-import OreGridVisualization from "./OreGridVisualization";
-import { GameContext } from "./GameContext";
+import OreGridVisualization from "../Components/OreGridVisualization";
+import { GameContext } from "../Components/GameContext";
 
 const CsvParse = () => {
   const { CSVReader } = useCSVReader();
@@ -93,13 +92,25 @@ const CsvParse = () => {
               console.log("File:", file);
               console.log("---------------------------");
 
-              // First validate the file itself
-              const fileValidation = CsvFileValidation(file);
-              if (!fileValidation.isValid) {
-                showToast(fileValidation.error, "error");
+              // Simple file-level checks before running CSV validation
+              if (!file || !file.name) {
+                showToast("No file provided. Please upload a CSV file.", "error");
                 setZoneHover(false);
                 resetFileVisuals();
-                return; // Don't proceed with data validation
+                return;
+              }
+
+              // Accept files with .csv extension or csv mime-type
+              const fileName = (file.name || "").toString().toLowerCase();
+              const isCsvExt = fileName.endsWith(".csv");
+              const mimeType = file.type || "";
+              const isCsvMime = mimeType.includes("csv") || mimeType === "text/plain";
+
+              if (!isCsvExt && !isCsvMime) {
+                showToast("Please upload a valid CSV file (.csv)", "error");
+                setZoneHover(false);
+                resetFileVisuals();
+                return;
               }
 
               // Then validate the CSV data
@@ -151,7 +162,7 @@ const CsvParse = () => {
                 <div
                   {...getRootProps()}
                   className={`
-                  relative border-2 border-dashed rounded-lg p-2 text-center cursor-pointer
+                  relative rounded-lg p-2 text-center cursor-pointer
                   transition-all duration-200 ease-in-out
                   ${
                     zoneHover
@@ -164,7 +175,7 @@ const CsvParse = () => {
                   {acceptedFile ? (
                     <>
                       {/* File accepted state */}
-                      <div className="space-y-4">
+                      <div className="space-y-4 ">
                         {/* File info section */}
                         <div className="flex items-center justify-center space-x-3">
                           <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
