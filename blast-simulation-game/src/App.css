@@ -1,33 +1,81 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @layer utilities {
   .text-stroke {
     -webkit-text-stroke: 2px black; /* stroke width and color */
   }
   .text-shadow {
-    text-shadow: 0 4px 4px rgba(0,0,0,0.25);
+    text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
   }
   .box-shadow {
     box-shadow: 0 4px 4px 0 rgba(0, 0, 0, 0.25);
   }
 }
-
-
+.logo {
+  font-family: 'Tiki Tropic';
+  src: url('./fonts/tiki-tropic.regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
 
 .background {
-  background-image: url('./images/background.jpg'); 
-  background-size: cover; 
-  background-position: center center; 
+  background-image: url("./images/background.jpg");
+  background-size: cover;
+  background-position: center center;
 
-  background-attachment: fixed;  
-  min-height: 100vh; 
-  width: 100vw; 
-} 
+  background-attachment: fixed;
+  min-height: 100vh;
+  width: 100vw;
+}
+
+.background2 {
+  background-image: url("./images/background3.jpg");
+  background-size: cover;
+  background-position: center center;
+
+  background-attachment: fixed;
+  min-height: 100vh;
+  width: 100vw;
+}
+.bg1 {
+  background-image: url("./images/bg1.jpg");
+  background-size: cover;
+  background-position: center center;
+
+  background-attachment: fixed;
+  min-height: 100vh;
+  width: 100vw;
+}
+.bg2 {
+  background-image: url("./images/bg2.jpg");
+  background-size: cover;
+  background-position: center center;
+
+  background-attachment: fixed;
+  min-height: 100vh;
+  width: 100vw;
+}
+.bg3 {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.5),
+      rgba(0, 0, 0, 0)
+    ),
+    url("./images/bg3.jpg");
+  background-size: cover;
+  background-position: center center;
+
+  background-attachment: fixed;
+  min-height: 100vh;
+  width: 100vw;
+}
+
+
+
 
 .ui-font {
-  font-family: 'GrilledCheese BTN Toasted';
+  font-family: "GrilledCheese BTN Toasted";
 }
 .leaderboard-font {
-  font-family: 'Poppins',sans-serif;
+  font-family: "Poppins", sans-serif;
 }
-
