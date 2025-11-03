@@ -440,7 +440,8 @@ const GridCanvas = ({
 
       // Clear canvas with background
       ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
-      ctx.fillStyle = "#f0f0f0";
+      // ctx.fillStyle = "#f0f0f0";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
       ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
       ctx.save();
