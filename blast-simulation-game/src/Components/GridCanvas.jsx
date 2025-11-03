@@ -9,6 +9,145 @@ import {
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
 
+// Helper utilities (module-level so identity is stable across renders)
+// Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
+const mulberry32 = (a) => {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const hexToRgb = (hex) => {
+  const h = hex.replace("#", "");
+  const bigint = parseInt(h, 16);
+  if (h.length === 6) {
+    return {
+      r: (bigint >> 16) & 255,
+      g: (bigint >> 8) & 255,
+      b: bigint & 255,
+    };
+  }
+  // fallback for short hex
+  return { r: 200, g: 200, b: 200 };
+};
+
+const rgbToHex = (r, g, b) => {
+  const toHex = (v) => {
+    const h = Math.max(0, Math.min(255, Math.round(v))).toString(16);
+    return h.length === 1 ? "0" + h : h;
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
+const adjustColor = (hex, factor) => {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToHex(r * (1 + factor), g * (1 + factor), b * (1 + factor));
+};
+
+// Draw a simple rock-like texture inside current origin (0,0) sized to (size)
+// baseColor is a hex string, seedNumber is a deterministic seed per cell
+const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
+  const rand = mulberry32(seedNumber);
+  const prevGlobalAlpha = ctx.globalAlpha ?? 1;
+
+  // Create a jagged blob silhouette (centered) to emulate a rock outline
+  const cx = size / 2;
+  const cy = size / 2;
+  const points = 8 + Math.floor(rand() * 6);
+  const outerR = size * 0.48;
+  const jagged = [];
+  for (let i = 0; i < points; i++) {
+    const ang = (i / points) * Math.PI * 2;
+    const r = outerR * (0.75 + rand() * 0.5); // vary radius
+    jagged.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r });
+  }
+
+  // Fill jagged blob with the base color so the rock takes the cell's color
+  ctx.beginPath();
+  jagged.forEach((p, i) =>
+    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
+  );
+  ctx.closePath();
+  ctx.fillStyle = baseColor;
+  ctx.globalAlpha = 1 * alpha;
+  ctx.fill();
+
+  // Stroke with a darker ring to emphasize the rock edge
+  ctx.lineWidth = Math.max(1, size * 0.04);
+  ctx.strokeStyle = adjustColor(baseColor, -0.35);
+  ctx.stroke();
+
+  // Clip to jagged blob so subsequent speckles sit inside the rock silhouette
+  ctx.save();
+  ctx.beginPath();
+  jagged.forEach((p, i) =>
+    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
+  );
+  ctx.closePath();
+  ctx.clip();
+
+  // blotches: a few soft, slightly lighter/darker blobs
+  const blotches = 6 + Math.floor(rand() * 6);
+  for (let i = 0; i < blotches; i++) {
+    const bx = cx + (rand() * 2 - 1) * outerR * 0.6;
+    const by = cy + (rand() * 2 - 1) * outerR * 0.5;
+    const br = (0.08 + rand() * 0.18) * size;
+    const shade = (rand() - 0.4) * 0.4; // slight variation
+    ctx.beginPath();
+    ctx.fillStyle = adjustColor(baseColor, shade);
+    ctx.globalAlpha = (0.55 + rand() * 0.35) * alpha;
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // speckles: small mineral flecks
+  const speckles = 18 + Math.floor(rand() * 36);
+  for (let i = 0; i < speckles; i++) {
+    const sx = cx + (rand() * 2 - 1) * outerR * 0.85;
+    const sy = cy + (rand() * 2 - 1) * outerR * 0.85;
+    const sr = Math.max(0.4, rand() * 1.8);
+    const shade = (rand() - 0.7) * 0.6;
+    ctx.beginPath();
+    ctx.fillStyle = adjustColor(baseColor, shade);
+    ctx.globalAlpha = 0.6 * rand() * alpha;
+    ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // subtle veins: short lines
+  const veins = 1 + Math.floor(rand() * 3);
+  ctx.lineWidth = Math.max(0.5, size * 0.01);
+  for (let v = 0; v < veins; v++) {
+    ctx.beginPath();
+    const sx = cx + (rand() * 2 - 1) * outerR * 0.5;
+    const sy = cy + (rand() * 2 - 1) * outerR * 0.5;
+    ctx.moveTo(sx, sy);
+    const segs = 2 + Math.floor(rand() * 3);
+    for (let s = 0; s < segs; s++) {
+      const nx = sx + (rand() - 0.5) * size * 0.25;
+      const ny = sy + (rand() - 0.5) * size * 0.25;
+      ctx.lineTo(nx, ny);
+    }
+    ctx.strokeStyle = adjustColor(baseColor, -0.28);
+    ctx.globalAlpha = 0.45 * rand() * alpha;
+    ctx.stroke();
+  }
+
+  // inner highlight to give a 'bouncy' stylized rock look (optional)
+  ctx.beginPath();
+  ctx.arc(cx - size * 0.08, cy - size * 0.12, outerR * 0.35, 0, Math.PI * 2);
+  ctx.fillStyle = adjustColor(baseColor, 0.28);
+  ctx.globalAlpha = 0.18 * alpha;
+  ctx.fill();
+
+  // restore alpha and clipping
+  ctx.restore();
+  ctx.globalAlpha = prevGlobalAlpha;
+};
+
 const GridCanvas = ({
   gridData,
   canvasSize,
@@ -232,7 +371,23 @@ const GridCanvas = ({
       ctx.save();
       drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
       ctx.clip();
-      blockToRender.render(ctx);
+      // deterministic seed based on grid coords and color to keep texture stable
+      const seedA =
+        (blockToRender.gridX * 73856093) ^ (blockToRender.gridY * 19349663);
+      const colorHashA = (blockToRender.getBlockColor() || "#ffffff")
+        .split("")
+        .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+      // draw a smaller rock so the container/background shows around it
+      const rockScale = 0.72;
+      const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
+      const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
+      ctx.translate(rockOffset, rockOffset);
+      drawRockTexture(
+        ctx,
+        rockSize,
+        blockToRender.getBlockColor(),
+        seedA + colorHashA
+      );
       ctx.restore();
 
       // stroke border after rendering so it sits on top
@@ -671,7 +826,23 @@ const GridCanvas = ({
               rrad
             );
             ctx.clip();
-            block.render(ctx);
+            const seedB = (block.gridX * 73856093) ^ (block.gridY * 19349663);
+            const colorHashB = (block.getBlockColor() || "#ffffff")
+              .split("")
+              .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+            const rockScaleB = 0.72;
+            const rockSizeB = Math.max(
+              2,
+              Math.round(innerBlockSize * rockScaleB)
+            );
+            const rockOffsetB = Math.round((innerBlockSize - rockSizeB) / 2);
+            ctx.translate(rockOffsetB, rockOffsetB);
+            drawRockTexture(
+              ctx,
+              rockSizeB,
+              block.getBlockColor(),
+              seedB + colorHashB
+            );
             ctx.restore();
 
             // stroke border
@@ -857,22 +1028,33 @@ const GridCanvas = ({
         ctx.translate(body.position.x, body.position.y);
         ctx.rotate(body.angle);
 
-        ctx.globalAlpha = opacity;
-        ctx.fillStyle = body.render.fillStyle;
-        // Draw debris piece as rounded rect
+        // Draw debris as a rock-shaped piece using the same procedural texture
         const dW = innerBlockSize * 0.8;
         const dH = innerBlockSize * 0.8;
-        const dx = -dW / 2;
-        const dy = -dH / 2;
-        drawRoundedRect(ctx, dx, dy, dW, dH, Math.max(2, dW * 0.12));
-        // Fill
-        ctx.fillStyle = body.render.fillStyle;
-        ctx.globalAlpha = opacity;
-        ctx.fill();
-        // Stroke border
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+        // Position the rock texture so it's centered at the body's position
+        ctx.translate(-dW / 2, -dH / 2);
+
+        // Determine a deterministic seed from body grid coords and color
+        const seedBody = (body.gridX * 73856093) ^ (body.gridY * 19349663);
+        const colorHashBody = (body.render?.fillStyle || "#ffffff")
+          .split("")
+          .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+
+        // Draw rock texture with overall opacity applied
+        drawRockTexture(
+          ctx,
+          Math.max(2, Math.min(dW, dH)),
+          body.render?.fillStyle || "#999999",
+          seedBody + colorHashBody,
+          opacity
+        );
+
+        // Optional: stroke outer rock bounding to match debris look
+        ctx.strokeStyle = "rgba(0,0,0,0.25)";
         ctx.lineWidth = 1;
+        // Draw a faint rounded rect boundary for readability
+        ctx.beginPath();
+        drawRoundedRect(ctx, 0, 0, dW, dH, Math.max(2, dW * 0.12));
         ctx.stroke();
 
         ctx.restore();
