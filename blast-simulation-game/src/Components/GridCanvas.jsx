@@ -32,6 +32,22 @@ const GridCanvas = ({
   const cellSpacing = cellGap; // spacing between cells in pixels
   const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
 
+  // Helper: draw rounded rectangle path (does not fill/stroke)
+  const drawRoundedRect = (ctx, x, y, width, height, radius = 6) => {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
+
   // Create OreBlock instances for each cell in the grid
   const createBlocks = useCallback(() => {
     if (!gridData || !gridData.grid) return [];
@@ -87,7 +103,6 @@ const GridCanvas = ({
 
     // Save the context state
     ctx.save();
-
     // Translate to center the grid
     ctx.translate(offsetX, offsetY);
 
@@ -193,14 +208,18 @@ const GridCanvas = ({
       ctx.save();
       ctx.translate(renderX, renderY);
 
-      // Draw faint grid
+      // Draw faint grid with rounded corners
       ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
       ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
       ctx.lineWidth = 1.2;
-      ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
-      ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
+      const rx = 0;
+      const ry = 0;
+      const rrad = Math.max(4, innerBlockSize * 0.12);
+      // background fill
+      drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+      ctx.fill();
 
-      // Render ore (block instances were created with innerBlockSize)
+      // Render ore clipped to rounded cell so contents respect corners
       const blockToRender = isDestroyed
         ? new OreBlock(
             { ...block.cell, oreType: "destroyed" },
@@ -210,7 +229,15 @@ const GridCanvas = ({
           )
         : block;
 
+      ctx.save();
+      drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+      ctx.clip();
       blockToRender.render(ctx);
+      ctx.restore();
+
+      // stroke border after rendering so it sits on top
+      drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+      ctx.stroke();
       ctx.restore();
     });
 
@@ -259,22 +286,20 @@ const GridCanvas = ({
     // 1. Draw Hover Highlight
     if (hoveredBlock) {
       const { x, y } = hoveredBlock;
-      // Highlight the block boundary
+      // Highlight the block boundary with rounded corners
       ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-
       ctx.lineWidth = 3;
-      // ctx.strokeRect(
-      //   x * blockSize + 1, // +1 for slight border padding
-      //   y * blockSize + 1,
-      //   blockSize - 2,
-      //   blockSize - 2
-      // );
-      ctx.strokeRect(
-        x * (innerBlockSize + cellSpacing),
-        y * (innerBlockSize + cellSpacing),
+      const hx = x * (innerBlockSize + cellSpacing);
+      const hy = y * (innerBlockSize + cellSpacing);
+      drawRoundedRect(
+        ctx,
+        hx,
+        hy,
         innerBlockSize,
-        innerBlockSize
+        innerBlockSize,
+        Math.max(4, innerBlockSize * 0.12)
       );
+      ctx.stroke();
     }
 
     // 2. Draw Blast Markers
@@ -620,7 +645,47 @@ const GridCanvas = ({
               x * (innerBlockSize + cellSpacing),
               y * (innerBlockSize + cellSpacing)
             );
+            // draw rounded background
+            const rrx = 0;
+            const rry = 0;
+            const rrad = Math.max(4, innerBlockSize * 0.12);
+            drawRoundedRect(
+              ctx,
+              rrx,
+              rry,
+              innerBlockSize,
+              innerBlockSize,
+              rrad
+            );
+            ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+            ctx.fill();
+
+            // render ore clipped to rounded shape
+            ctx.save();
+            drawRoundedRect(
+              ctx,
+              rrx,
+              rry,
+              innerBlockSize,
+              innerBlockSize,
+              rrad
+            );
+            ctx.clip();
             block.render(ctx);
+            ctx.restore();
+
+            // stroke border
+            drawRoundedRect(
+              ctx,
+              rrx,
+              rry,
+              innerBlockSize,
+              innerBlockSize,
+              rrad
+            );
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
             ctx.restore();
           }
         });
@@ -794,23 +859,21 @@ const GridCanvas = ({
 
         ctx.globalAlpha = opacity;
         ctx.fillStyle = body.render.fillStyle;
-        ctx.fillRect(
-          -innerBlockSize * 0.4,
-          -innerBlockSize * 0.4,
-          innerBlockSize * 0.8,
-          innerBlockSize * 0.8
-        );
-
-        // Add border
+        // Draw debris piece as rounded rect
+        const dW = innerBlockSize * 0.8;
+        const dH = innerBlockSize * 0.8;
+        const dx = -dW / 2;
+        const dy = -dH / 2;
+        drawRoundedRect(ctx, dx, dy, dW, dH, Math.max(2, dW * 0.12));
+        // Fill
+        ctx.fillStyle = body.render.fillStyle;
+        ctx.globalAlpha = opacity;
+        ctx.fill();
+        // Stroke border
+        ctx.globalAlpha = 1;
         ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
-        // ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
         ctx.lineWidth = 1;
-        ctx.strokeRect(
-          -innerBlockSize * 0.4,
-          -innerBlockSize * 0.4,
-          innerBlockSize * 0.8,
-          innerBlockSize * 0.8
-        );
+        ctx.stroke();
 
         ctx.restore();
       });
@@ -890,9 +953,23 @@ const GridCanvas = ({
   // );
   return (
     <div
+<<<<<<< HEAD
       ref={containerRef}
       className={`border border-gray-300 rounded-lg overflow-hidden inline-block ${className}`}
       style={{ width: canvasSize.width, height: canvasSize.height }}
+=======
+      className={`relative flex items-center justify-center ${className}`}
+      style={{
+        width: canvasSize.width,
+        height: canvasSize.height,
+        borderRadius: "20px",
+        backdropFilter: "blur(12px)",
+        background: "rgba(255, 255, 255, 0.15)",
+        border: "2px solid rgba(255, 255, 255, 0.3)",
+        boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
+        padding: "10px",
+      }}
+>>>>>>> 88c143f (cells have rounded corners)
     >
       <canvas
         ref={canvasRef}
