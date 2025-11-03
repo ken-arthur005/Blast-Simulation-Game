@@ -182,6 +182,7 @@ const GridCanvas = ({
   onBlockClick,
   cellGap = 8, // optional prop to control spacing between cells
   selectedBlast = null,
+  fileResetKey = 0, // Trigger to force cleanup when new file is uploaded
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -388,12 +389,16 @@ const GridCanvas = ({
   }, [gridData, innerBlockSize]);
 
   // Initialize blocks when grid changes and reset destroyed cells
+  // Use gridData.grid as a dependency trigger since it changes on canvas reset
   useEffect(() => {
     if (gridData && gridData.grid) {
       blocksRef.current = createBlocks();
       setDestroyedCells([]);
+      console.log(
+        "Grid reset: blocks reinitalized and destroyed cells cleared"
+      );
     }
-  }, [createBlocks, gridData]);
+  }, [gridData, createBlocks, fileResetKey]);
 
   // Render all blocks on the canvas
   const renderCanvas = useCallback(() => {
@@ -1175,6 +1180,10 @@ const GridCanvas = ({
         Runner.stop(runner);
         cleanupPhysicsEngine(engine, null);
 
+        // Clear cache immediately when animation completes to prevent next blast interference
+        staticGridCacheRef.current = null;
+        staticGridCacheParamsRef.current = null;
+
         // Set destroyed cells first, then wait a bit before calling completion
         setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
@@ -1196,6 +1205,10 @@ const GridCanvas = ({
       Runner.stop(runner);
       cleanupPhysicsEngine(engine, null);
       isBlastRunningRef.current = false; // Reset on cleanup
+
+      // Clear the static grid cache refs to prevent interference with next blast
+      staticGridCacheRef.current = null;
+      staticGridCacheParamsRef.current = null;
     };
   }, [
     blastTrigger,
