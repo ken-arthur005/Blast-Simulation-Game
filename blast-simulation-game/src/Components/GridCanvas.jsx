@@ -873,7 +873,7 @@ const GridCanvas = ({
       /* ignore diagnostics errors */
     }
 
-    applyBlastForce(bodies, blastCenters, 0.08);
+    applyBlastForce(bodies, blastCenters, 0.06); // Increased from 0.08 to 0.15 for more dramatic effect
 
     // Shockwave animation state
     const shockwaves = blastCenters.map(() => ({

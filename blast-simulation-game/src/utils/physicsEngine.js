@@ -25,9 +25,10 @@ const computeMaterialScales = (cellData) => {
     : 0.5;
 
   // Displacement scale: light and soft → move more; heavy and hard → move less
-  const densityForceScale = mapRange(rawDensity, 1.0, 8.0, 1.2, 0.6);
-  const hardnessForceScale = mapRange(rawHardness, 0.0, 1.0, 1.25, 0.85);
-  const fragmentationForceScale = mapRange(frag, 0.0, 1.0, 0.95, 1.15);
+  // Increased ranges to make material differences more visually apparent
+  const densityForceScale = mapRange(rawDensity, 1.0, 8.0, 1.6, 0.4); // light: 1.6x, heavy: 0.4x
+  const hardnessForceScale = mapRange(rawHardness, 0.0, 1.0, 1.5, 0.7); // soft: 1.5x, hard: 0.7x
+  const fragmentationForceScale = mapRange(frag, 0.0, 1.0, 0.9, 1.25); // cohesive: 0.9x, fragile: 1.25x
   const displacementScale =
     densityForceScale * hardnessForceScale * fragmentationForceScale;
 
@@ -228,6 +229,7 @@ export const createBlastBodies = (
 
 /**
  * Apply blast force to bodies based on distance from epicenter
+ * Adaptively scales force based on number of affected cells to prevent wildness on large datasets
  * @param {Array} bodies
  * @param {Array} blastCenters
  * @param {number} blastForce
@@ -260,7 +262,16 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
   // Calmer biasing
   const biasMultiplier = 1.2;
   const impulseMultiplier = 0.25;
-  const maxForcePerCall = 0.004; // clamp to avoid explosive impulses
+  const maxForcePerCall = 0.012;
+
+  // Adaptive normalization: smaller datasets can have stronger forces
+  // Large datasets (many affected bodies) need gentler forces to prevent explosion
+  const bodyCount = bodies ? bodies.length : 1;
+  const adaptiveScale = Math.max(
+    0.5,
+    Math.min(1.0, 100 / Math.max(bodyCount, 1))
+  );
+  const scaledBlastForce = blastForce * adaptiveScale;
 
   const clampVec = (vx, vy, maxMag) => {
     const mag = Math.hypot(vx, vy);
@@ -297,12 +308,28 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
       // Material scaling
       const scales = computeMaterialScales(body.cellData);
 
-      // Distance falloff: use both grid blastDistance and pixel distance (gentle)
-      const gridFalloff = 1 / (1 + (body.blastDistance ?? 0) * 0.45);
-      const radialFalloff = 1 / (1 + distance * 0.002);
+      // Enhanced distance falloff: creates much stronger effect closer to blast
+      // Grid distance uses stronger falloff to prioritize blast epicenter blocks
+      // Adaptive: limit grid distance impact on large datasets to prevent peripheral chaos
+      const gridDistanceFalloff = Math.max(
+        0.1,
+        Math.min(0.3, adaptiveScale * 0.15)
+      );
+      const gridFalloff =
+        1 / (1 + (body.blastDistance ?? 0) * gridDistanceFalloff);
+
+      // Radial (pixel) distance falloff - more aggressive to show nearby blocks moving much more
+      // Special case: if very close to epicenter (within ~1.5 block sizes), give bonus
+      const radialFalloff =
+        distance < 40
+          ? 1.0 // Full force for blocks at/very near blast epicenter
+          : 1 / (1 + distance * 0.008); // Increased from 0.002 for steeper drop-off
 
       let forceMagnitude =
-        blastForce * gridFalloff * radialFalloff * scales.displacementScale;
+        scaledBlastForce *
+        gridFalloff *
+        radialFalloff *
+        scales.displacementScale;
 
       // Radial force component
       let forceX = ux * forceMagnitude;
