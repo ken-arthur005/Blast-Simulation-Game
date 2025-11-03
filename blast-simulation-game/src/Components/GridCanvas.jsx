@@ -236,9 +236,8 @@ const GridCanvas = ({
       cacheCanvas.height = canvas.height;
       const cacheCtx = cacheCanvas.getContext("2d");
 
-      // Draw background
-      cacheCtx.fillStyle = "rgba(255, 255, 255, 0.15)";
-      cacheCtx.fillRect(0, 0, cacheCanvas.width, cacheCanvas.height);
+      // Note: Do NOT draw background here - it's drawn separately in animatePhysics
+      // This prevents double background and z-order issues
 
       cacheCtx.save();
       cacheCtx.translate(offsetX, offsetY);
