@@ -1,14 +1,12 @@
-import MainUi from './Pages/HomePage'
-import './App.css'
-
+import MainUi from "./Pages/HomePage";
+import "./App.css";
 
 function App() {
-
   return (
     <>
-      <MainUi/>
+      <MainUi />
     </>
-  )
+  );
 }
 
-export default App
+export default App;

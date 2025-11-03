@@ -15,7 +15,7 @@ function HomePage() {
       return false;
     }
     setError("");
-    setClicked(true);
+
     setTimeout(() => setClicked(false), 300);
     return true;
   };
@@ -39,12 +39,7 @@ function HomePage() {
               setGameState({ ...gameState, playerName: e.target.value });
             }}
             value={gameState.playerName}
-            className="rounded-[10px] backdrop-blur-[12px] bg-[rgba(255,255,255,0.15)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] h-[80px] w-[600px] mb-7  text-center
-    text-white
-    placeholder:text-white/70
-    outline-none
-    focus:border-white/50
-    focus:ring-0"
+            className="rounded-[10px] backdrop-blur-[12px] bg-[rgba(255,255,255,0.15)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] h-[80px] w-[600px] mb-7 text-center text-white placeholder:text-white/70 outline-none focus:border-white/50 focus:ring-0"
             placeholder="name"
           />
           {error && (
@@ -56,26 +51,9 @@ function HomePage() {
           {gameState.playerName && gameState.playerName.trim() ? (
             <button
               onClick={handleStartGame}
-              className="
-    rounded-[10px]
-    backdrop-blur-[12px]
-    bg-[rgb(112,171,117)]
-    border-2
-    border-[rgba(255,255,255,0.3)]
-    shadow-[0_4px_30px_rgba(0,0,0,0.1)]
-    text-white
-    text-xl
-    font-semibold
-    px-8
-    py-4
-    hover:bg-[rgba(112,171,117,0.8)]
-    hover:scale-105
-    transition-all
-    duration-300
-  "
-              type="submit"
+              className="rounded-[10px] backdrop-blur-[12px] bg-[rgb(112,171,117)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] text-white text-xl font-semibold px-8 py-4 hover:bg-[rgba(112,171,117,0.8)] hover:scale-105 transition-all duration-300"
             >
-              <Link to="/simulation-screen">Start Game</Link>
+              <Link to="/simulation">Start Game</Link>
             </button>
           ) : (
             <button onClick={handleStartGame}></button>
