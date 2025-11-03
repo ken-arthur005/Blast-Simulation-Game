@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import OreBlock from "../utils/OreBlock";
+import OreBlock from "../utils/oreBlock";
 import { Engine, World, Runner, Events } from "matter-js";
 import {
   createBlastBodies,
@@ -191,6 +191,9 @@ const GridCanvas = ({
   const [destroyedCells, setDestroyedCells] = useState([]);
   const hoverRafRef = useRef(null);
   const pendingHoverRef = useRef(null);
+  // Cache for static grid during blast animation
+  const staticGridCacheRef = useRef(null);
+  const staticGridCacheParamsRef = useRef(null);
   const cellSpacing = cellGap; // spacing between cells in pixels
   const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
 
@@ -209,6 +212,118 @@ const GridCanvas = ({
     ctx.quadraticCurveTo(x, y, x + r, y);
     ctx.closePath();
   };
+
+  // Helper: Create a cached canvas of static (non-affected) cells for fast rendering during blast
+  const createStaticGridCache = useCallback(
+    (affectedCells) => {
+      if (!gridData || !gridData.grid || !canvasRef.current) return null;
+
+      const canvas = canvasRef.current;
+      const { grid } = gridData;
+
+      // Calculate grid dimensions
+      const actualGridWidth =
+        grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
+      const actualGridHeight =
+        grid.length * (innerBlockSize + cellSpacing) - cellSpacing;
+
+      const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
+      const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
+
+      // Create offscreen canvas for static grid
+      const cacheCanvas = document.createElement("canvas");
+      cacheCanvas.width = canvas.width;
+      cacheCanvas.height = canvas.height;
+      const cacheCtx = cacheCanvas.getContext("2d");
+
+      // Draw background
+      cacheCtx.fillStyle = "rgba(255, 255, 255, 0.15)";
+      cacheCtx.fillRect(0, 0, cacheCanvas.width, cacheCanvas.height);
+
+      cacheCtx.save();
+      cacheCtx.translate(offsetX, offsetY);
+
+      // Draw only non-affected cells
+      grid.forEach((row, y) => {
+        row.forEach((cell, x) => {
+          const isAffected = affectedCells.some((c) => c.x === x && c.y === y);
+
+          if (!isAffected) {
+            const block = new OreBlock(cell, x, y, innerBlockSize);
+            cacheCtx.save();
+            cacheCtx.translate(
+              x * (innerBlockSize + cellSpacing),
+              y * (innerBlockSize + cellSpacing)
+            );
+
+            // Draw rounded background
+            const rrx = 0;
+            const rry = 0;
+            const rrad = Math.max(4, innerBlockSize * 0.12);
+            drawRoundedRect(
+              cacheCtx,
+              rrx,
+              rry,
+              innerBlockSize,
+              innerBlockSize,
+              rrad
+            );
+            cacheCtx.fillStyle = "rgba(255, 255, 255, 0.08)";
+            cacheCtx.fill();
+
+            // Render ore clipped to rounded shape
+            cacheCtx.save();
+            drawRoundedRect(
+              cacheCtx,
+              rrx,
+              rry,
+              innerBlockSize,
+              innerBlockSize,
+              rrad
+            );
+            cacheCtx.clip();
+            const seedB = (block.gridX * 73856093) ^ (block.gridY * 19349663);
+            const colorHashB = (block.getBlockColor() || "#ffffff")
+              .split("")
+              .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+            const rockScaleB = 0.72;
+            const rockSizeB = Math.max(
+              2,
+              Math.round(innerBlockSize * rockScaleB)
+            );
+            const rockOffsetB = Math.round((innerBlockSize - rockSizeB) / 2);
+            cacheCtx.translate(rockOffsetB, rockOffsetB);
+            drawRockTexture(
+              cacheCtx,
+              rockSizeB,
+              block.getBlockColor(),
+              seedB + colorHashB
+            );
+            cacheCtx.restore();
+
+            // Stroke border
+            drawRoundedRect(
+              cacheCtx,
+              rrx,
+              rry,
+              innerBlockSize,
+              innerBlockSize,
+              rrad
+            );
+            cacheCtx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+            cacheCtx.lineWidth = 1.2;
+            cacheCtx.stroke();
+            cacheCtx.restore();
+          }
+        });
+      });
+
+      cacheCtx.restore();
+
+      return cacheCanvas;
+    },
+    [gridData, innerBlockSize, cellSpacing]
+  );
 
   // Create OreBlock instances for each cell in the grid
   const createBlocks = useCallback(() => {
@@ -472,8 +587,6 @@ const GridCanvas = ({
       const { grid } = gridData;
 
       // Calculate centering offsets (same as in renderCanvas)
-      // const actualGridWidth = grid[0].length * blockSize;
-      // const actualGridHeight = grid.length * blockSize;
       const actualGridWidth =
         grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
       const actualGridHeight =
@@ -497,10 +610,32 @@ const GridCanvas = ({
       }
 
       // Convert relative pixel coords to grid coords
-      // const gridX = Math.floor(relativeX / blockSize);
-      // const gridY = Math.floor(relativeY / blockSize);
-      const gridX = Math.floor(relativeX / (innerBlockSize + cellSpacing));
-      const gridY = Math.floor(relativeY / (innerBlockSize + cellSpacing));
+      // Each cell occupies (innerBlockSize + cellSpacing) pixels, but we need to check
+      // if the click is within the actual cell or in the gap between cells
+      const stride = innerBlockSize + cellSpacing;
+
+      // Calculate which "block unit" the click is in
+      const unitX = Math.floor(relativeX / stride);
+      const unitY = Math.floor(relativeY / stride);
+
+      // Check if the click is within the cell part or the gap part
+      const posInUnitX = relativeX - unitX * stride;
+      const posInUnitY = relativeY - unitY * stride;
+
+      // If click is in the gap region (after the cell content), clamp to the cell
+      const gridX =
+        posInUnitX < innerBlockSize
+          ? unitX
+          : Math.min(unitX + 1, grid[0].length - 1);
+      const gridY =
+        posInUnitY < innerBlockSize
+          ? unitY
+          : Math.min(unitY + 1, grid.length - 1);
+
+      // Final bounds check
+      if (gridX >= grid[0].length || gridY >= grid.length) {
+        return null;
+      }
 
       return { x: gridX, y: gridY };
     },
@@ -678,7 +813,7 @@ const GridCanvas = ({
 
     // Create Matter.js physics engine
     const engine = Engine.create({
-      gravity: { x: 0, y: 0.8 },
+      gravity: { x: 0, y: 0.6 }, // Reduced gravity from 0.8 to 0.6 for faster settling
     });
 
     const runner = Runner.create();
@@ -755,8 +890,18 @@ const GridCanvas = ({
       engine.world.bodies.length
     );
 
+    // Pre-render static grid cache for faster animation rendering
+    const staticGridCache = createStaticGridCache(affectedCells);
+    staticGridCacheRef.current = staticGridCache;
+    staticGridCacheParamsRef.current = {
+      offsetX,
+      offsetY,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+    };
+
     const startTime = performance.now();
-    const duration = 5000;
+    const duration = 2000; // Reduced from 5000ms to 2000ms for faster animation
     const shockwaveDuration = 500; // 0.5s for shockwave
     const flashDuration = 150; // Quick flash
     let animationFrame;
@@ -784,100 +929,34 @@ const GridCanvas = ({
       ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
       ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
-      ctx.save();
-      ctx.translate(offsetX, offsetY);
+      // Draw cached static grid instead of redrawing every frame
+      if (staticGridCache) {
+        try {
+          ctx.drawImage(staticGridCache, 0, 0);
+        } catch {
+          // fallback if cache fails
+        }
+      }
 
-      // Render static grid (non-affected cells)
-      gridData.grid.forEach((row, y) => {
-        row.forEach((cell, x) => {
-          const isAffected = affectedCells.some((c) => c.x === x && c.y === y);
-
-          if (!isAffected) {
-            const block = new OreBlock(cell, x, y, innerBlockSize);
-            // compute render position with spacing
-            ctx.save();
-            ctx.translate(
-              x * (innerBlockSize + cellSpacing),
-              y * (innerBlockSize + cellSpacing)
-            );
-            // draw rounded background
-            const rrx = 0;
-            const rry = 0;
-            const rrad = Math.max(4, innerBlockSize * 0.12);
-            drawRoundedRect(
-              ctx,
-              rrx,
-              rry,
-              innerBlockSize,
-              innerBlockSize,
-              rrad
-            );
-            ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-            ctx.fill();
-
-            // render ore clipped to rounded shape
-            ctx.save();
-            drawRoundedRect(
-              ctx,
-              rrx,
-              rry,
-              innerBlockSize,
-              innerBlockSize,
-              rrad
-            );
-            ctx.clip();
-            const seedB = (block.gridX * 73856093) ^ (block.gridY * 19349663);
-            const colorHashB = (block.getBlockColor() || "#ffffff")
-              .split("")
-              .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-            const rockScaleB = 0.72;
-            const rockSizeB = Math.max(
-              2,
-              Math.round(innerBlockSize * rockScaleB)
-            );
-            const rockOffsetB = Math.round((innerBlockSize - rockSizeB) / 2);
-            ctx.translate(rockOffsetB, rockOffsetB);
-            drawRockTexture(
-              ctx,
-              rockSizeB,
-              block.getBlockColor(),
-              seedB + colorHashB
-            );
-            ctx.restore();
-
-            // stroke border
-            drawRoundedRect(
-              ctx,
-              rrx,
-              rry,
-              innerBlockSize,
-              innerBlockSize,
-              rrad
-            );
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-            ctx.restore();
-          }
-        });
-      });
-
-      ctx.restore();
+      // Debris bodies are already positioned with absolute canvas coordinates
+      // (they include offsetX and offsetY from physics engine)
+      // so we render them directly without additional translation
 
       // RENDER SHOCKWAVES 🔥
       blastCenters.forEach((center, i) => {
         const shockwave = shockwaves[i];
 
         // Update shockwave properties
-        shockwave.radius = shockwaveProgress * blockSize * 4; // Expand to 4 block radius
+        shockwave.radius = shockwaveProgress * blockSize * 3; // Reduced from 4 to 3 block radius
         shockwave.opacity = Math.max(0, 1 - shockwaveProgress);
         shockwave.flashOpacity = Math.max(0, 1 - flashProgress * 2);
 
         // FIRE/EXPLOSION PARTICLES 🔥💥
-        if (elapsed < 800) {
-          // Fire particles last 0.8s
-          const particleProgress = Math.min(elapsed / 800, 1);
-          const numParticles = 12;
+        if (elapsed < 600) {
+          // Reduced from 800ms to 600ms
+          // Fire particles last 0.6s
+          const particleProgress = Math.min(elapsed / 600, 1);
+          const numParticles = 8; // Reduced from 12 to 8 particles
 
           for (let p = 0; p < numParticles; p++) {
             const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01;
@@ -932,10 +1011,11 @@ const GridCanvas = ({
         }
 
         // SMOKE PUFFS 💨
-        if (elapsed > 200 && elapsed < 1500) {
+        if (elapsed > 200 && elapsed < 1000) {
+          // Reduced smoke duration from 1500ms to 1000ms
           // Smoke appears after initial flash
-          const smokeProgress = Math.min((elapsed - 200) / 1300, 1);
-          const numPuffs = 6;
+          const smokeProgress = Math.min((elapsed - 200) / 800, 1);
+          const numPuffs = 4; // Reduced from 6 to 4 puffs
 
           for (let s = 0; s < numPuffs; s++) {
             const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005;
@@ -1127,6 +1207,7 @@ const GridCanvas = ({
     cellSpacing,
     onBlastComplete,
     blasts,
+    createStaticGridCache,
   ]);
 
   if (!gridData) {
