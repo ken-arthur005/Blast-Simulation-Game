@@ -30,37 +30,59 @@ class OreBlock {
     return this.cell && this.cell.oreType
       ? OreColorMapper.getColor(this.cell.oreType)
       : "#ffffff";
-      // your other ore color mappings
-  // return this.cell?.color || "#cccccc";
+    // your other ore color mappings
+    // return this.cell?.color || "#cccccc";
   }
 
+  // render(ctx) {
+  //   const { pixelX, pixelY } = this.getPixelPosition();
+
+  //   //transformations for animation
+  //   ctx.save();
+
+  //   // Set opacity
+  //   ctx.globalAlpha = this.opacity;
+
+  //   //center point for transformations
+  //   const centerX = pixelX + this.blockSize / 2;
+  //   const centerY = pixelY + this.blockSize / 2;
+
+  //   //transformations from center
+  //   ctx.translate(centerX, centerY);
+  //   ctx.rotate((this.rotation * Math.PI) / 180); // Convert degrees to radians
+  //   ctx.scale(this.scale, this.scale);
+  //   ctx.translate(-centerX, -centerY);
+  //    const color = this.cell.oreType === "destroyed" ? "#9ca3af" : this.getBlockColor();
+
+  //   ctx.fillStyle = color;
+  //   ctx.fillRect(pixelX, pixelY, this.blockSize, this.blockSize);
+
+  //   //border (helps see the blocks better)
+  //   ctx.strokeStyle = "#00000022";
+  //   ctx.lineWidth = 1;
+  //   ctx.strokeRect(pixelX, pixelY, this.blockSize, this.blockSize);
+
+  //   ctx.restore();
+  // }
+
   render(ctx) {
-    const { pixelX, pixelY } = this.getPixelPosition();
-
-    //transformations for animation
     ctx.save();
-
-    // Set opacity
     ctx.globalAlpha = this.opacity;
 
-    //center point for transformations
-    const centerX = pixelX + this.blockSize / 2;
-    const centerY = pixelY + this.blockSize / 2;
+    // use blockSize as inner block size passed from GridCanvas
+    const size = this.blockSize;
 
-    //transformations from center
-    ctx.translate(centerX, centerY);
-    ctx.rotate((this.rotation * Math.PI) / 180); // Convert degrees to radians
-    ctx.scale(this.scale, this.scale);
-    ctx.translate(-centerX, -centerY);
-     const color = this.cell.oreType === "destroyed" ? "#9ca3af" : this.getBlockColor();
+    const color =
+      this.cell.oreType === "destroyed" ? "#9ca3af" : this.getBlockColor();
 
+    // Draw the ore block perfectly inside its cell
     ctx.fillStyle = color;
-    ctx.fillRect(pixelX, pixelY, this.blockSize, this.blockSize);
+    ctx.fillRect(0, 0, size, size);
 
-    //border (helps see the blocks better)
-    ctx.strokeStyle = "#00000022"; 
-    ctx.lineWidth = 1;
-    ctx.strokeRect(pixelX, pixelY, this.blockSize, this.blockSize);
+    // Add consistent border
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.15)";
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(0, 0, size, size);
 
     ctx.restore();
   }

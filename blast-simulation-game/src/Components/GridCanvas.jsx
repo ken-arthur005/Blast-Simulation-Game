@@ -18,13 +18,19 @@ const GridCanvas = ({
   className = "",
   blasts = [],
   onBlockClick,
+<<<<<<< HEAD
   selectedBlast = null,
+=======
+  cellGap = 8, // optional prop to control spacing between cells
+>>>>>>> 623a986 (cells spaced now)
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const blocksRef = useRef([]);
   const [hoveredBlock, setHoveredBlock] = useState(null);
   const [destroyedCells, setDestroyedCells] = useState([]);
+  const cellSpacing = cellGap; // spacing between cells in pixels
+  const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
 
   // Create OreBlock instances for each cell in the grid
   const createBlocks = useCallback(() => {
@@ -33,12 +39,13 @@ const GridCanvas = ({
     const { grid } = gridData;
     grid.forEach((row, y) => {
       row.forEach((cell, x) => {
-        const block = new OreBlock(cell, x, y, blockSize);
+        // Create OreBlock sized to the inner block size (so render aligns with spacing)
+        const block = new OreBlock(cell, x, y, innerBlockSize);
         blocks.push(block);
       });
     });
     return blocks;
-  }, [gridData, blockSize]);
+  }, [gridData, innerBlockSize]);
 
   // Initialize blocks when grid changes and reset destroyed cells
   useEffect(() => {
@@ -63,14 +70,19 @@ const GridCanvas = ({
     if (columns === 0 || rows === 0) return; //stop if empty grid
 
     // ... (Calculations for centering offsets: actualGridWidth, actualGridHeight, offsetX, offsetY)
-    const actualGridWidth = grid[0].length * blockSize;
-    const actualGridHeight = grid.length * blockSize;
+    // const actualGridWidth = grid[0].length * blockSize;
+    // const actualGridHeight = grid.length * blockSize;
+    const actualGridWidth =
+      grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
+    const actualGridHeight =
+      grid.length * (innerBlockSize + cellSpacing) - cellSpacing;
+
     const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
     const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
     // Clear & fill background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#f0f0f0";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; // light gray background
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Save the context state
@@ -80,23 +92,126 @@ const GridCanvas = ({
     ctx.translate(offsetX, offsetY);
 
     // Render all blocks
+    // blocksRef.current.forEach((block) => {
+    //   const isDestroyed = destroyedCells.some(
+    //     (cell) => cell.x === block.gridX && cell.y === block.gridY
+    //   );
+
+    //   // Create a temporary cell object for rendering if destroyed
+    //   if (isDestroyed) {
+    //     const destroyedBlock = new OreBlock(
+    //       { ...block.cell, oreType: "destroyed" },
+    //       block.gridX,
+    //       block.gridY,
+    //       blockSize
+    //     );
+    //     destroyedBlock.render(ctx);
+    //   } else {
+    //     block.render(ctx);
+    //   }
+    // });
+
+    // blocksRef.current.forEach((block) => {
+    //   const isDestroyed = destroyedCells.some(
+    //     (cell) => cell.x === block.gridX && cell.y === block.gridY
+    //   );
+
+    //   // compute render position with spacing
+    //   const renderX = block.gridX * (innerBlockSize + cellSpacing);
+    //   const renderY = block.gridY * (innerBlockSize + cellSpacing);
+
+    //   ctx.save();
+    //   ctx.translate(renderX, renderY);
+
+    //   // optional: draw faint translucent square behind each block (like glass cells)
+    //   ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+    //   ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+    //   ctx.lineWidth = 1.2;
+    //   ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
+    //   ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
+
+    //   // render the ore block inside
+    //   const blockToRender = isDestroyed
+    //     ? new OreBlock(
+    //         { ...block.cell, oreType: "destroyed" },
+    //         block.gridX,
+    //         block.gridY,
+    //         innerBlockSize
+    //       )
+    //     : block;
+
+    //   // Draw inside the spaced area
+    //   ctx.save();
+    //   // ctx.translate(cellSpacing / 2, cellSpacing / 2);
+    //   blockToRender.render(ctx);
+    //   ctx.restore();
+
+    //   ctx.restore();
+    // });
+    // Render all blocks
+    // blocksRef.current.forEach((block) => {
+    //   const isDestroyed = destroyedCells.some(
+    //     (cell) => cell.x === block.gridX && cell.y === block.gridY
+    //   );
+
+    //   const renderX = block.gridX * (innerBlockSize + cellSpacing);
+    //   const renderY = block.gridY * (innerBlockSize + cellSpacing);
+
+    //   ctx.save();
+    //   ctx.translate(renderX, renderY);
+    //   block.render(ctx);
+    //   // Draw faint background cell (grid)
+    //   ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+    //   ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+    //   ctx.lineWidth = 1.2;
+    //   ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
+    //   ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
+
+    //   // Render ore block directly inside this cell, no extra offset
+    //   const blockToRender = isDestroyed
+    //     ? new OreBlock(
+    //         { ...block.cell, oreType: "destroyed" },
+    //         block.gridX,
+    //         block.gridY,
+    //         innerBlockSize
+    //       )
+    //     : block;
+
+    //   // Align ore block perfectly with the faint cell background
+    //   blockToRender.render(ctx);
+
+    //   ctx.restore();
+    // });
     blocksRef.current.forEach((block) => {
       const isDestroyed = destroyedCells.some(
         (cell) => cell.x === block.gridX && cell.y === block.gridY
       );
 
-      // Create a temporary cell object for rendering if destroyed
-      if (isDestroyed) {
-        const destroyedBlock = new OreBlock(
-          { ...block.cell, oreType: "destroyed" },
-          block.gridX,
-          block.gridY,
-          blockSize
-        );
-        destroyedBlock.render(ctx);
-      } else {
-        block.render(ctx);
-      }
+      const renderX = block.gridX * (innerBlockSize + cellSpacing);
+      const renderY = block.gridY * (innerBlockSize + cellSpacing);
+
+      ctx.save();
+      ctx.translate(renderX, renderY);
+
+      // Draw faint grid
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.lineWidth = 1.2;
+      ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
+      ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
+
+      // Render ore (block instances were created with innerBlockSize)
+      const blockToRender = isDestroyed
+        ? new OreBlock(
+            { ...block.cell, oreType: "destroyed" },
+            block.gridX,
+            block.gridY,
+            innerBlockSize
+          )
+        : block;
+
+      blockToRender.render(ctx);
+      ctx.restore();
     });
 
     // const cellSpacing = 1; // adjust to control spacing between cells
@@ -146,12 +261,19 @@ const GridCanvas = ({
       const { x, y } = hoveredBlock;
       // Highlight the block boundary
       ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+
       ctx.lineWidth = 3;
+      // ctx.strokeRect(
+      //   x * blockSize + 1, // +1 for slight border padding
+      //   y * blockSize + 1,
+      //   blockSize - 2,
+      //   blockSize - 2
+      // );
       ctx.strokeRect(
-        x * blockSize + 1, // +1 for slight border padding
-        y * blockSize + 1,
-        blockSize - 2,
-        blockSize - 2
+        x * (innerBlockSize + cellSpacing),
+        y * (innerBlockSize + cellSpacing),
+        innerBlockSize,
+        innerBlockSize
       );
     }
 
@@ -159,18 +281,20 @@ const GridCanvas = ({
     blasts.forEach((blast) => {
       const { x, y } = blast;
       // Calculate center of the block
-      const centerX = x * blockSize + blockSize / 2;
-      const centerY = y * blockSize + blockSize / 2;
+      // const centerX = x * blockSize + blockSize / 2;
+      // const centerY = y * blockSize + blockSize / 2;
+      const centerX = x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+      const centerY = y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
 
       // Draw a red circle (blast icon)
       ctx.beginPath();
-      ctx.arc(centerX, centerY, blockSize * 0.3, 0, Math.PI * 2); // Radius 30% of block size
+      ctx.arc(centerX, centerY, innerBlockSize * 0.3, 0, Math.PI * 2); // Radius 30% of inner block size
       ctx.fillStyle = "#dc2626"; // Red
       ctx.fill();
 
       // Optional: Add a white flash/dot for visibility
       ctx.beginPath();
-      ctx.arc(centerX, centerY, blockSize * 0.1, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, innerBlockSize * 0.1, 0, Math.PI * 2);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
 
@@ -224,11 +348,19 @@ const GridCanvas = ({
     );
   }, [
     gridData,
+<<<<<<< HEAD
     blockSize,
     blasts,
     hoveredBlock,
     destroyedCells,
     selectedBlast,
+=======
+    blasts,
+    hoveredBlock,
+    destroyedCells,
+    innerBlockSize,
+    cellSpacing,
+>>>>>>> 623a986 (cells spaced now)
   ]);
   // Re-render when dependencies change
   useEffect(() => {
@@ -253,8 +385,13 @@ const GridCanvas = ({
       const { grid } = gridData;
 
       // Calculate centering offsets (same as in renderCanvas)
-      const actualGridWidth = grid[0].length * blockSize;
-      const actualGridHeight = grid.length * blockSize;
+      // const actualGridWidth = grid[0].length * blockSize;
+      // const actualGridHeight = grid.length * blockSize;
+      const actualGridWidth =
+        grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
+      const actualGridHeight =
+        grid.length * (innerBlockSize + cellSpacing) - cellSpacing;
+
       const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
       const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
@@ -273,12 +410,14 @@ const GridCanvas = ({
       }
 
       // Convert relative pixel coords to grid coords
-      const gridX = Math.floor(relativeX / blockSize);
-      const gridY = Math.floor(relativeY / blockSize);
+      // const gridX = Math.floor(relativeX / blockSize);
+      // const gridY = Math.floor(relativeY / blockSize);
+      const gridX = Math.floor(relativeX / (innerBlockSize + cellSpacing));
+      const gridY = Math.floor(relativeY / (innerBlockSize + cellSpacing));
 
       return { x: gridX, y: gridY };
     },
-    [gridData, blockSize]
+    [gridData, innerBlockSize, cellSpacing]
   );
 
   // Click Handler
@@ -355,8 +494,13 @@ const GridCanvas = ({
     console.log("Starting blast animation...");
 
     // Calculate grid offset for centering (same as in renderCanvas)
-    const actualGridWidth = gridData.grid[0].length * blockSize;
-    const actualGridHeight = gridData.grid.length * blockSize;
+    // const actualGridWidth = gridData.grid[0].length * blockSize;
+    // const actualGridHeight = gridData.grid.length * blockSize;
+    const actualGridWidth =
+      gridData.grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
+    const actualGridHeight =
+      gridData.grid.length * (innerBlockSize + cellSpacing) - cellSpacing;
+
     const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
     const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
@@ -385,9 +529,10 @@ const GridCanvas = ({
     World.add(engine.world, walls);
 
     // Create bodies for affected cells
+    // Create physics bodies sized to the inner block size so visual debris matches spacing
     const bodies = createBlastBodies(
       affectedCells,
-      blockSize,
+      innerBlockSize,
       { x: offsetX, y: offsetY },
       gridData
     );
@@ -395,12 +540,27 @@ const GridCanvas = ({
     // Add bodies to the world
     World.add(engine.world, bodies);
 
+<<<<<<< HEAD
     // Calculate blast centers in pixel coordinates including their dirKey (use blasts prop so dirKey is preserved)
     const blastCenters = (blasts || []).map((b) => ({
       x: b.x * blockSize + offsetX + blockSize / 2,
       y: b.y * blockSize + offsetY + blockSize / 2,
       dirKey: b.dirKey || null,
     }));
+=======
+    // Calculate blast centers in pixel coordinates
+    const blastCenters = [
+      ...new Set(affectedCells.map((c) => `${c.blastX},${c.blastY}`)),
+    ].map((coord) => {
+      const [x, y] = coord.split(",").map(Number);
+      return {
+        // x: x * blockSize + offsetX + blockSize / 2,
+        // y: y * blockSize + offsetY + blockSize / 2,
+        x: x * (innerBlockSize + cellSpacing) + offsetX + innerBlockSize / 2,
+        y: y * (innerBlockSize + cellSpacing) + offsetY + innerBlockSize / 2,
+      };
+    });
+>>>>>>> 623a986 (cells spaced now)
 
     // Apply blast forces (tunable factor)
     applyBlastForce(bodies, blastCenters, 0.08);
@@ -453,8 +613,15 @@ const GridCanvas = ({
           const isAffected = affectedCells.some((c) => c.x === x && c.y === y);
 
           if (!isAffected) {
-            const block = new OreBlock(cell, x, y, blockSize);
+            const block = new OreBlock(cell, x, y, innerBlockSize);
+            // compute render position with spacing
+            ctx.save();
+            ctx.translate(
+              x * (innerBlockSize + cellSpacing),
+              y * (innerBlockSize + cellSpacing)
+            );
             block.render(ctx);
+            ctx.restore();
           }
         });
       });
@@ -628,20 +795,21 @@ const GridCanvas = ({
         ctx.globalAlpha = opacity;
         ctx.fillStyle = body.render.fillStyle;
         ctx.fillRect(
-          -blockSize * 0.4,
-          -blockSize * 0.4,
-          blockSize * 0.8,
-          blockSize * 0.8
+          -innerBlockSize * 0.4,
+          -innerBlockSize * 0.4,
+          innerBlockSize * 0.8,
+          innerBlockSize * 0.8
         );
 
         // Add border
         ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+        // ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
         ctx.lineWidth = 1;
         ctx.strokeRect(
-          -blockSize * 0.4,
-          -blockSize * 0.4,
-          blockSize * 0.8,
-          blockSize * 0.8
+          -innerBlockSize * 0.4,
+          -innerBlockSize * 0.4,
+          innerBlockSize * 0.8,
+          innerBlockSize * 0.8
         );
 
         ctx.restore();
@@ -680,7 +848,19 @@ const GridCanvas = ({
       cleanupPhysicsEngine(engine, null);
       isBlastRunningRef.current = false; // Reset on cleanup
     };
+<<<<<<< HEAD
   }, [blastTrigger, gridData, blockSize, canvasSize, onBlastComplete, blasts]);
+=======
+  }, [
+    blastTrigger,
+    gridData,
+    blockSize,
+    canvasSize,
+    innerBlockSize,
+    cellSpacing,
+    onBlastComplete,
+  ]);
+>>>>>>> 623a986 (cells spaced now)
 
   if (!gridData) {
     return (
