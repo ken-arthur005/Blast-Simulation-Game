@@ -4,7 +4,7 @@ class OreColorMapper {
     // Metals
     iron: "#8B4513",
     gold: "#FFD700",
-    silver: "#C0C0C0",
+    silver: "#FF0000",
     copper: "#B87333",
     aluminum: "#A0A0A0",
     lead: "#2F4F4F",
@@ -39,6 +39,8 @@ class OreColorMapper {
     mineral: "#DDA0DD",
     empty: "#F5F5F5",
     void: "#000000",
+
+    clay: "#8F00FF"
   };
 
   // Cache for assigned fallback colors
