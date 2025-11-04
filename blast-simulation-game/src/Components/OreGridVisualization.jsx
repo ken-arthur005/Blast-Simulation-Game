@@ -17,13 +17,13 @@ import {
 } from "../utils/blastCalculator";
 import BlastResults from "./BlastResults";
 
-
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [gridData, setGridData] = useState(null);
   const [originalGridData, setOriginalGridData] = useState(null); // to keep an original deep copy of grid.
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
   const [blockSize, setBlockSize] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [fileResetKey, setFileResetKey] = useState(0); // Increment on new file upload to force GridCanvas reset
   const {
     gameState,
     clearBlasts,
@@ -187,7 +187,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         ...prev,
         canPlaceExplosives: false,
       }));
-    }, 100); // Wait 0.1 seconds to ensure gray cells are visible
+    }, 1500); // Wait 0.1 seconds to ensure gray cells are visible
 
     console.log(
       "Blast complete! Destroyed:",
@@ -368,6 +368,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             canPlaceExplosives: true,
           }));
 
+          // Increment file reset key to trigger GridCanvas cleanup
+          setFileResetKey((prev) => prev + 1);
+
           console.log("New CSV imported - game state reset");
 
           // Notify parent component
@@ -471,6 +474,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           onBlockClick={handleCellClick}
           blastTrigger={blastTrigger}
           onBlastComplete={handleBlastComplete}
+          fileResetKey={fileResetKey}
         />
       </div>
 
