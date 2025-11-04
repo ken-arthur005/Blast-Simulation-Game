@@ -904,6 +904,15 @@ const GridCanvas = ({
       canvasHeight: canvas.height,
     };
 
+    console.debug("GridCanvas: Static cache created", {
+      affectedCellsCount: affectedCells.length,
+      cacheCreated: !!staticGridCache,
+    });
+
+    // Mark affected cells as destroyed immediately when blast starts
+    // so they disappear from the grid right away
+    setDestroyedCells((prev) => [...prev, ...affectedCells]);
+
     const startTime = performance.now();
     const duration = 2000; // Reduced from 5000ms to 2000ms for faster animation
     const shockwaveDuration = 500; // 0.5s for shockwave
@@ -941,6 +950,69 @@ const GridCanvas = ({
           // fallback if cache fails
         }
       }
+
+      // Draw affected cells at their original grid positions
+      // (the debris bodies are flying around, but we show fading ores for visual continuity)
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+
+      // Only show affected cells at the very start of blast (first 50ms)
+      // then hide them to let debris take center stage
+      if (elapsed < 50) {
+        affectedCells.forEach((cell) => {
+          const block = new OreBlock(
+            gridData.grid[cell.y][cell.x],
+            cell.x,
+            cell.y,
+            innerBlockSize
+          );
+          const renderX = cell.x * (innerBlockSize + cellSpacing);
+          const renderY = cell.y * (innerBlockSize + cellSpacing);
+
+          ctx.save();
+          ctx.translate(renderX, renderY);
+
+          // Draw faint grid with rounded corners
+          const rrad = Math.max(4, innerBlockSize * 0.12);
+          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+          ctx.fill();
+
+          // Draw the ore
+          ctx.save();
+          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+          ctx.clip();
+          const seedCell = (cell.x * 73856093) ^ (cell.y * 19349663);
+          const colorHashCell = (block.getBlockColor() || "#ffffff")
+            .split("")
+            .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+          const rockScaleCell = 0.72;
+          const rockSizeCell = Math.max(
+            2,
+            Math.round(innerBlockSize * rockScaleCell)
+          );
+          const rockOffsetCell = Math.round(
+            (innerBlockSize - rockSizeCell) / 2
+          );
+          ctx.translate(rockOffsetCell, rockOffsetCell);
+          drawRockTexture(
+            ctx,
+            rockSizeCell,
+            block.getBlockColor(),
+            seedCell + colorHashCell
+          );
+          ctx.restore();
+
+          // Border
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+          ctx.lineWidth = 1.2;
+          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+          ctx.stroke();
+
+          ctx.restore();
+        });
+      }
+      ctx.restore();
 
       // Debris bodies are already positioned with absolute canvas coordinates
       // (they include offsetX and offsetY from physics engine)
@@ -1184,8 +1256,7 @@ const GridCanvas = ({
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
 
-        // Set destroyed cells first, then wait a bit before calling completion
-        setDestroyedCells((prev) => [...prev, ...affectedCells]);
+        // destroyedCells were marked at start of blast; no need to set again here
 
         // Allow time for destroyed cells to render before completion callback
         setTimeout(() => {
