@@ -956,9 +956,9 @@ const GridCanvas = ({
       ctx.save();
       ctx.translate(offsetX, offsetY);
 
-      // Only show affected cells at the very start of blast (first 50ms)
+      // Only show affected cells at the very start of blast (first 3ms)
       // then hide them to let debris take center stage
-      if (elapsed < 50) {
+      if (elapsed < 3) {
         affectedCells.forEach((cell) => {
           const block = new OreBlock(
             gridData.grid[cell.y][cell.x],

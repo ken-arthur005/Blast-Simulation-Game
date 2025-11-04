@@ -17,7 +17,6 @@ import {
 } from "../utils/blastCalculator";
 import BlastResults from "./BlastResults";
 
-
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [gridData, setGridData] = useState(null);
   const [originalGridData, setOriginalGridData] = useState(null); // to keep an original deep copy of grid.
@@ -188,7 +187,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         ...prev,
         canPlaceExplosives: false,
       }));
-    }, 100); // Wait 0.1 seconds to ensure gray cells are visible
+    }, 1500); // Wait 0.1 seconds to ensure gray cells are visible
 
     console.log(
       "Blast complete! Destroyed:",
