@@ -804,10 +804,10 @@ const GridCanvas = ({
 
     // VIOLENT CANVAS SHAKE 🔥
     gsap.to(container, {
-      x: "random(-12, 12)",
-      y: "random(-12, 12)",
-      duration: 0.05,
-      repeat: 7,
+      x: "random(-20, 20)",
+      y: "random(-20, 20)",
+      duration: 0.07,
+      repeat: 9,
       yoyo: true,
       ease: "power2.inOut",
       onComplete: () => {
@@ -914,9 +914,9 @@ const GridCanvas = ({
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
     const startTime = performance.now();
-    const duration = 2000; // Reduced from 5000ms to 2000ms for faster animation
-    const shockwaveDuration = 500; // 0.5s for shockwave
-    const flashDuration = 150; // Quick flash
+    const duration = 3500; // Reduced from 5000ms to 2000ms for faster animation
+    const shockwaveDuration = 700; // 0.5s for shockwave
+    const flashDuration = 200; // Quick flash
     let animationFrame;
 
     const animatePhysics = (time) => {
@@ -1028,18 +1028,18 @@ const GridCanvas = ({
         shockwave.flashOpacity = Math.max(0, 1 - flashProgress * 2);
 
         // FIRE/EXPLOSION PARTICLES 🔥💥
-        if (elapsed < 600) {
+        if (elapsed < 900) {
           // Reduced from 800ms to 600ms
           // Fire particles last 0.6s
-          const particleProgress = Math.min(elapsed / 600, 1);
-          const numParticles = 8; // Reduced from 12 to 8 particles
+          const particleProgress = Math.min(elapsed / 900, 1);
+          const numParticles = 15; // Reduced from 12 to 8 particles
 
           for (let p = 0; p < numParticles; p++) {
-            const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01;
+            const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + (p * 0.2);
             const distance =
               particleProgress *
               blockSize *
-              2.5 *
+              3.5 *
               (1 + Math.sin(elapsed * 0.02 + p) * 0.3);
             const particleX = center.x + Math.cos(angle) * distance;
             const particleY =
@@ -1049,7 +1049,7 @@ const GridCanvas = ({
 
             // Particle size shrinks over time
             const particleSize =
-              blockSize * 0.15 * (1 - particleProgress * 0.7);
+              blockSize * 0.25 * (1 - particleProgress * 0.7);
 
             // Color shifts from white -> yellow -> orange -> red -> fade
             let particleColor;
@@ -1087,25 +1087,22 @@ const GridCanvas = ({
         }
 
         // SMOKE PUFFS 💨
-        if (elapsed > 200 && elapsed < 1000) {
+        if (elapsed > 150 && elapsed < 1500) {
           // Reduced smoke duration from 1500ms to 1000ms
           // Smoke appears after initial flash
-          const smokeProgress = Math.min((elapsed - 200) / 800, 1);
-          const numPuffs = 4; // Reduced from 6 to 4 puffs
+          const smokeProgress = Math.min((elapsed - 150) / 1350, 1);
+          const numPuffs = 8; // Reduced from 6 to 4 puffs
 
           for (let s = 0; s < numPuffs; s++) {
-            const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005;
+            const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + (s * 0.5);
             const distance = smokeProgress * blockSize * 1.8;
             const puffX = center.x + Math.cos(angle) * distance;
-            const puffY =
-              center.y +
-              Math.sin(angle) * distance -
-              smokeProgress * blockSize * 1.2; // Rise up more
-
-            const puffSize = blockSize * 0.4 * (1 + smokeProgress);
+            const puffY =center.y +
++           Math.sin(angle) * distance - smokeProgress * blockSize * 1.5; // Rise up more
+            const puffSize = blockSize * 0.6 * (1 + smokeProgress * 0.5);
 
             ctx.save();
-            ctx.globalAlpha = (1 - smokeProgress) * 0.4;
+            ctx.globalAlpha = (1 - smokeProgress) * 0.75;
 
             // Gray smoke
             const smokeGradient = ctx.createRadialGradient(
@@ -1116,8 +1113,8 @@ const GridCanvas = ({
               puffY,
               puffSize
             );
-            smokeGradient.addColorStop(0, "#666666");
-            smokeGradient.addColorStop(1, "rgba(50, 50, 50, 0)");
+            smokeGradient.addColorStop(0, "#bbbbbb");
+            smokeGradient.addColorStop(1, "rgba(80, 80, 80, 0)");
 
             ctx.fillStyle = smokeGradient;
             ctx.beginPath();
@@ -1137,14 +1134,14 @@ const GridCanvas = ({
             0,
             center.x,
             center.y,
-            blockSize * 1.5
+            blockSize * 2.5
           );
           gradient.addColorStop(0, "#ffffff");
           gradient.addColorStop(0.3, "#ffff00");
           gradient.addColorStop(1, "rgba(255, 200, 0, 0)");
           ctx.fillStyle = gradient;
           ctx.beginPath();
-          ctx.arc(center.x, center.y, blockSize * 1.5, 0, Math.PI * 2);
+          ctx.arc(center.x, center.y, blockSize * 2.5, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
@@ -1153,9 +1150,9 @@ const GridCanvas = ({
         if (shockwave.opacity > 0 && shockwave.radius > 0) {
           // Outer ring (red)
           ctx.save();
-          ctx.globalAlpha = shockwave.opacity * 0.6;
+          ctx.globalAlpha = shockwave.opacity * 0.8;
           ctx.strokeStyle = "#ff0000";
-          ctx.lineWidth = 6;
+          ctx.lineWidth = 10;
           ctx.beginPath();
           ctx.arc(center.x, center.y, shockwave.radius, 0, Math.PI * 2);
           ctx.stroke();
@@ -1163,9 +1160,9 @@ const GridCanvas = ({
 
           // Middle ring (orange)
           ctx.save();
-          ctx.globalAlpha = shockwave.opacity * 0.8;
+          ctx.globalAlpha = shockwave.opacity * 0.1;
           ctx.strokeStyle = "#ff6600";
-          ctx.lineWidth = 4;
+          ctx.lineWidth = 7;
           ctx.beginPath();
           ctx.arc(center.x, center.y, shockwave.radius * 0.7, 0, Math.PI * 2);
           ctx.stroke();
@@ -1174,8 +1171,8 @@ const GridCanvas = ({
           // Inner ring (yellow-white)
           ctx.save();
           ctx.globalAlpha = shockwave.opacity;
-          ctx.strokeStyle = "#ffcc00";
-          ctx.lineWidth = 3;
+          ctx.strokeStyle = "#ffff00";
+          ctx.lineWidth = 5;
           ctx.beginPath();
           ctx.arc(center.x, center.y, shockwave.radius * 0.4, 0, Math.PI * 2);
           ctx.stroke();
@@ -1190,9 +1187,9 @@ const GridCanvas = ({
         // Draw motion trail
         if (body.velocity.x !== 0 || body.velocity.y !== 0) {
           ctx.save();
-          ctx.globalAlpha = opacity * 0.3;
+          ctx.globalAlpha = opacity * 0.5;
           ctx.strokeStyle = body.render.fillStyle;
-          ctx.lineWidth = blockSize * 0.6;
+          ctx.lineWidth = blockSize * 0.8;
           ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(body.position.x, body.position.y);
