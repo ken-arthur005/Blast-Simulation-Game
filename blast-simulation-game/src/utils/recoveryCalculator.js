@@ -62,3 +62,120 @@ export function computeRecoveryScoreFromNorms({
   const score = Math.min(1, Math.max(0, raw * blastPenalty));
   return score;
 }
+
+/**
+ * Full pipeline: annotate affectedCells with normalized features and recovery score/status
+ * Returns { annotatedCells, metrics, stats }.
+ *
+ * config:
+ * {
+ *  thresholds: { recovered: 0.6, diluted: 0.2 },
+ *  useLogDensity: boolean,
+ *  blastForceNormalized: 0..1,
+ *  weights: { materialHardness, materialDensity }
+ * }
+ */
+export function computeRecoveryForAffected({
+  affectedCells,
+  grid,
+  config = {},
+  globalStats = null,
+}) {
+  const thresholds = config.thresholds ?? { recovered: 0.6, diluted: 0.2 };
+
+  const stats =
+    config.statsScope === "global" && globalStats
+      ? globalStats
+      : buildNormalizationStats(affectedCells, grid, {
+          useLogDensity: config.useLogDensity,
+        });
+
+  const annotated = [];
+  let sumScores = 0;
+
+  affectedCells.forEach((c) => {
+    const cell = (grid?.[c.y] || [])[c.x] || {};
+    const rawDensity = Number(cell.density ?? NaN);
+    const rawHardness = Number(cell.hardness ?? NaN);
+    const rawFrag = Number(cell.fragmentation_index ?? NaN);
+    const rawDist = Number(c.distance ?? NaN);
+
+    const densValue = stats.useLogDensity
+      ? logTransform(rawDensity)
+      : rawDensity;
+
+    const densNorm = safeMinMaxNormalize(
+      densValue,
+      stats.densityStats.min,
+      stats.densityStats.max
+    );
+    const hardNorm = safeMinMaxNormalize(
+      rawHardness,
+      stats.hardnessStats.min,
+      stats.hardnessStats.max
+    );
+    const fragNorm = safeMinMaxNormalize(
+      rawFrag,
+      stats.fragmentationStats.min,
+      stats.fragmentationStats.max
+    );
+    const distNorm = safeMinMaxNormalize(
+      rawDist,
+      stats.distanceStats.min,
+      stats.distanceStats.max
+    );
+
+    const blastForceNorm = Number(config.blastForceNormalized ?? 0.5);
+
+    const score = computeRecoveryScoreFromNorms({
+      densNorm,
+      hardNorm,
+      fragNorm,
+      distNorm,
+      blastForceNorm,
+      weights: config.weights,
+    });
+
+    let status = "diluted";
+    if (score >= thresholds.recovered) status = "recovered";
+    else if (score < thresholds.diluted) status = "lost";
+
+    const annotatedCell = {
+      ...c,
+      gridX: c.x,
+      gridY: c.y,
+      raw: {
+        density: rawDensity,
+        hardness: rawHardness,
+        fragmentation_index: rawFrag,
+        distance: rawDist,
+      },
+      norm: { densNorm, hardNorm, fragNorm, distNorm },
+      recoveryScore: score,
+      recoveryStatus: status,
+    };
+
+    annotated.push(annotatedCell);
+    sumScores += score;
+  });
+
+  const total = annotated.length || 1;
+  const recoveredCount = annotated.filter(
+    (a) => a.recoveryStatus === "recovered"
+  ).length;
+  const dilutedCount = annotated.filter(
+    (a) => a.recoveryStatus === "diluted"
+  ).length;
+  const lostCount = annotated.filter((a) => a.recoveryStatus === "lost").length;
+
+  const metrics = {
+    totalAffected: annotated.length,
+    recoveredCount,
+    dilutedCount,
+    lostCount,
+    efficiencyPct: (sumScores / total) * 100,
+    avgScore: sumScores / total,
+  };
+
+  return { annotatedCells: annotated, metrics, stats };
+}
