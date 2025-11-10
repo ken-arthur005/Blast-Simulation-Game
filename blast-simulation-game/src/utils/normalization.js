@@ -13,3 +13,10 @@ export function safeMinMaxNormalize(value, min, max) {
   if (min === max) return 0.5; // prevent division by zero; neutral value
   return (v - min) / (max - min);
 }
+
+// Optional: log transform to reduce skew before normalization (e.g. density)
+export function logTransform(value, eps = 1e-6) {
+  const v = Number(value);
+  if (!Number.isFinite(v) || v <= 0) return Math.log(eps);
+  return Math.log(v);
+}
