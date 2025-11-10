@@ -190,8 +190,8 @@ const GridCanvas = ({
   // Use a ref for hover to avoid frequent React state updates on mousemove
   const hoveredBlockRef = useRef(null);
   const [destroyedCells, setDestroyedCells] = useState([]);
-  const hoverRafRef = useRef(null);
-  const pendingHoverRef = useRef(null);
+  // Main render loop RAF ref
+  const rafRef = useRef(null);
   // Cache for static grid during blast animation
   const staticGridCacheRef = useRef(null);
   const staticGridCacheParamsRef = useRef(null);
@@ -717,50 +717,65 @@ const GridCanvas = ({
 
   const handleMouseMove = useCallback(
     (event) => {
-      // Throttle hover updates via requestAnimationFrame to reduce full-canvas redraws
+      //  requestAnimationFrame-driven main loop to handle rendering.
+      // Here we only update the hovered block ref and let the RAF loop draw the overlay.
       const rect = canvasRef.current.getBoundingClientRect();
       const pixelX = event.clientX - rect.left;
       const pixelY = event.clientY - rect.top;
-
       const gridCoords = getGridCoords(pixelX, pixelY);
-      pendingHoverRef.current = gridCoords || null;
-
-      if (hoverRafRef.current) return;
-      hoverRafRef.current = requestAnimationFrame(() => {
-        const next = pendingHoverRef.current;
-        const prev = hoveredBlockRef.current;
-        // Only redraw overlay if changed
-        if (
-          (next && !prev) ||
-          (next && prev && (next.x !== prev.x || next.y !== prev.y))
-        ) {
-          hoveredBlockRef.current = next;
-          // re-draw base canvas then overlay to ensure overlay is on top
-          renderCanvas();
-          drawHoverOverlay(next);
-        } else if (!next && prev) {
-          hoveredBlockRef.current = null;
-          // clear overlay by re-rendering the base canvas
-          renderCanvas();
-        }
-        hoverRafRef.current = null;
-      });
+      hoveredBlockRef.current = gridCoords || null;
     },
-    [getGridCoords, renderCanvas, drawHoverOverlay]
-  ); // Dependency on 'getGridCoords' and 'hoveredBlock'
+    [getGridCoords]
+  );
 
   // Mouse Leave Handler
   const handleMouseLeave = useCallback(() => {
-    // cancel pending RAF and clear
-    if (hoverRafRef.current) {
-      cancelAnimationFrame(hoverRafRef.current);
-      hoverRafRef.current = null;
-    }
-    pendingHoverRef.current = null;
+    // Clear hovered block and let the RAF loop redraw to clear overlays
     hoveredBlockRef.current = null;
-    // re-render base canvas to clear overlays
-    renderCanvas();
-  }, [renderCanvas]);
+  }, []);
+
+  /**
+   * Central render loop (requestAnimationFrame)
+   * - Runs when there is no active blast animation so the grid can update
+   *   smoothly (hover overlays, selection rings, etc.).
+   * - When a blast starts we cancel this loop so the blast's own RAF-driven
+   *   animation (animatePhysics) can fully own canvas updates and avoid
+   *   competing draws to the same canvas.
+   * - The RAF id is stored in `rafRef` so we can cancel it safely on cleanup
+   *   or when switching to the blast animation.
+   */
+  useEffect(() => {
+    // If a blast is active, let the blast animation own the RAF loop.
+    if (blastTrigger) {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      return;
+    }
+
+    let af = null;
+    const loop = () => {
+      // Render base canvas
+      renderCanvas();
+      // Draw hover overlay if present
+      if (hoveredBlockRef.current) {
+        drawHoverOverlay(hoveredBlockRef.current);
+      }
+      af = requestAnimationFrame(loop);
+      rafRef.current = af;
+    };
+
+    af = requestAnimationFrame(loop);
+    rafRef.current = af;
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [renderCanvas, drawHoverOverlay, blastTrigger]);
 
   // Add a ref to track if blast is already running
   const isBlastRunningRef = useRef(false);
@@ -768,6 +783,12 @@ const GridCanvas = ({
   useEffect(() => {
     if (!blastTrigger || !gridData || !gridData.grid || !gridData.grid.length)
       return;
+
+    // Cancel any global RAF-driven render loop so the blast animation can own frames
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
 
     // PREVENT DOUBLE EXECUTION
     if (isBlastRunningRef.current) {
