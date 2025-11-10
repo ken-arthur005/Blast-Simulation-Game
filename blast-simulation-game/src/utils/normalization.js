@@ -6,3 +6,10 @@ export function minMaxStats(values) {
   const max = Math.max(...nums);
   return { min, max };
 }
+
+export function safeMinMaxNormalize(value, min, max) {
+  const v = Number.isFinite(value) ? value : NaN;
+  if (!Number.isFinite(v)) return 0.5; // neutral when value is missing
+  if (min === max) return 0.5; // prevent division by zero; neutral value
+  return (v - min) / (max - min);
+}
