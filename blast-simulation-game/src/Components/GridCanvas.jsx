@@ -971,9 +971,10 @@ const GridCanvas = ({
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
     const startTime = performance.now();
-    const duration = 2000; // Reduced from 5000ms to 2000ms for faster animation
-    const shockwaveDuration = 500; // 0.5s for shockwave
-    const flashDuration = 150; // Quick flash
+    // Tunable animation parameters (reduced for performance)
+    const duration = 1400; // total blast animation duration (ms) - reduced for snappier UX
+    const shockwaveDuration = 350; // shockwave expansion duration (ms)
+    const flashDuration = 100; // flash fade duration (ms)
     let animationFrame;
 
     const animatePhysics = (time) => {
@@ -1086,10 +1087,10 @@ const GridCanvas = ({
 
         // FIRE/EXPLOSION PARTICLES 🔥💥
         if (elapsed < 600) {
-          // Reduced from 800ms to 600ms
-          // Fire particles last 0.6s
+          // Fire particles last ~0.6s (visual window)
           const particleProgress = Math.min(elapsed / 600, 1);
-          const numParticles = 8; // Reduced from 12 to 8 particles
+          // Lower particle count to reduce CPU/GPU work while maintaining visual fidelity
+          const numParticles = 6;
 
           for (let p = 0; p < numParticles; p++) {
             const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01;
@@ -1145,10 +1146,9 @@ const GridCanvas = ({
 
         // SMOKE PUFFS 💨
         if (elapsed > 200 && elapsed < 1000) {
-          // Reduced smoke duration from 1500ms to 1000ms
-          // Smoke appears after initial flash
+          // Smoke appears after initial flash; keep duration short to reduce work
           const smokeProgress = Math.min((elapsed - 200) / 800, 1);
-          const numPuffs = 4; // Reduced from 6 to 4 puffs
+          const numPuffs = 3; // fewer smoke puffs for performance
 
           for (let s = 0; s < numPuffs; s++) {
             const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005;
