@@ -54,6 +54,7 @@ export const GameProvider = ({ children }) => {
         setPlayerName,
         updateGrid,
         clearBlasts,
+        addRecoveryRecord,
       }}
     >
       {children}
