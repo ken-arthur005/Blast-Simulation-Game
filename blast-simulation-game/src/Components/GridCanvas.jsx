@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+﻿import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "../utils/oreBlock";
 import { Engine, World, Runner, Events, Body } from "matter-js";
 import {
@@ -9,7 +9,12 @@ import {
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
 
+// ===== ANIMATION HELPER FUNCTIONS =====
 
+/**
+ * Capture physics simulation results for smooth animation
+ * Runs a headless physics simulation to determine final positions
+ */
 const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
   const trajectories = new Map();
   
@@ -114,7 +119,7 @@ const animateBlastWithGSAP = (
   return { timeline, animStates };
 };
 
-
+// ===== EXISTING HELPER UTILITIES =====
 
 const mulberry32 = (a) => {
   return function () {
@@ -126,10 +131,8 @@ const mulberry32 = (a) => {
 };
 
 const hexToRgb = (hex) => {
-  // Defensive: if not provided or not a string, return a neutral gray
   if (!hex || typeof hex !== "string") return { r: 200, g: 200, b: 200 };
   const h = hex.replace("#", "").trim();
-  // If it's already an rgb(...) string, try to parse numbers
   if (h.startsWith("rgb")) {
     const nums = h
       .replace(/[^0-9,.-]/g, "")
@@ -141,7 +144,6 @@ const hexToRgb = (hex) => {
     return { r: 200, g: 200, b: 200 };
   }
 
-  // Fallback for hex parsing
   const bigint = parseInt(h, 16);
   if (!Number.isNaN(bigint) && (h.length === 6 || h.length === 3)) {
     if (h.length === 6) {
@@ -151,14 +153,12 @@ const hexToRgb = (hex) => {
         b: bigint & 255,
       };
     }
-    // short hex like 'abc' -> 'aabbcc'
     const r = parseInt(h[0] + h[0], 16);
     const g = parseInt(h[1] + h[1], 16);
     const b = parseInt(h[2] + h[2], 16);
     return { r, g, b };
   }
 
-  // fallback
   return { r: 200, g: 200, b: 200 };
 };
 
@@ -175,13 +175,10 @@ const adjustColor = (hex, factor) => {
   return rgbToHex(r * (1 + factor), g * (1 + factor), b * (1 + factor));
 };
 
-// Draw a simple rock-like texture inside current origin (0,0) sized to (size)
-// baseColor is a hex string, seedNumber is a deterministic seed per cell
 const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
   const rand = mulberry32(seedNumber);
   const prevGlobalAlpha = ctx.globalAlpha ?? 1;
 
-  // Create a jagged blob silhouette (centered) to emulate a rock outline
   const cx = size / 2;
   const cy = size / 2;
   const points = 8 + Math.floor(rand() * 6);
@@ -189,11 +186,10 @@ const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
   const jagged = [];
   for (let i = 0; i < points; i++) {
     const ang = (i / points) * Math.PI * 2;
-    const r = outerR * (0.75 + rand() * 0.5); // vary radius
+    const r = outerR * (0.75 + rand() * 0.5);
     jagged.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r });
   }
 
-  // Fill jagged blob with the base color so the rock takes the cell's color
   ctx.beginPath();
   jagged.forEach((p, i) =>
     i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
@@ -203,12 +199,10 @@ const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
   ctx.globalAlpha = 1 * alpha;
   ctx.fill();
 
-  // Stroke with a darker ring to emphasize the rock edge
   ctx.lineWidth = Math.max(1, size * 0.04);
   ctx.strokeStyle = adjustColor(baseColor, -0.35);
   ctx.stroke();
 
-  // Clip to jagged blob so subsequent speckles sit inside the rock silhouette
   ctx.save();
   ctx.beginPath();
   jagged.forEach((p, i) =>
@@ -217,13 +211,12 @@ const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
   ctx.closePath();
   ctx.clip();
 
-  // blotches: a few soft, slightly lighter/darker blobs
   const blotches = 6 + Math.floor(rand() * 6);
   for (let i = 0; i < blotches; i++) {
     const bx = cx + (rand() * 2 - 1) * outerR * 0.6;
     const by = cy + (rand() * 2 - 1) * outerR * 0.5;
     const br = (0.08 + rand() * 0.18) * size;
-    const shade = (rand() - 0.4) * 0.4; // slight variation
+    const shade = (rand() - 0.4) * 0.4;
     ctx.beginPath();
     ctx.fillStyle = adjustColor(baseColor, shade);
     ctx.globalAlpha = (0.55 + rand() * 0.35) * alpha;
@@ -231,7 +224,6 @@ const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
     ctx.fill();
   }
 
-  // speckles: small mineral flecks
   const speckles = 18 + Math.floor(rand() * 36);
   for (let i = 0; i < speckles; i++) {
     const sx = cx + (rand() * 2 - 1) * outerR * 0.85;
@@ -245,7 +237,6 @@ const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
     ctx.fill();
   }
 
-  // subtle veins: short lines
   const veins = 1 + Math.floor(rand() * 3);
   ctx.lineWidth = Math.max(0.5, size * 0.01);
   for (let v = 0; v < veins; v++) {
@@ -264,17 +255,17 @@ const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
     ctx.stroke();
   }
 
-  // inner highlight to give a 'bouncy' stylized rock look (optional)
   ctx.beginPath();
   ctx.arc(cx - size * 0.08, cy - size * 0.12, outerR * 0.35, 0, Math.PI * 2);
   ctx.fillStyle = adjustColor(baseColor, 0.28);
   ctx.globalAlpha = 0.18 * alpha;
   ctx.fill();
 
-  // restore alpha and clipping
   ctx.restore();
   ctx.globalAlpha = prevGlobalAlpha;
 };
+
+// ===== MAIN COMPONENT =====
 
 const GridCanvas = ({
   gridData,
@@ -285,19 +276,17 @@ const GridCanvas = ({
   className = "",
   blasts = [],
   onBlockClick,
-  cellGap = 8, // optional prop to control spacing between cells
+  cellGap = 8,
   selectedBlast = null,
-  fileResetKey = 0, // Trigger to force cleanup when new file is uploaded
+  fileResetKey = 0,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const blocksRef = useRef([]);
-  // Use a ref for hover to avoid frequent React state updates on mousemove
   const hoveredBlockRef = useRef(null);
   const [destroyedCells, setDestroyedCells] = useState([]);
   const hoverRafRef = useRef(null);
   const pendingHoverRef = useRef(null);
-  // Cache for static grid during blast animation
   const staticGridCacheRef = useRef(null);
   const staticGridCacheParamsRef = useRef(null);
   const cellSpacing = cellGap;
@@ -330,7 +319,6 @@ const GridCanvas = ({
       const canvas = canvasRef.current;
       const { grid } = gridData;
 
-      // Calculate grid dimensions
       const actualGridWidth =
         grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
       const actualGridHeight =
@@ -339,7 +327,6 @@ const GridCanvas = ({
       const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
       const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-      // Create offscreen canvas for static grid
       const cacheCanvas = document.createElement("canvas");
       cacheCanvas.width = canvas.width;
       cacheCanvas.height = canvas.height;
@@ -348,7 +335,6 @@ const GridCanvas = ({
       cacheCtx.save();
       cacheCtx.translate(offsetX, offsetY);
 
-      // Draw only non-affected cells
       grid.forEach((row, y) => {
         row.forEach((cell, x) => {
           const isAffected = affectedCells.some((c) => c.x === x && c.y === y);
@@ -421,7 +407,6 @@ const GridCanvas = ({
       });
 
       cacheCtx.restore();
-
       return cacheCanvas;
     },
     [gridData, innerBlockSize, cellSpacing]
@@ -576,19 +561,16 @@ const GridCanvas = ({
       const centerX = x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
       const centerY = y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
 
-      // Draw a red circle (blast icon)
       ctx.beginPath();
-      ctx.arc(centerX, centerY, innerBlockSize * 0.3, 0, Math.PI * 2); // Radius 30% of inner block size
-      ctx.fillStyle = "#dc2626"; // Red
+      ctx.arc(centerX, centerY, innerBlockSize * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = "#dc2626";
       ctx.fill();
 
-      // Optional: Add a white flash/dot for visibility
       ctx.beginPath();
       ctx.arc(centerX, centerY, innerBlockSize * 0.1, 0, Math.PI * 2);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
 
-      // Draw direction overlay for this blast (small arrow) so users can see per-blast dirKey
       if (blast.dirKey) {
         const arrowLen = blockSize * 0.28;
         const angleMap = {
@@ -619,23 +601,16 @@ const GridCanvas = ({
         ctx.restore();
       }
 
-      // If this blast is selected, draw a selection ring
       if (selectedBlast && selectedBlast.x === x && selectedBlast.y === y) {
         ctx.beginPath();
         ctx.lineWidth = 2;
-        ctx.strokeStyle = "rgba(37, 99, 235, 0.9)"; // indigo-600
+        ctx.strokeStyle = "rgba(37, 99, 235, 0.9)";
         ctx.arc(centerX, centerY, blockSize * 0.42, 0, Math.PI * 2);
         ctx.stroke();
       }
     });
-    // END NEW RENDERING LOGIC
 
-    // Restore the context state
     ctx.restore();
-
-    console.debug(
-      `Canvas rendered: ${blocksRef.current.length} blocks, centered with offset (${offsetX}, ${offsetY})`
-    );
   }, [
     gridData,
     blasts,
@@ -645,14 +620,11 @@ const GridCanvas = ({
     blockSize,
     selectedBlast,
   ]);
-  // Re-render when dependencies change
+
   useEffect(() => {
     renderCanvas();
   }, [renderCanvas]);
 
-  // GridCanvas.jsx
-
-  // Helper function to convert pixel coords to grid coords
   const getGridCoords = useCallback(
     (pixelX, pixelY) => {
       const canvas = canvasRef.current;
@@ -667,7 +639,6 @@ const GridCanvas = ({
 
       const { grid } = gridData;
 
-      // Calculate centering offsets (same as in renderCanvas)
       const actualGridWidth =
         grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
       const actualGridHeight =
@@ -676,34 +647,25 @@ const GridCanvas = ({
       const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
       const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-      // Adjust for centering translation
       const relativeX = pixelX - offsetX;
       const relativeY = pixelY - offsetY;
 
-      // Check if the click is within the actual grid
       if (
         relativeX < 0 ||
         relativeX >= actualGridWidth ||
         relativeY < 0 ||
         relativeY >= actualGridHeight
       ) {
-        return null; // Clicked outside the centered grid area
+        return null;
       }
 
-      // Convert relative pixel coords to grid coords
-      // Each cell occupies (innerBlockSize + cellSpacing) pixels, but we need to check
-      // if the click is within the actual cell or in the gap between cells
       const stride = innerBlockSize + cellSpacing;
-
-      // Calculate which "block unit" the click is in
       const unitX = Math.floor(relativeX / stride);
       const unitY = Math.floor(relativeY / stride);
 
-      // Check if the click is within the cell part or the gap part
       const posInUnitX = relativeX - unitX * stride;
       const posInUnitY = relativeY - unitY * stride;
 
-      // If click is in the gap region (after the cell content), clamp to the cell
       const gridX =
         posInUnitX < innerBlockSize
           ? unitX
@@ -713,7 +675,6 @@ const GridCanvas = ({
           ? unitY
           : Math.min(unitY + 1, grid.length - 1);
 
-      // Final bounds check
       if (gridX >= grid[0].length || gridY >= grid.length) {
         return null;
       }
@@ -723,12 +684,10 @@ const GridCanvas = ({
     [gridData, innerBlockSize, cellSpacing]
   );
 
-  // Click Handler
   const handleClick = useCallback(
     (event) => {
       if (!onBlockClick || !canvasRef.current) return;
 
-      // Get canvas-relative click coordinates
       const rect = canvasRef.current.getBoundingClientRect();
       const pixelX = event.clientX - rect.left;
       const pixelY = event.clientY - rect.top;
@@ -740,10 +699,8 @@ const GridCanvas = ({
       }
     },
     [onBlockClick, getGridCoords]
-  ); // Dependency on 'onBlockClick' and 'getGridCoords'
+  );
 
-  // Mouse Move Handler (for hover)
-  // Helper to compute grid offsets (used for hover overlay drawing)
   const getGridOffsets = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !gridData || !gridData.grid) return null;
@@ -766,13 +723,12 @@ const GridCanvas = ({
       if (!offsets) return;
       const { offsetX, offsetY } = offsets;
 
-      // draw overlay without clearing base render
       try {
         ctx.save();
         if (block) {
           const hx = block.x * (innerBlockSize + cellSpacing) + offsetX;
           const hy = block.y * (innerBlockSize + cellSpacing) + offsetY;
-          ctx.strokeStyle = "rgba(37, 99, 235, 0.9)"; // match selection color
+          ctx.strokeStyle = "rgba(37, 99, 235, 0.9)";
           ctx.lineWidth = 3;
           drawRoundedRect(
             ctx,
@@ -785,16 +741,13 @@ const GridCanvas = ({
           ctx.stroke();
         }
         ctx.restore();
-      } catch {
-        /* ignore overlay errors */
-      }
+      } catch {}
     },
     [getGridOffsets, innerBlockSize, cellSpacing]
   );
 
   const handleMouseMove = useCallback(
     (event) => {
-      // Throttle hover updates via requestAnimationFrame to reduce full-canvas redraws
       const rect = canvasRef.current.getBoundingClientRect();
       const pixelX = event.clientX - rect.left;
       const pixelY = event.clientY - rect.top;
@@ -806,36 +759,30 @@ const GridCanvas = ({
       hoverRafRef.current = requestAnimationFrame(() => {
         const next = pendingHoverRef.current;
         const prev = hoveredBlockRef.current;
-        // Only redraw overlay if changed
         if (
           (next && !prev) ||
           (next && prev && (next.x !== prev.x || next.y !== prev.y))
         ) {
           hoveredBlockRef.current = next;
-          // re-draw base canvas then overlay to ensure overlay is on top
           renderCanvas();
           drawHoverOverlay(next);
         } else if (!next && prev) {
           hoveredBlockRef.current = null;
-          // clear overlay by re-rendering the base canvas
           renderCanvas();
         }
         hoverRafRef.current = null;
       });
     },
     [getGridCoords, renderCanvas, drawHoverOverlay]
-  ); // Dependency on 'getGridCoords' and 'hoveredBlock'
+  );
 
-  // Mouse Leave Handler
   const handleMouseLeave = useCallback(() => {
-    // cancel pending RAF and clear
     if (hoverRafRef.current) {
       cancelAnimationFrame(hoverRafRef.current);
       hoverRafRef.current = null;
     }
     pendingHoverRef.current = null;
     hoveredBlockRef.current = null;
-    // re-render base canvas to clear overlays
     renderCanvas();
   }, [renderCanvas]);
 
@@ -997,88 +944,18 @@ const GridCanvas = ({
         } catch {}
       }
 
-      // Draw affected cells at their original grid positions
-      // (the debris bodies are flying around, but we show fading ores for visual continuity)
-      ctx.save();
-      ctx.translate(offsetX, offsetY);
-
-      // Only show affected cells at the very start of blast (first 3ms)
-      // then hide them to let debris take center stage
-      if (elapsed < 3) {
-        affectedCells.forEach((cell) => {
-          const block = new OreBlock(
-            gridData.grid[cell.y][cell.x],
-            cell.x,
-            cell.y,
-            innerBlockSize
-          );
-          const renderX = cell.x * (innerBlockSize + cellSpacing);
-          const renderY = cell.y * (innerBlockSize + cellSpacing);
-
-          ctx.save();
-          ctx.translate(renderX, renderY);
-
-          // Draw faint grid with rounded corners
-          const rrad = Math.max(4, innerBlockSize * 0.12);
-          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-          ctx.fill();
-
-          // Draw the ore
-          ctx.save();
-          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
-          ctx.clip();
-          const seedCell = (cell.x * 73856093) ^ (cell.y * 19349663);
-          const colorHashCell = (block.getBlockColor() || "#ffffff")
-            .split("")
-            .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-          const rockScaleCell = 0.72;
-          const rockSizeCell = Math.max(
-            2,
-            Math.round(innerBlockSize * rockScaleCell)
-          );
-          const rockOffsetCell = Math.round(
-            (innerBlockSize - rockSizeCell) / 2
-          );
-          ctx.translate(rockOffsetCell, rockOffsetCell);
-          drawRockTexture(
-            ctx,
-            rockSizeCell,
-            block.getBlockColor(),
-            seedCell + colorHashCell
-          );
-          ctx.restore();
-
-          // Border
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-          ctx.lineWidth = 1.2;
-          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
-          ctx.stroke();
-
-          ctx.restore();
-        });
-      }
-      ctx.restore();
-
-      // Debris bodies are already positioned with absolute canvas coordinates
-      // (they include offsetX and offsetY from physics engine)
-      // so we render them directly without additional translation
-
-      // RENDER SHOCKWAVES 🔥
+      // RENDER SHOCKWAVES AND EFFECTS 🔥
       blastCenters.forEach((center, i) => {
         const shockwave = shockwaves[i];
 
-        // Update shockwave properties
-        shockwave.radius = shockwaveProgress * blockSize * 3; // Reduced from 4 to 3 block radius
+        shockwave.radius = shockwaveProgress * blockSize * 3;
         shockwave.opacity = Math.max(0, 1 - shockwaveProgress);
         shockwave.flashOpacity = Math.max(0, 1 - flashProgress * 2);
 
-        // FIRE/EXPLOSION PARTICLES 🔥💥
+        // FIRE PARTICLES 🔥
         if (elapsed < 900) {
-          // Reduced from 800ms to 600ms
-          // Fire particles last 0.6s
           const particleProgress = Math.min(elapsed / 900, 1);
-          const numParticles = 15; // Reduced from 12 to 8 particles
+          const numParticles = 15;
 
           for (let p = 0; p < numParticles; p++) {
             const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + (p * 0.2);
@@ -1091,28 +968,19 @@ const GridCanvas = ({
             const particleY =
               center.y +
               Math.sin(angle) * distance -
-              particleProgress * blockSize * 0.5; // Rise up
+              particleProgress * blockSize * 0.5;
 
-            // Particle size shrinks over time
-            const particleSize =
-              blockSize * 0.25 * (1 - particleProgress * 0.7);
+            const particleSize = blockSize * 0.25 * (1 - particleProgress * 0.7);
 
-            // Color shifts from white -> yellow -> orange -> red -> fade
             let particleColor;
-            if (particleProgress < 0.2) {
-              particleColor = "#ffffff";
-            } else if (particleProgress < 0.4) {
-              particleColor = "#ffff00";
-            } else if (particleProgress < 0.6) {
-              particleColor = "#ff8800";
-            } else {
-              particleColor = "#ff3300";
-            }
+            if (particleProgress < 0.2) particleColor = "#ffffff";
+            else if (particleProgress < 0.4) particleColor = "#ffff00";
+            else if (particleProgress < 0.6) particleColor = "#ff8800";
+            else particleColor = "#ff3300";
 
             ctx.save();
             ctx.globalAlpha = (1 - particleProgress) * 0.8;
 
-            // Draw flame particle with glow
             const particleGradient = ctx.createRadialGradient(
               particleX,
               particleY,
@@ -1134,23 +1002,22 @@ const GridCanvas = ({
 
         // SMOKE PUFFS 💨
         if (elapsed > 150 && elapsed < 1500) {
-          // Reduced smoke duration from 1500ms to 1000ms
-          // Smoke appears after initial flash
           const smokeProgress = Math.min((elapsed - 150) / 1350, 1);
-          const numPuffs = 8; // Reduced from 6 to 4 puffs
+          const numPuffs = 8;
 
           for (let s = 0; s < numPuffs; s++) {
             const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + (s * 0.5);
             const distance = smokeProgress * blockSize * 1.8;
             const puffX = center.x + Math.cos(angle) * distance;
-            const puffY =center.y +
-+           Math.sin(angle) * distance - smokeProgress * blockSize * 1.5; // Rise up more
+            const puffY =
+              center.y +
+              Math.sin(angle) * distance -
+              smokeProgress * blockSize * 1.5;
             const puffSize = blockSize * 0.6 * (1 + smokeProgress * 0.5);
 
             ctx.save();
             ctx.globalAlpha = (1 - smokeProgress) * 0.75;
 
-            // Gray smoke
             const smokeGradient = ctx.createRadialGradient(
               puffX,
               puffY,
@@ -1170,7 +1037,7 @@ const GridCanvas = ({
           }
         }
 
-        // Draw initial flash
+        // Initial flash
         if (shockwave.flashOpacity > 0) {
           ctx.save();
           ctx.globalAlpha = shockwave.flashOpacity;
@@ -1192,9 +1059,8 @@ const GridCanvas = ({
           ctx.restore();
         }
 
-        // Draw expanding shockwave rings
+        // Shockwave rings
         if (shockwave.opacity > 0 && shockwave.radius > 0) {
-          // Outer ring (red)
           ctx.save();
           ctx.globalAlpha = shockwave.opacity * 0.8;
           ctx.strokeStyle = "#ff0000";
@@ -1204,9 +1070,8 @@ const GridCanvas = ({
           ctx.stroke();
           ctx.restore();
 
-          // Middle ring (orange)
           ctx.save();
-          ctx.globalAlpha = shockwave.opacity * 0.1;
+          ctx.globalAlpha = shockwave.opacity * 0.6;
           ctx.strokeStyle = "#ff6600";
           ctx.lineWidth = 7;
           ctx.beginPath();
@@ -1214,7 +1079,6 @@ const GridCanvas = ({
           ctx.stroke();
           ctx.restore();
 
-          // Inner ring (yellow-white)
           ctx.save();
           ctx.globalAlpha = shockwave.opacity;
           ctx.strokeStyle = "#ffff00";
@@ -1277,10 +1141,8 @@ const GridCanvas = ({
           opacity
         );
 
-        // Optional: stroke outer rock bounding to match debris look
         ctx.strokeStyle = "rgba(0,0,0,0.25)";
         ctx.lineWidth = 1;
-        // Draw a faint rounded rect boundary for readability
         ctx.beginPath();
         drawRoundedRect(ctx, 0, 0, dW, dH, Math.max(2, dW * 0.12));
         ctx.stroke();
@@ -1288,6 +1150,7 @@ const GridCanvas = ({
         ctx.restore();
       });
 
+      // Continue animation or cleanup
       if (progress < 1) {
         animationFrame = requestAnimationFrame(animateFrame);
       } else {
@@ -1358,7 +1221,7 @@ const GridCanvas = ({
         border: "2px solid rgba(255, 255, 255, 0.3)",
         boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
         padding: "10px",
-        overflow: "hidden", // clip canvas to rounded container so textures can't escape
+        overflow: "hidden",
         boxSizing: "border-box",
       }}
     >
