@@ -211,7 +211,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     let blockSize = Math.min(blockSizeByWidth, blockSizeByHeight);
 
     // Size constraints for readability
-    const minBlockSize = 6;
+    // this was 6 which made rocks tiny for extreme grid dimensions.
+    const minBlockSize = 12;
     const maxBlockSize = 80;
 
     if (blockSize < minBlockSize || blockSize > maxBlockSize) {
