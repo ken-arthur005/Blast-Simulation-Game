@@ -1,5 +1,6 @@
 import { Engine, Render, World, Bodies, Body, Events } from "matter-js";
 import OreColorMapper from "./oreColorMapper.js";
+import gsap from "gsap";
 
 // Helper utils for safe scaling
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -58,7 +59,8 @@ const computeMaterialScales = (cellData) => {
  */
 export const createPhysicsEngine = (canvas, canvasSize) => {
   const engine = Engine.create({
-    gravity: { x: 0, y: 1 },
+    gravity: { x: 0, y: 1, scale: 0.0001 },
+    
   });
 
   const render = Render.create({
@@ -201,6 +203,9 @@ export const createBlastBodies = (
       }
     );
 
+    // Store original position for animation reference
+    body.originalPosition = { x: pixelX, y: pixelY };
+
     return body;
   });
 
@@ -258,6 +263,8 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     "down-right": { x: Math.SQRT1_2, y: Math.SQRT1_2 },
     "down-left": { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
   };
+
+
 
   // Calmer biasing
   const biasMultiplier = 1.2;
@@ -357,6 +364,235 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
 
     // Mild random rotation
     Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.12);
+  });
+};
+
+
+//capture physics simulation for animation
+
+export const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
+  const trajectories = new Map();
+
+  //initialize trajects storage
+ bodies.forEach(body => {
+    trajectories.set(body.id, {
+      body: body,
+      keyframes: [{
+        x: body.originalPosition.x,
+        y: body.originalPosition.y,
+        angle: 0,
+        time: 0
+      }]
+    });
+  });
+
+  const sampleInterval = 4; // Capture every 4th frame
+  
+  for (let i = 0; i < steps; i++) {
+    Engine.update(engine, 1000 / 60); // 60fps simulation
+    
+    if (i % sampleInterval === 0 || i === steps - 1) {
+      bodies.forEach(body => {
+        const trajectory = trajectories.get(body.id);
+        trajectory.keyframes.push({
+          x: body.position.x,
+          y: body.position.y,
+          angle: body.angle,
+          time: (i / steps)
+        });
+      });
+    }
+  }
+
+  return Array.from(trajectories.values());
+}
+
+
+export const animateBlastWithGSAP = (
+  trajectories,
+  onUpdate,
+  onComplete,
+  duration = 2.5
+) => {
+  const timeline = gsap.timeline({
+    onComplete: () => {
+      console.debug("Blast animation complete");
+      onComplete?.();
+    }
+  });
+
+  // Create animation state objects for each body
+  const animStates = trajectories.map(traj => {
+    const body = traj.body;
+    const finalFrame = traj.keyframes[traj.keyframes.length - 1];
+    
+    return {
+      body: body,
+      animX: body.originalPosition.x,
+      animY: body.originalPosition.y,
+      animAngle: 0,
+      targetX: finalFrame.x,
+      targetY: finalFrame.y,
+      targetAngle: finalFrame.angle,
+      keyframes: traj.keyframes
+    };
+  });
+
+  // Animate each body
+  animStates.forEach((state, index) => {
+    // Add slight stagger based on blast distance for wave effect
+    const delay = (state.body.blastDistance || 0) * 0.008;
+    
+    // Use bezier path for more realistic physics-like motion
+    const controlPoints = state.keyframes.map(kf => ({
+      x: kf.x,
+      y: kf.y
+    }));
+
+    timeline.to(state, {
+      animX: state.targetX,
+      animY: state.targetY,
+      animAngle: state.targetAngle,
+      duration: duration,
+      delay: delay,
+      ease: "power2.out", // Natural deceleration
+      onUpdate: () => {
+        // Update the actual body position for rendering
+        state.body.animatedPosition = {
+          x: state.animX,
+          y: state.animY,
+          angle: state.animAngle
+        };
+        
+        // Trigger render update
+        onUpdate?.(state.body);
+      }
+    }, 0); // Start all animations at timeline time 0 (delay handles stagger)
+  });
+
+  return timeline;
+};
+
+export const animateBlastWithCanvas = (
+  trajectories,
+  onUpdate,
+  onComplete,
+  duration = 2500
+) => {
+  const startTime = performance.now();
+  const animStates = trajectories.map(traj => {
+    const body = traj.body;
+    const finalFrame = traj.keyframes[traj.keyframes.length - 1];
+    const delay = (body.blastDistance || 0) * 8; // milliseconds
+    
+    return {
+      body: body,
+      startX: body.originalPosition.x,
+      startY: body.originalPosition.y,
+      targetX: finalFrame.x,
+      targetY: finalFrame.y,
+      targetAngle: finalFrame.angle,
+      delay: delay,
+      keyframes: traj.keyframes
+    };
+  });
+
+  let animationId;
+  
+  const easeOutQuad = (t) => t * (2 - t); // Smooth deceleration
+  
+  const animate = (currentTime) => {
+    const elapsed = currentTime - startTime;
+    let allComplete = true;
+
+    animStates.forEach(state => {
+      const adjustedElapsed = Math.max(0, elapsed - state.delay);
+      const progress = Math.min(1, adjustedElapsed / duration);
+      
+      if (progress < 1) {
+        allComplete = false;
+      }
+
+      // Apply easing
+      const easedProgress = easeOutQuad(progress);
+
+      // Interpolate position with physics-based curve
+      // Use keyframes for more accurate path
+      const keyframeIndex = Math.floor(easedProgress * (state.keyframes.length - 1));
+      const nextIndex = Math.min(keyframeIndex + 1, state.keyframes.length - 1);
+      const kf1 = state.keyframes[keyframeIndex];
+      const kf2 = state.keyframes[nextIndex];
+      const localProgress = (easedProgress * (state.keyframes.length - 1)) - keyframeIndex;
+
+      const x = kf1.x + (kf2.x - kf1.x) * localProgress;
+      const y = kf1.y + (kf2.y - kf1.y) * localProgress;
+      const angle = kf1.angle + (kf2.angle - kf1.angle) * localProgress;
+
+      // Update body with animated position
+      state.body.animatedPosition = { x, y, angle };
+      
+      onUpdate?.(state.body);
+    });
+
+    if (!allComplete) {
+      animationId = requestAnimationFrame(animate);
+    } else {
+      console.debug("Canvas blast animation complete");
+      onComplete?.();
+    }
+  };
+
+  animationId = requestAnimationFrame(animate);
+  
+  // Return cancellation function
+  return () => cancelAnimationFrame(animationId);
+};
+
+export const runAnimatedBlast = async (
+  bodies,
+  blastCenters,
+  engine,
+  options = {}
+) => {
+  const {
+    blastForce = 0.08,
+    duration = 2.5,
+    useGSAP = true,
+    onUpdate = null,
+    simulationSteps = 120
+  } = options;
+
+  console.debug("Starting animated blast simulation...");
+
+  // Step 1: Apply blast forces
+  applyBlastForce(bodies, blastCenters, blastForce);
+
+  // Step 2: Run physics simulation and capture trajectories
+  console.debug("Capturing physics trajectories...");
+  const trajectories = capturePhysicsTrajectories(bodies, engine, simulationSteps);
+
+  // Step 3: Reset bodies to original positions for animation
+  bodies.forEach(body => {
+    Body.setPosition(body, body.originalPosition);
+    Body.setAngle(body, 0);
+    Body.setVelocity(body, { x: 0, y: 0 });
+    Body.setAngularVelocity(body, 0);
+  });
+
+  // Step 4: Animate based on captured trajectories
+  return new Promise((resolve) => {
+    const handleComplete = () => {
+      console.debug("Blast animation sequence complete");
+      resolve();
+    };
+
+    if (useGSAP) {
+      console.debug("Using GSAP animation");
+      animateBlastWithGSAP(trajectories, onUpdate, handleComplete, duration);
+    } else {
+      console.debug("Using Canvas animation");
+      animateBlastWithCanvas(trajectories, onUpdate, handleComplete, duration * 1000);
+    }
   });
 };
 
