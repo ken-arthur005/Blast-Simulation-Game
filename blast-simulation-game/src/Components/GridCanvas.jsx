@@ -1,6 +1,6 @@
 ﻿import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "../utils/oreBlock";
-import { Engine, World, Runner, Events } from "matter-js";
+import { Engine, World, Runner, Events, Body } from "matter-js";
 import {
   createBlastBodies,
   applyBlastForce,
@@ -9,8 +9,113 @@ import {
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
 
-// Helper utilities (module-level so identity is stable across renders)
-// Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
+
+const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
+  const trajectories = new Map();
+  
+  // Initialize trajectory storage with original positions
+  bodies.forEach(body => {
+    trajectories.set(body.id, {
+      body: body,
+      keyframes: [{
+        x: body.position.x,
+        y: body.position.y,
+        angle: body.angle,
+        time: 0
+      }]
+    });
+  });
+
+  // Run physics simulation and capture keyframes
+  const sampleInterval = 4; // Capture every 4th frame for efficiency
+  
+  for (let i = 0; i < steps; i++) {
+    Engine.update(engine, 1000 / 60); // 60fps simulation
+    
+    if (i % sampleInterval === 0 || i === steps - 1) {
+      bodies.forEach(body => {
+        const trajectory = trajectories.get(body.id);
+        trajectory.keyframes.push({
+          x: body.position.x,
+          y: body.position.y,
+          angle: body.angle,
+          velocityX: body.velocity.x,
+          velocityY: body.velocity.y,
+          time: (i / steps)
+        });
+      });
+    }
+  }
+
+  return Array.from(trajectories.values());
+};
+
+/**
+ * Animate blocks using GSAP based on physics trajectories
+ */
+const animateBlastWithGSAP = (
+  trajectories,
+  duration = 2.5
+) => {
+  const timeline = gsap.timeline();
+
+  // Create animation state objects for each body
+  const animStates = trajectories.map(traj => {
+    const body = traj.body;
+    const startFrame = traj.keyframes[0];
+    const finalFrame = traj.keyframes[traj.keyframes.length - 1];
+    
+    return {
+      body: body,
+      animX: startFrame.x,
+      animY: startFrame.y,
+      animAngle: startFrame.angle,
+      animVelocityX: 0,
+      animVelocityY: 0,
+      targetX: finalFrame.x,
+      targetY: finalFrame.y,
+      targetAngle: finalFrame.angle,
+      keyframes: traj.keyframes
+    };
+  });
+
+  // Animate each body with stagger effect
+  animStates.forEach((state) => {
+    const delay = (state.body.blastDistance || 0) * 0.008;
+    
+    timeline.to(state, {
+      animX: state.targetX,
+      animY: state.targetY,
+      animAngle: state.targetAngle,
+      duration: duration,
+      delay: delay,
+      ease: "power2.out",
+      onUpdate: function() {
+        // Calculate current keyframe for velocity (for motion trails)
+        const progress = this.progress();
+        const kfIndex = Math.floor(progress * (state.keyframes.length - 1));
+        const kf = state.keyframes[Math.min(kfIndex, state.keyframes.length - 1)];
+        
+        state.animVelocityX = kf.velocityX || 0;
+        state.animVelocityY = kf.velocityY || 0;
+        
+        // Update body's animated position for rendering
+        state.body.animatedPosition = {
+          x: state.animX,
+          y: state.animY,
+          angle: state.animAngle,
+          velocityX: state.animVelocityX,
+          velocityY: state.animVelocityY
+        };
+      }
+    }, 0);
+  });
+
+  return { timeline, animStates };
+};
+
+
+
 const mulberry32 = (a) => {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -195,12 +300,14 @@ const GridCanvas = ({
   // Cache for static grid during blast animation
   const staticGridCacheRef = useRef(null);
   const staticGridCacheParamsRef = useRef(null);
-  // Merged offscreen cache for batch drawing the entire grid
-  const gridRenderCacheRef = useRef(null);
-  const cellSpacing = cellGap; // spacing between cells in pixels
-  const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
+  const cellSpacing = cellGap;
+  const innerBlockSize = Math.max(4, blockSize - cellSpacing);
+  const isBlastRunningRef = useRef(false);
+  
 
-  // Helper: draw rounded rectangle path (does not fill/stroke)
+  const animationTimelineRef = useRef(null);
+  const animationStatesRef = useRef(null);
+
   const drawRoundedRect = (ctx, x, y, width, height, radius = 6) => {
     const r = Math.min(radius, width / 2, height / 2);
     ctx.beginPath();
@@ -216,7 +323,6 @@ const GridCanvas = ({
     ctx.closePath();
   };
 
-  // Helper: Create a cached canvas of static (non-affected) cells for fast rendering during blast
   const createStaticGridCache = useCallback(
     (affectedCells) => {
       if (!gridData || !gridData.grid || !canvasRef.current) return null;
@@ -239,9 +345,6 @@ const GridCanvas = ({
       cacheCanvas.height = canvas.height;
       const cacheCtx = cacheCanvas.getContext("2d");
 
-      // Note: Do NOT draw background here - it's drawn separately in animatePhysics
-      // This prevents double background and z-order issues
-
       cacheCtx.save();
       cacheCtx.translate(offsetX, offsetY);
 
@@ -258,7 +361,6 @@ const GridCanvas = ({
               y * (innerBlockSize + cellSpacing)
             );
 
-            // Draw rounded background
             const rrx = 0;
             const rry = 0;
             const rrad = Math.max(4, innerBlockSize * 0.12);
@@ -273,7 +375,6 @@ const GridCanvas = ({
             cacheCtx.fillStyle = "rgba(255, 255, 255, 0.08)";
             cacheCtx.fill();
 
-            // Render ore clipped to rounded shape
             cacheCtx.save();
             drawRoundedRect(
               cacheCtx,
@@ -303,7 +404,6 @@ const GridCanvas = ({
             );
             cacheCtx.restore();
 
-            // Stroke border
             drawRoundedRect(
               cacheCtx,
               rrx,
@@ -327,32 +427,25 @@ const GridCanvas = ({
     [gridData, innerBlockSize, cellSpacing]
   );
 
-  // Create OreBlock instances for each cell in the grid
   const createBlocks = useCallback(() => {
     if (!gridData || !gridData.grid) return [];
     const blocks = [];
     const { grid } = gridData;
     grid.forEach((row, y) => {
       row.forEach((cell, x) => {
-        // Create OreBlock sized to the inner block size (so render aligns with spacing)
         const block = new OreBlock(cell, x, y, innerBlockSize);
 
-        // Pre-render each block into an offscreen canvas to avoid expensive
-        // procedural drawing on every animation frame.
         try {
           const off = document.createElement("canvas");
           off.width = innerBlockSize;
           off.height = innerBlockSize;
           const octx = off.getContext("2d");
 
-          // Draw faint rounded background and the rock texture into cache
           const rrad = Math.max(4, innerBlockSize * 0.12);
-          // background fill
           drawRoundedRect(octx, 0, 0, innerBlockSize, innerBlockSize, rrad);
           octx.fillStyle = "rgba(255, 255, 255, 0.08)";
           octx.fill();
 
-          // Clip and draw rock texture
           octx.save();
           drawRoundedRect(octx, 0, 0, innerBlockSize, innerBlockSize, rrad);
           octx.clip();
@@ -372,7 +465,6 @@ const GridCanvas = ({
           );
           octx.restore();
 
-          // stroke border
           drawRoundedRect(octx, 0, 0, innerBlockSize, innerBlockSize, rrad);
           octx.strokeStyle = "rgba(255, 255, 255, 0.25)";
           octx.lineWidth = 1.2;
@@ -380,7 +472,6 @@ const GridCanvas = ({
 
           block.cachedCanvas = off;
         } catch {
-          // If offscreen canvas creation fails (non-browser env), ignore caching
           block.cachedCanvas = null;
         }
 
@@ -390,19 +481,14 @@ const GridCanvas = ({
     return blocks;
   }, [gridData, innerBlockSize]);
 
-  // Initialize blocks when grid changes and reset destroyed cells
-  // Use gridData.grid as a dependency trigger since it changes on canvas reset
   useEffect(() => {
     if (gridData && gridData.grid) {
       blocksRef.current = createBlocks();
       setDestroyedCells([]);
-      console.log(
-        "Grid reset: blocks reinitalized and destroyed cells cleared"
-      );
+      console.log("Grid reset: blocks reinitialized");
     }
   }, [gridData, createBlocks, fileResetKey]);
 
-  // Render all blocks on the canvas
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !gridData || !gridData.grid || gridData.grid.length === 0)
@@ -410,11 +496,10 @@ const GridCanvas = ({
     const ctx = canvas.getContext("2d");
     const { grid } = gridData;
 
-    // Avoid accessing grid[0] if grid is empty
     const columns = grid[0]?.length || 0;
     const rows = grid.length;
 
-    if (columns === 0 || rows === 0) return; //stop if empty grid
+    if (columns === 0 || rows === 0) return;
 
     const actualGridWidth =
       grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
@@ -424,13 +509,12 @@ const GridCanvas = ({
     const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
     const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-    // Clear & fill background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; // light gray background
+    ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Save the context state
     ctx.save();
+    ctx.translate(offsetX, offsetY);
 
     // FAST PATH: if we have a precomposed grid cache, draw it in one call.
     if (gridRenderCacheRef.current) {
@@ -450,9 +534,27 @@ const GridCanvas = ({
           (cell) => cell.x === block.gridX && cell.y === block.gridY
         );
 
-        const renderX = block.gridX * (innerBlockSize + cellSpacing);
-        const renderY = block.gridY * (innerBlockSize + cellSpacing);
+      ctx.save();
+      ctx.translate(renderX, renderY);
 
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.lineWidth = 1.2;
+      const rx = 0;
+      const ry = 0;
+      const rrad = Math.max(4, innerBlockSize * 0.12);
+      drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+      ctx.fill();
+
+      if (block.cachedCanvas && !isDestroyed) {
+        ctx.drawImage(block.cachedCanvas, 0, 0);
+      } else if (isDestroyed) {
+        ctx.fillStyle = "#9ca3af";
+        ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
+        ctx.strokeStyle = "rgba(0,0,0,0.12)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
+      } else {
         ctx.save();
         ctx.translate(renderX, renderY);
 
@@ -506,7 +608,6 @@ const GridCanvas = ({
       });
     }
 
-    // 2. Draw Blast Markers
     blasts.forEach((blast) => {
       const { x, y } = blast;
 
@@ -819,14 +920,11 @@ const GridCanvas = ({
     renderCanvas();
   }, [renderCanvas]);
 
-  // Add a ref to track if blast is already running
-  const isBlastRunningRef = useRef(false);
-
+  // ===== MAIN BLAST ANIMATION EFFECT =====
   useEffect(() => {
     if (!blastTrigger || !gridData || !gridData.grid || !gridData.grid.length)
       return;
 
-    // PREVENT DOUBLE EXECUTION
     if (isBlastRunningRef.current) {
       console.log("Blast already running, skipping duplicate trigger");
       return;
@@ -839,18 +937,10 @@ const GridCanvas = ({
 
     const { affectedCells } = blastTrigger;
 
-    // Mark blast as running
     isBlastRunningRef.current = true;
-    console.debug("GridCanvas: blastTrigger received", {
-      affectedCellsCount: affectedCells?.length,
-      affectedSample: affectedCells?.slice?.(0, 6),
-      blastTrigger,
-    });
-    console.log("Starting blast animation...");
+    console.log("🎬 Starting ANIMATED blast...");
 
-    // Calculate grid offset for centering (same as in renderCanvas)
-    // const actualGridWidth = gridData.grid[0].length * blockSize;
-    // const actualGridHeight = gridData.grid.length * blockSize;
+    // Calculate grid offset for centering
     const actualGridWidth =
       gridData.grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
     const actualGridHeight =
@@ -859,7 +949,7 @@ const GridCanvas = ({
     const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
     const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-    // VIOLENT CANVAS SHAKE 🔥
+    // CANVAS SHAKE EFFECT 🔥
     gsap.to(container, {
       x: "random(-12, 12)",
       y: "random(-12, 12)",
@@ -872,20 +962,15 @@ const GridCanvas = ({
       },
     });
 
-    // Create Matter.js physics engine
+    // Step 1: Create physics engine for trajectory calculation
     const engine = Engine.create({
-      gravity: { x: 0, y: 0.6 }, // Reduced gravity from 0.8 to 0.6 for faster settling
+      gravity: { x: 0, y: 0.6 },
     });
 
-    const runner = Runner.create();
-
-    // Create boundary walls to contain debris
     const walls = createBoundaryWalls(canvasSize);
     World.add(engine.world, walls);
 
-    // Create bodies for affected cells
-    // Create physics bodies sized to the inner block size so visual debris matches spacing
-    // Pass stride = innerBlockSize + cellSpacing so bodies are positioned in the same grid layout
+    // Step 2: Create bodies
     const stride = innerBlockSize + cellSpacing;
     const bodies = createBlastBodies(
       affectedCells,
@@ -895,18 +980,16 @@ const GridCanvas = ({
       stride
     );
 
-    console.debug("GridCanvas: created bodies", { count: bodies.length });
+    console.log(`✅ Created ${bodies.length} physics bodies`);
 
-    // Add bodies to the world
     World.add(engine.world, bodies);
 
-    // Calculate blast centers in pixel coordinates and include dirKey for directional bias
+    // Step 3: Calculate blast centers with directional bias
     const uniqueCoords = [
       ...new Set(affectedCells.map((c) => `${c.blastX},${c.blastY}`)),
     ];
     const blastCenters = uniqueCoords.map((coord) => {
       const [x, y] = coord.split(",").map(Number);
-      // find matching blast object (if available) to read dirKey
       const matchingBlast = blasts?.find((b) => b.x === x && b.y === y) || {};
       return {
         x: x * stride + offsetX + innerBlockSize / 2,
@@ -915,43 +998,26 @@ const GridCanvas = ({
       };
     });
 
-    // Apply blast forces (tunable factor)
-    // Diagnostic overlay: draw small markers at computed blast centers so we can see where
-    // the engine expects the epicenters (helpful when debugging off-canvas placements)
-    try {
-      ctx.save();
-      blastCenters.forEach((c, i) => {
-        ctx.beginPath();
-        ctx.fillStyle = "rgba(255,0,0,0.9)";
-        ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "10px sans-serif";
-        ctx.fillText(String(i), c.x + 6, c.y + 4);
-      });
-      ctx.restore();
-    } catch {
-      /* ignore diagnostics errors */
-    }
+    // Step 4: Apply blast forces
+    applyBlastForce(bodies, blastCenters, 0.02);
 
-    applyBlastForce(bodies, blastCenters, 0.02); // Reduce from 0.08 to 0.02 for more dramatic effect
+    // Step 5: Run headless physics simulation to capture trajectories
+    console.log("📊 Capturing physics trajectories...");
+    const trajectories = capturePhysicsTrajectories(bodies, engine, 120);
+    console.log(`✅ Captured ${trajectories.length} trajectories`);
 
-    // Shockwave animation state
-    const shockwaves = blastCenters.map(() => ({
-      radius: 0,
-      opacity: 1,
-      flashOpacity: 1,
-    }));
+    // Step 6: Reset bodies to original positions for animation
+    bodies.forEach(body => {
+      const startPos = trajectories.find(t => t.body.id === body.id)?.keyframes[0];
+      if (startPos) {
+        Body.setPosition(body, { x: startPos.x, y: startPos.y });
+        Body.setAngle(body, 0);
+        Body.setVelocity(body, { x: 0, y: 0 });
+        Body.setAngularVelocity(body, 0);
+      }
+    });
 
-    // Start physics simulation
-    Runner.run(runner, engine);
-
-    console.debug(
-      "GridCanvas: runner started, bodies in world:",
-      engine.world.bodies.length
-    );
-
-    // Pre-render static grid cache for faster animation rendering
+    // Step 7: Create static grid cache for performance
     const staticGridCache = createStaticGridCache(affectedCells);
     staticGridCacheRef.current = staticGridCache;
     staticGridCacheParamsRef.current = {
@@ -961,52 +1027,55 @@ const GridCanvas = ({
       canvasHeight: canvas.height,
     };
 
-    console.debug("GridCanvas: Static cache created", {
-      affectedCellsCount: affectedCells.length,
-      cacheCreated: !!staticGridCache,
-    });
-
-    // Mark affected cells as destroyed immediately when blast starts
-    // so they disappear from the grid right away
+    // Mark affected cells as destroyed
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
+    // Step 8: Animate using GSAP
+    console.log("🎨 Starting GSAP animation...");
+    const animationDuration = 2.5; // seconds
+    const { timeline, animStates } = animateBlastWithGSAP(trajectories, animationDuration);
+    
+    animationTimelineRef.current = timeline;
+    animationStatesRef.current = animStates;
+
+    // Shockwave animation state
+    const shockwaves = blastCenters.map(() => ({
+      radius: 0,
+      opacity: 1,
+      flashOpacity: 1,
+    }));
+
     const startTime = performance.now();
-    // Tunable animation parameters (reduced for performance)
-    const duration = 1400; // total blast animation duration (ms) - reduced for snappier UX
-    const shockwaveDuration = 350; // shockwave expansion duration (ms)
-    const flashDuration = 100; // flash fade duration (ms)
+    const shockwaveDuration = 700;
+    const flashDuration = 200;
     let animationFrame;
 
-    const animatePhysics = (time) => {
-      // Safety check - if grid data is gone, stop animation
+    // Step 9: Render loop
+    const animateFrame = (time) => {
+      // Safety check
       if (!gridData || !gridData.grid || !gridData.grid.length) {
-        if (animationFrame) {
-          cancelAnimationFrame(animationFrame);
-        }
-        Runner.stop(runner);
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        timeline.kill();
         cleanupPhysicsEngine(engine, null);
-        isBlastRunningRef.current = false; // Reset flag
+        isBlastRunningRef.current = false;
         return;
       }
 
       const elapsed = time - startTime;
-      const progress = Math.min(elapsed / duration, 1);
+      const progress = Math.min(elapsed / (animationDuration * 1000), 1);
       const shockwaveProgress = Math.min(elapsed / shockwaveDuration, 1);
       const flashProgress = Math.min(elapsed / flashDuration, 1);
 
-      // Clear canvas with background
+      // Clear and draw background
       ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
-      // ctx.fillStyle = "#f0f0f0";
       ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
       ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
-      // Draw cached static grid instead of redrawing every frame
+      // Draw cached static grid
       if (staticGridCache) {
         try {
           ctx.drawImage(staticGridCache, 0, 0);
-        } catch {
-          // fallback if cache fails
-        }
+        } catch {}
       }
 
       // Draw affected cells at their original grid positions
@@ -1240,22 +1309,30 @@ const GridCanvas = ({
         }
       });
 
-      // Render physics bodies (affected cells as debris) with motion trails 🔥
-      bodies.forEach((body) => {
+      // RENDER ANIMATED DEBRIS 🎯
+      animStates.forEach((state) => {
+        const body = state.body;
+        const animPos = body.animatedPosition;
+        
+        if (!animPos) return;
+
         const opacity = Math.max(0, 1 - progress * 0.8);
 
         // Draw motion trail
-        if (body.velocity.x !== 0 || body.velocity.y !== 0) {
+        const velocityX = animPos.velocityX || 0;
+        const velocityY = animPos.velocityY || 0;
+        
+        if (velocityX !== 0 || velocityY !== 0) {
           ctx.save();
           ctx.globalAlpha = opacity * 0.3;
           ctx.strokeStyle = body.render.fillStyle;
           ctx.lineWidth = blockSize * 0.6;
           ctx.lineCap = "round";
           ctx.beginPath();
-          ctx.moveTo(body.position.x, body.position.y);
+          ctx.moveTo(animPos.x, animPos.y);
           ctx.lineTo(
-            body.position.x - body.velocity.x * 2,
-            body.position.y - body.velocity.y * 2
+            animPos.x - velocityX * 2,
+            animPos.y - velocityY * 2
           );
           ctx.stroke();
           ctx.restore();
@@ -1263,22 +1340,18 @@ const GridCanvas = ({
 
         // Draw debris block
         ctx.save();
-        ctx.translate(body.position.x, body.position.y);
-        ctx.rotate(body.angle);
+        ctx.translate(animPos.x, animPos.y);
+        ctx.rotate(animPos.angle);
 
-        // Draw debris as a rock-shaped piece using the same procedural texture
         const dW = innerBlockSize * 0.8;
         const dH = innerBlockSize * 0.8;
-        // Position the rock texture so it's centered at the body's position
         ctx.translate(-dW / 2, -dH / 2);
 
-        // Determine a deterministic seed from body grid coords and color
         const seedBody = (body.gridX * 73856093) ^ (body.gridY * 19349663);
         const colorHashBody = (body.render?.fillStyle || "#ffffff")
           .split("")
           .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
 
-        // Draw rock texture with overall opacity applied
         drawRockTexture(
           ctx,
           Math.max(2, Math.min(dW, dH)),
@@ -1299,44 +1372,38 @@ const GridCanvas = ({
       });
 
       if (progress < 1) {
-        animationFrame = requestAnimationFrame(animatePhysics);
+        animationFrame = requestAnimationFrame(animateFrame);
       } else {
-        if (animationFrame) {
-          cancelAnimationFrame(animationFrame);
-        }
+        if (animationFrame) cancelAnimationFrame(animationFrame);
 
-        // Stop physics simulation and cleanup
-        Runner.stop(runner);
+        // Cleanup
+        timeline.kill();
         cleanupPhysicsEngine(engine, null);
-
-        // Clear cache immediately when animation completes to prevent next blast interference
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
+        animationTimelineRef.current = null;
+        animationStatesRef.current = null;
 
-        // destroyedCells were marked at start of blast; no need to set again here
-
-        // Allow time for destroyed cells to render before completion callback
         setTimeout(() => {
-          isBlastRunningRef.current = false; // Reset flag BEFORE callback
-          console.log("Blast animation completed");
+          isBlastRunningRef.current = false;
+          console.log("✅ Blast animation completed");
           onBlastComplete?.();
         }, 200);
       }
     };
 
-    animationFrame = requestAnimationFrame(animatePhysics);
+    animationFrame = requestAnimationFrame(animateFrame);
 
+    // Cleanup function
     return () => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-      }
-      Runner.stop(runner);
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (timeline) timeline.kill();
       cleanupPhysicsEngine(engine, null);
-      isBlastRunningRef.current = false; // Reset on cleanup
-
-      // Clear the static grid cache refs to prevent interference with next blast
+      isBlastRunningRef.current = false;
       staticGridCacheRef.current = null;
       staticGridCacheParamsRef.current = null;
+      animationTimelineRef.current = null;
+      animationStatesRef.current = null;
     };
   }, [
     blastTrigger,

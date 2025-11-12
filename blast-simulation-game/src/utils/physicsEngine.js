@@ -1,5 +1,6 @@
 import { Engine, Render, World, Bodies, Body, Events } from "matter-js";
 import OreColorMapper from "./oreColorMapper.js";
+import gsap from "gsap";
 
 // Helper utils for safe scaling
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -58,7 +59,8 @@ const computeMaterialScales = (cellData) => {
  */
 export const createPhysicsEngine = (canvas, canvasSize) => {
   const engine = Engine.create({
-    gravity: { x: 0, y: 1 },
+    gravity: { x: 0, y: 1, scale: 0.0001 },
+    
   });
 
   const render = Render.create({
@@ -201,6 +203,9 @@ export const createBlastBodies = (
       }
     );
 
+    // Store original position for animation reference
+    body.originalPosition = { x: pixelX, y: pixelY };
+
     return body;
   });
 
@@ -258,6 +263,8 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     "down-right": { x: Math.SQRT1_2, y: Math.SQRT1_2 },
     "down-left": { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
   };
+
+
 
   // Calmer biasing
   const biasMultiplier = 1.2;
@@ -359,6 +366,9 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.12);
   });
 };
+
+
+
 
 /**
  * Clean up physics engine and renderer
