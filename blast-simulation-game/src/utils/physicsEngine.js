@@ -8,12 +8,49 @@ const mapRange = (v, inMin, inMax, outMin, outMax) => {
   return outMin + t * (outMax - outMin);
 };
 
+// Compute actual min/max for ore properties from the dataset for normalization
+const getMinMax = (gridData) => {
+  if (!gridData?.grid)
+    return {
+      density: { min: 1.0, max: 8.0 },
+      hardness: { min: 0.0, max: 1.0 },
+      fragmentation_index: { min: 0.0, max: 1.0 },
+    };
+
+  let minDensity = Infinity,
+    maxDensity = -Infinity;
+  let minHardness = Infinity,
+    maxHardness = -Infinity;
+  let minFrag = Infinity,
+    maxFrag = -Infinity;
+
+  for (let row of gridData.grid) {
+    for (let cell of row) {
+      if (cell?.density !== undefined) {
+        minDensity = Math.min(minDensity, cell.density);
+        maxDensity = Math.max(maxDensity, cell.density);
+      }
+      if (cell?.hardness !== undefined) {
+        minHardness = Math.min(minHardness, cell.hardness);
+        maxHardness = Math.max(maxHardness, cell.hardness);
+      }
+      if (cell?.fragmentation_index !== undefined) {
+        minFrag = Math.min(minFrag, cell.fragmentation_index);
+        maxFrag = Math.max(maxFrag, cell.fragmentation_index);
+      }
+    }
+  }
+
+  return {
+    density: { min: minDensity, max: maxDensity },
+    hardness: { min: minHardness, max: maxHardness },
+    fragmentation_index: { min: minFrag, max: maxFrag },
+  };
+};
+
 // Centralize material-to-physics mapping
-// Assumptions:
-// - density in CSV ~ 1.0..8.0 (g/cm^3) typical rock/ore range
-// - hardness in CSV ~ 0.0..1.0 (soft..hard)
-// - fragmentation_index in CSV ~ 0.0..1.0 (cohesive..fragile)
-const computeMaterialScales = (cellData) => {
+// Assumptions: min/max are now computed dynamically from the dataset for proper normalization
+const computeMaterialScales = (cellData, minMax) => {
   const rawDensity = Number.isFinite(cellData?.density)
     ? cellData.density
     : 2.5;
@@ -26,19 +63,61 @@ const computeMaterialScales = (cellData) => {
 
   // Displacement scale: light and soft → move more; heavy and hard → move less
   // Increased ranges to make material differences more visually apparent
-  const densityForceScale = mapRange(rawDensity, 1.0, 8.0, 1.6, 0.4); // light: 1.6x, heavy: 0.4x
-  const hardnessForceScale = mapRange(rawHardness, 0.0, 1.0, 1.5, 0.7); // soft: 1.5x, hard: 0.7x
-  const fragmentationForceScale = mapRange(frag, 0.0, 1.0, 0.9, 1.25); // cohesive: 0.9x, fragile: 1.25x
+  const densityForceScale = mapRange(
+    rawDensity,
+    minMax.density.min,
+    minMax.density.max,
+    1.6,
+    0.4
+  ); // light: 1.6x, heavy: 0.4x
+  const hardnessForceScale = mapRange(
+    rawHardness,
+    minMax.hardness.min,
+    minMax.hardness.max,
+    1.5,
+    0.7
+  ); // soft: 1.5x, hard: 0.7x
+  const fragmentationForceScale = mapRange(
+    frag,
+    minMax.fragmentation_index.min,
+    minMax.fragmentation_index.max,
+    0.9,
+    1.25
+  ); // cohesive: 0.9x, fragile: 1.25x
   const displacementScale =
     densityForceScale * hardnessForceScale * fragmentationForceScale;
 
   // Matter body properties tuned for stability
-  const restitution = mapRange(rawHardness, 0.0, 1.0, 0.25, 0.55);
-  const frictionAir = mapRange(rawDensity, 1.0, 8.0, 0.035, 0.02); // heavier -> less drag
-  const matterDensity = mapRange(rawDensity, 1.0, 8.0, 0.0007, 0.0012); // keep near Matter default range
+  const restitution = mapRange(
+    rawHardness,
+    minMax.hardness.min,
+    minMax.hardness.max,
+    0.25,
+    0.55
+  );
+  const frictionAir = mapRange(
+    rawDensity,
+    minMax.density.min,
+    minMax.density.max,
+    0.035,
+    0.02
+  ); // heavier -> less drag
+  const matterDensity = mapRange(
+    rawDensity,
+    minMax.density.min,
+    minMax.density.max,
+    0.0007,
+    0.0012
+  ); // keep near Matter default range
 
   // Visual size: fragile breaks smaller but still “a little bigger” than before
-  const sizeScale = mapRange(frag, 0.0, 1.0, 0.92, 0.65);
+  const sizeScale = mapRange(
+    frag,
+    minMax.fragmentation_index.min,
+    minMax.fragmentation_index.max,
+    0.92,
+    0.65
+  );
 
   return {
     displacementScale,
@@ -160,6 +239,9 @@ export const createBlastBodies = (
 ) => {
   if (!Array.isArray(affectedCells)) return [];
 
+  // Compute min/max for normalization once for the dataset
+  const minMax = getMinMax(gridData);
+
   const bodies = affectedCells.map((cell) => {
     // Convert grid coordinates to pixel coordinates (center of cell using stride)
     const pixelX = cell.x * stride + gridOffset.x + stride / 2;
@@ -170,7 +252,7 @@ export const createBlastBodies = (
     const oreType = cellData?.oreType || cell.oreType || "unknown";
 
     // Normalize material props → physics scales
-    const scales = computeMaterialScales(cellData);
+    const scales = computeMaterialScales(cellData, minMax);
 
     // Adjust body size based on fragmentation (scale relative to provided bodySizeParam)
     const adjustBlockSize = bodySizeParam * scales.sizeScale;
@@ -193,6 +275,7 @@ export const createBlastBodies = (
         oreType: oreType,
         isOreBlock: true,
         cellData: cellData,
+        minMax: minMax, // Store minMax for use in applyBlastForce
         render: {
           // fallback to a neutral gray if the mapper doesn't have the ore
           fillStyle:
@@ -306,7 +389,7 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
       const uy = dy / distance;
 
       // Material scaling
-      const scales = computeMaterialScales(body.cellData);
+      const scales = computeMaterialScales(body.cellData, body.minMax);
 
       // Enhanced distance falloff: creates much stronger effect closer to blast
       // Grid distance uses stronger falloff to prioritize blast epicenter blocks
