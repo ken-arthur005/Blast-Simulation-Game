@@ -14,6 +14,7 @@ export const GameProvider = ({ children }) => {
     numberOfMaterialsDestroyed: 0,
     materialsRemainedAfterDestroy: 0,
     blastRadius: 3,
+    recoveryHistory: [],
   });
   // pendingDirection stores the currently selected direction for the next blast placement
   // If null, no default direction is applied; players must choose a direction explicitly or edit per-blast
