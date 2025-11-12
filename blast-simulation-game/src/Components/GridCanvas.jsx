@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+﻿import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "../utils/oreBlock";
 import { Engine, World, Runner, Events } from "matter-js";
 import {
@@ -968,7 +968,7 @@ const GridCanvas = ({
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
     const startTime = performance.now();
-    const duration = 30000; // Reduced from 5000ms to 2000ms for faster animation
+    const duration = 50000; // Change 2000ms to 50000ms for longer animation
     const shockwaveDuration = 500; // 0.5s for shockwave
     const flashDuration = 150; // Quick flash
     let animationFrame;
