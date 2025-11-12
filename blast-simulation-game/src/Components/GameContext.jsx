@@ -34,6 +34,16 @@ export const GameProvider = ({ children }) => {
     setGameState((prevState) => ({ ...prevState, blasts: [] }));
   };
 
+  const addRecoveryRecord = (record) => {
+    setGameState((prevState) => ({
+      ...prevState,
+      recoveryHistory: [
+        ...prevState.recoveryHistory,
+        { ...record, timestamp: new Date() },
+      ],
+    }));
+  };
+
   return (
     <GameContext.Provider
       value={{
