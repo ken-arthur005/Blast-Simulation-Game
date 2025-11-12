@@ -8,6 +8,7 @@ import {
   createBoundaryWalls,
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
+import OreValueMapper from "../utils/oreValueMapper";
 
 // Helper utilities (module-level so identity is stable across renders)
 // Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
@@ -879,6 +880,59 @@ const GridCanvas = ({
 
     applyBlastForce(bodies, blastCenters, 0.02); // Reduce from 0.08 to 0.02 for more dramatic effect
 
+    // Set timeout to check blast results after simulation settles (5 seconds)
+    setTimeout(() => {
+      const recoveryY = canvas.height * 0.8;
+      const neighborRadius = 50; // Pixels to check for mixing
+      const highValueThreshold = 50; // From oreValueMapper
+
+      bodies.forEach((body) => {
+        const value = OreValueMapper.getValue(body.oreType);
+        let isDiluted = false;
+
+        if (body.position.y > recoveryY) {
+          // In recovery zone: check for mixing
+          const neighbors = bodies.filter((other) => {
+            if (other === body) return false;
+            const dist = Math.hypot(
+              body.position.x - other.position.x,
+              body.position.y - other.position.y
+            );
+            return dist <= neighborRadius;
+          });
+          const lowValueNeighbors = neighbors.filter(
+            (n) => OreValueMapper.getValue(n.oreType) < highValueThreshold
+          ).length;
+
+          if (value >= highValueThreshold && lowValueNeighbors >= 1) {
+            isDiluted = true; // High-value mixed with low-value
+          } else if (value < highValueThreshold) {
+            isDiluted = true; // Low-value is always diluted
+          }
+        } else {
+          isDiluted = true; // Outside zone
+        }
+
+        body.render.fillStyle = isDiluted ? "#FF0000" : "#00FF00";
+      });
+
+      // Calculate feedback
+      const recovered = bodies.filter(
+        (b) => b.render.fillStyle === "#00FF00"
+      ).length;
+      const totalValue = bodies.reduce(
+        (sum, b) => sum + OreValueMapper.getValue(b.oreType),
+        0
+      );
+      const recoveredValue = bodies
+        .filter((b) => b.render.fillStyle === "#00FF00")
+        .reduce((sum, b) => sum + OreValueMapper.getValue(b.oreType), 0);
+      const efficiency =
+        totalValue > 0 ? Math.round((recoveredValue / totalValue) * 100) : 0;
+
+      onBlastComplete({ recoveredCount: recovered, efficiency });
+    }, 5000);
+
     // Shockwave animation state
     const shockwaves = blastCenters.map(() => ({
       radius: 0,
@@ -914,7 +968,7 @@ const GridCanvas = ({
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
     const startTime = performance.now();
-    const duration = 2000; // Reduced from 5000ms to 2000ms for faster animation
+    const duration = 30000; // Reduced from 5000ms to 2000ms for faster animation
     const shockwaveDuration = 500; // 0.5s for shockwave
     const flashDuration = 150; // Quick flash
     let animationFrame;
@@ -925,8 +979,8 @@ const GridCanvas = ({
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
         }
-        Runner.stop(runner);
-        cleanupPhysicsEngine(engine, null);
+        // Runner.stop(runner);
+        // cleanupPhysicsEngine(engine, null);
         isBlastRunningRef.current = false; // Reset flag
         return;
       }
@@ -1185,7 +1239,7 @@ const GridCanvas = ({
 
       // Render physics bodies (affected cells as debris) with motion trails 🔥
       bodies.forEach((body) => {
-        const opacity = Math.max(0, 1 - progress * 0.8);
+        const opacity = 1;
 
         // Draw motion trail
         if (body.velocity.x !== 0 || body.velocity.y !== 0) {
@@ -1249,8 +1303,8 @@ const GridCanvas = ({
         }
 
         // Stop physics simulation and cleanup
-        Runner.stop(runner);
-        cleanupPhysicsEngine(engine, null);
+        // Runner.stop(runner);
+        // cleanupPhysicsEngine(engine, null);
 
         // Clear cache immediately when animation completes to prevent next blast interference
         staticGridCacheRef.current = null;
@@ -1263,7 +1317,7 @@ const GridCanvas = ({
           isBlastRunningRef.current = false; // Reset flag BEFORE callback
           console.log("Blast animation completed");
           onBlastComplete?.();
-        }, 200);
+        }, 10000);
       }
     };
 
@@ -1273,8 +1327,8 @@ const GridCanvas = ({
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }
-      Runner.stop(runner);
-      cleanupPhysicsEngine(engine, null);
+      // Runner.stop(runner);
+      // cleanupPhysicsEngine(engine, null);
       isBlastRunningRef.current = false; // Reset on cleanup
 
       // Clear the static grid cache refs to prevent interference with next blast
