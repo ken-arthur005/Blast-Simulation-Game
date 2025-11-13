@@ -18,6 +18,7 @@ import {
 import BlastResults from "./BlastResults";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
+  const { addRecoveryRecord } = useContext(GameContext);
   const [gridData, setGridData] = useState(null);
   const [originalGridData, setOriginalGridData] = useState(null); // to keep an original deep copy of grid.
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
@@ -475,6 +476,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           blastTrigger={blastTrigger}
           onBlastComplete={handleBlastComplete}
           fileResetKey={fileResetKey}
+          addRecoveryRecordToGameContext={addRecoveryRecord}
         />
       </div>
 
@@ -502,6 +504,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         score={gameState.score}
         materialsRemained={gameState.materialsRemainedAfterDestroy}
         resetCanvas={handleCanvasReset}
+        recoveredCount={gameState.recoveryHistory[0].recoveredCount}
+        efficiency={gameState.recoveryHistory[0].efficiency}
       />
     </div>
   );
