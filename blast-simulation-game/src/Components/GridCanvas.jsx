@@ -293,7 +293,7 @@ const GridCanvas = ({
   const innerBlockSize = Math.max(4, blockSize - cellSpacing);
   const isBlastRunningRef = useRef(false);
   
-  // NEW: Store current animation timeline for cleanup
+
   const animationTimelineRef = useRef(null);
   const animationStatesRef = useRef(null);
 
@@ -501,13 +501,23 @@ const GridCanvas = ({
     ctx.save();
     ctx.translate(offsetX, offsetY);
 
-    blocksRef.current.forEach((block) => {
-      const isDestroyed = destroyedCells.some(
-        (cell) => cell.x === block.gridX && cell.y === block.gridY
-      );
+    // FAST PATH: if we have a precomposed grid cache, draw it in one call.
+    if (gridRenderCacheRef.current) {
+      try {
+        // cache already contains the correct centering translation (created by createStaticGridCache)
+        ctx.drawImage(gridRenderCacheRef.current, 0, 0);
+      } catch {
+        // If the cache draw fails for any reason, clear cache and fall back to per-block rendering
+        gridRenderCacheRef.current = null;
+      }
+    } else {
+      // Translate to center the grid for per-block rendering
+      ctx.translate(offsetX, offsetY);
 
-      const renderX = block.gridX * (innerBlockSize + cellSpacing);
-      const renderY = block.gridY * (innerBlockSize + cellSpacing);
+      blocksRef.current.forEach((block) => {
+        const isDestroyed = destroyedCells.some(
+          (cell) => cell.x === block.gridX && cell.y === block.gridY
+        );
 
       ctx.save();
       ctx.translate(renderX, renderY);
@@ -531,35 +541,74 @@ const GridCanvas = ({
         ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
       } else {
         ctx.save();
-        drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-        ctx.clip();
-        const seedA = (block.gridX * 73856093) ^ (block.gridY * 19349663);
-        const colorHashA = (block.getBlockColor() || "#ffffff")
-          .split("")
-          .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-        const rockScale = 0.72;
-        const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
-        const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
-        ctx.translate(rockOffset, rockOffset);
-        drawRockTexture(
-          ctx,
-          rockSize,
-          block.getBlockColor(),
-          seedA + colorHashA
-        );
-        ctx.restore();
-        drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-        ctx.stroke();
-      }
+        ctx.translate(renderX, renderY);
 
-      ctx.restore();
-    });
+        // Draw faint grid with rounded corners
+        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+        ctx.lineWidth = 1.2;
+        const rx = 0;
+        const ry = 0;
+        const rrad = Math.max(4, innerBlockSize * 0.12);
+        // background fill
+        drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+        ctx.fill();
+
+        // If we have a cached canvas for this block and it's not destroyed, draw the cache
+        if (block.cachedCanvas && !isDestroyed) {
+          // Draw the cached pre-rendered block (already includes texture + border)
+          ctx.drawImage(block.cachedCanvas, 0, 0);
+        } else if (isDestroyed) {
+          // Simple destroyed block fallback (cheap)
+          ctx.fillStyle = "#9ca3af"; // gray
+          ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
+          ctx.strokeStyle = "rgba(0,0,0,0.12)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
+        } else {
+          // Fallback: render procedurally when cache unavailable
+          ctx.save();
+          drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+          ctx.clip();
+          const seedA = (block.gridX * 73856093) ^ (block.gridY * 19349663);
+          const colorHashA = (block.getBlockColor() || "#ffffff")
+            .split("")
+            .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+          const rockScale = 0.72;
+          const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
+          const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
+          ctx.translate(rockOffset, rockOffset);
+          drawRockTexture(
+            ctx,
+            rockSize,
+            block.getBlockColor(),
+            seedA + colorHashA
+          );
+          ctx.restore();
+          drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      });
+    }
 
     blasts.forEach((blast) => {
       const { x, y } = blast;
 
-      const centerX = x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
-      const centerY = y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+      // Compute base center within the grid (without centering offset)
+      const baseCenterX =
+        x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+      const baseCenterY =
+        y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+
+      // If we drew the precomposed cache (which already contains the offset), draw blasts at absolute coords
+      const centerX = gridRenderCacheRef.current
+        ? baseCenterX + offsetX
+        : baseCenterX;
+      const centerY = gridRenderCacheRef.current
+        ? baseCenterY + offsetY
+        : baseCenterY;
 
       ctx.beginPath();
       ctx.arc(centerX, centerY, innerBlockSize * 0.3, 0, Math.PI * 2);
@@ -625,6 +674,37 @@ const GridCanvas = ({
     renderCanvas();
   }, [renderCanvas]);
 
+  // Build or rebuild the merged offscreen cache used by the fast-path draw.
+  // This is purely visual optimization and does not change any UI or behavior.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !gridData || !gridData.grid) {
+      gridRenderCacheRef.current = null;
+      return;
+    }
+
+    try {
+      // createStaticGridCache returns an offscreen canvas sized to match the main canvas
+      gridRenderCacheRef.current = createStaticGridCache(destroyedCells || []);
+    } catch {
+      gridRenderCacheRef.current = null;
+    }
+
+    return () => {
+      gridRenderCacheRef.current = null;
+    };
+  }, [
+    gridData,
+    destroyedCells,
+    innerBlockSize,
+    cellSpacing,
+    canvasSize,
+    createStaticGridCache,
+  ]);
+
+  // GridCanvas.jsx
+
+  // Helper function to convert pixel coords to grid coords
   const getGridCoords = useCallback(
     (pixelX, pixelY) => {
       const canvas = canvasRef.current;
@@ -689,8 +769,10 @@ const GridCanvas = ({
       if (!onBlockClick || !canvasRef.current) return;
 
       const rect = canvasRef.current.getBoundingClientRect();
-      const pixelX = event.clientX - rect.left;
-      const pixelY = event.clientY - rect.top;
+      const scaleX = canvasRef.current.width / rect.width;
+      const scaleY = canvasRef.current.height / rect.height;
+      const pixelX = (event.clientX - rect.left) * scaleX;
+      const pixelY = (event.clientY - rect.top) * scaleY;
 
       const gridCoords = getGridCoords(pixelX, pixelY);
 
@@ -749,8 +831,10 @@ const GridCanvas = ({
   const handleMouseMove = useCallback(
     (event) => {
       const rect = canvasRef.current.getBoundingClientRect();
-      const pixelX = event.clientX - rect.left;
-      const pixelY = event.clientY - rect.top;
+      const scaleX = canvasRef.current.width / rect.width;
+      const scaleY = canvasRef.current.height / rect.height;
+      const pixelX = (event.clientX - rect.left) * scaleX;
+      const pixelY = (event.clientY - rect.top) * scaleY;
 
       const gridCoords = getGridCoords(pixelX, pixelY);
       pendingHoverRef.current = gridCoords || null;
@@ -817,10 +901,10 @@ const GridCanvas = ({
 
     // CANVAS SHAKE EFFECT 🔥
     gsap.to(container, {
-      x: "random(-20, 20)",
-      y: "random(-20, 20)",
-      duration: 0.07,
-      repeat: 9,
+      x: "random(-12, 12)",
+      y: "random(-12, 12)",
+      duration: 0.05,
+      repeat: 7,
       yoyo: true,
       ease: "power2.inOut",
       onComplete: () => {
@@ -958,11 +1042,11 @@ const GridCanvas = ({
           const numParticles = 15;
 
           for (let p = 0; p < numParticles; p++) {
-            const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + (p * 0.2);
+            const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01;
             const distance =
               particleProgress *
               blockSize *
-              3.5 *
+              2.5 *
               (1 + Math.sin(elapsed * 0.02 + p) * 0.3);
             const particleX = center.x + Math.cos(angle) * distance;
             const particleY =
@@ -970,7 +1054,9 @@ const GridCanvas = ({
               Math.sin(angle) * distance -
               particleProgress * blockSize * 0.5;
 
-            const particleSize = blockSize * 0.25 * (1 - particleProgress * 0.7);
+            // Particle size shrinks over time
+            const particleSize =
+              blockSize * 0.15 * (1 - particleProgress * 0.7);
 
             let particleColor;
             if (particleProgress < 0.2) particleColor = "#ffffff";
@@ -1006,17 +1092,18 @@ const GridCanvas = ({
           const numPuffs = 8;
 
           for (let s = 0; s < numPuffs; s++) {
-            const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + (s * 0.5);
+            const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005;
             const distance = smokeProgress * blockSize * 1.8;
             const puffX = center.x + Math.cos(angle) * distance;
             const puffY =
               center.y +
               Math.sin(angle) * distance -
-              smokeProgress * blockSize * 1.5;
-            const puffSize = blockSize * 0.6 * (1 + smokeProgress * 0.5);
+              smokeProgress * blockSize * 1.2; // Rise up more
+
+            const puffSize = blockSize * 0.4 * (1 + smokeProgress);
 
             ctx.save();
-            ctx.globalAlpha = (1 - smokeProgress) * 0.75;
+            ctx.globalAlpha = (1 - smokeProgress) * 0.4;
 
             const smokeGradient = ctx.createRadialGradient(
               puffX,
@@ -1026,8 +1113,8 @@ const GridCanvas = ({
               puffY,
               puffSize
             );
-            smokeGradient.addColorStop(0, "#bbbbbb");
-            smokeGradient.addColorStop(1, "rgba(80, 80, 80, 0)");
+            smokeGradient.addColorStop(0, "#666666");
+            smokeGradient.addColorStop(1, "rgba(50, 50, 50, 0)");
 
             ctx.fillStyle = smokeGradient;
             ctx.beginPath();
@@ -1047,14 +1134,14 @@ const GridCanvas = ({
             0,
             center.x,
             center.y,
-            blockSize * 2.5
+            blockSize * 1.5
           );
           gradient.addColorStop(0, "#ffffff");
           gradient.addColorStop(0.3, "#ffff00");
           gradient.addColorStop(1, "rgba(255, 200, 0, 0)");
           ctx.fillStyle = gradient;
           ctx.beginPath();
-          ctx.arc(center.x, center.y, blockSize * 2.5, 0, Math.PI * 2);
+          ctx.arc(center.x, center.y, blockSize * 1.5, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
@@ -1062,18 +1149,18 @@ const GridCanvas = ({
         // Shockwave rings
         if (shockwave.opacity > 0 && shockwave.radius > 0) {
           ctx.save();
-          ctx.globalAlpha = shockwave.opacity * 0.8;
+          ctx.globalAlpha = shockwave.opacity * 0.6;
           ctx.strokeStyle = "#ff0000";
-          ctx.lineWidth = 10;
+          ctx.lineWidth = 6;
           ctx.beginPath();
           ctx.arc(center.x, center.y, shockwave.radius, 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
 
           ctx.save();
-          ctx.globalAlpha = shockwave.opacity * 0.6;
+          ctx.globalAlpha = shockwave.opacity * 0.8;
           ctx.strokeStyle = "#ff6600";
-          ctx.lineWidth = 7;
+          ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.arc(center.x, center.y, shockwave.radius * 0.7, 0, Math.PI * 2);
           ctx.stroke();
@@ -1081,8 +1168,8 @@ const GridCanvas = ({
 
           ctx.save();
           ctx.globalAlpha = shockwave.opacity;
-          ctx.strokeStyle = "#ffff00";
-          ctx.lineWidth = 5;
+          ctx.strokeStyle = "#ffcc00";
+          ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.arc(center.x, center.y, shockwave.radius * 0.4, 0, Math.PI * 2);
           ctx.stroke();
@@ -1105,9 +1192,9 @@ const GridCanvas = ({
         
         if (velocityX !== 0 || velocityY !== 0) {
           ctx.save();
-          ctx.globalAlpha = opacity * 0.5;
+          ctx.globalAlpha = opacity * 0.3;
           ctx.strokeStyle = body.render.fillStyle;
-          ctx.lineWidth = blockSize * 0.8;
+          ctx.lineWidth = blockSize * 0.6;
           ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(animPos.x, animPos.y);
