@@ -4,7 +4,7 @@ import { Engine, World, Runner, Events } from "matter-js";
 import {
   createBlastBodies,
   applyBlastForce,
-  cleanupPhysicsEngine,
+  // cleanupPhysicsEngine,
   createBoundaryWalls,
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
@@ -184,6 +184,7 @@ const GridCanvas = ({
   cellGap = 8, // optional prop to control spacing between cells
   selectedBlast = null,
   fileResetKey = 0, // Trigger to force cleanup when new file is uploaded
+  addRecoveryRecordToGameContext,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -929,8 +930,15 @@ const GridCanvas = ({
         .reduce((sum, b) => sum + OreValueMapper.getValue(b.oreType), 0);
       const efficiency =
         totalValue > 0 ? Math.round((recoveredValue / totalValue) * 100) : 0;
-
-      onBlastComplete({ recoveredCount: recovered, efficiency });
+      console.log(
+        `Recovery Info:
+        recoveredCount: (recovered: ${recovered} efficiency: ${efficiency})
+        `
+      );
+      addRecoveryRecordToGameContext({
+        recoveredCount: recovered,
+        efficiency: efficiency,
+      });
     }, 5000);
 
     // Shockwave animation state
@@ -968,7 +976,7 @@ const GridCanvas = ({
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
     const startTime = performance.now();
-    const duration = 50000; // Change 2000ms to 50000ms for longer animation
+    const duration = 5000;
     const shockwaveDuration = 500; // 0.5s for shockwave
     const flashDuration = 150; // Quick flash
     let animationFrame;
@@ -1327,13 +1335,17 @@ const GridCanvas = ({
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }
-      // Runner.stop(runner);
-      // cleanupPhysicsEngine(engine, null);
-      isBlastRunningRef.current = false; // Reset on cleanup
 
-      // Clear the static grid cache refs to prevent interference with next blast
-      staticGridCacheRef.current = null;
-      staticGridCacheParamsRef.current = null;
+      setTimeout(() => {
+        onBlastComplete();
+        // Runner.stop(runner);
+        // cleanupPhysicsEngine(engine, null);
+        isBlastRunningRef.current = false; // Reset on cleanup
+
+        // Clear the static grid cache refs to prevent interference with next blast
+        staticGridCacheRef.current = null;
+        staticGridCacheParamsRef.current = null;
+      }, 6000);
     };
   }, [
     blastTrigger,
@@ -1345,6 +1357,7 @@ const GridCanvas = ({
     onBlastComplete,
     blasts,
     createStaticGridCache,
+    addRecoveryRecordToGameContext,
   ]);
 
   if (!gridData) {
