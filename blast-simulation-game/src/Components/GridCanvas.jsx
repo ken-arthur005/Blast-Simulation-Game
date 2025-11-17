@@ -1035,7 +1035,8 @@ const GridCanvas = ({
           const numParticles = 15; // Reduced from 12 to 8 particles
 
           for (let p = 0; p < numParticles; p++) {
-            const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + (p * 0.2);
+            const angle =
+              (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + p * 0.2;
             const distance =
               particleProgress *
               blockSize *
@@ -1094,11 +1095,14 @@ const GridCanvas = ({
           const numPuffs = 8; // Reduced from 6 to 4 puffs
 
           for (let s = 0; s < numPuffs; s++) {
-            const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + (s * 0.5);
+            const angle =
+              (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + s * 0.5;
             const distance = smokeProgress * blockSize * 1.8;
             const puffX = center.x + Math.cos(angle) * distance;
-            const puffY =center.y +
-+           Math.sin(angle) * distance - smokeProgress * blockSize * 1.5; // Rise up more
+            const puffY =
+              center.y +
+              Math.sin(angle) * distance -
+              smokeProgress * blockSize * 1.5; // Rise up more
             const puffSize = blockSize * 0.6 * (1 + smokeProgress * 0.5);
 
             ctx.save();
@@ -1188,7 +1192,9 @@ const GridCanvas = ({
         if (body.velocity.x !== 0 || body.velocity.y !== 0) {
           ctx.save();
           ctx.globalAlpha = opacity * 0.5;
+          ctx.globalAlpha = opacity * 0.5;
           ctx.strokeStyle = body.render.fillStyle;
+          ctx.lineWidth = blockSize * 0.8;
           ctx.lineWidth = blockSize * 0.8;
           ctx.lineCap = "round";
           ctx.beginPath();
