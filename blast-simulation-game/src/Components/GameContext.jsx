@@ -1,4 +1,4 @@
-import React, { useState, createContext } from "react";
+import React, { useState, createContext, useCallback, useMemo } from "react";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const GameContext = createContext();
@@ -20,26 +20,23 @@ export const GameProvider = ({ children }) => {
   // If null, no default direction is applied; players must choose a direction explicitly or edit per-blast
   const [pendingDirection, setPendingDirection] = useState(null);
 
-  const setPlayerName = (name) => {
+  const setPlayerName = useCallback((name) => {
     setGameState((prevState) => ({
       ...prevState,
       playerName: name,
     }));
-  };
-  const updateGrid = (newGrid) => {
+  }, []);
+
+  const updateGrid = useCallback((newGrid) => {
     setGameState((prevState) => ({ ...prevState, grid: newGrid }));
-  };
+  }, []);
 
-  const clearBlasts = () => {
+  const clearBlasts = useCallback(() => {
     setGameState((prevState) => ({ ...prevState, blasts: [] }));
-  };
+  }, []);
 
-  // Help me with this issue:
-  // For some reason, this function is not able to add the recoveredCount and the efficiency to the recoveryHistory.
-  // Sometimes it's able to do it and I wonder why.
-  // Another wonderful thing is that, the window.alert is able to alert a new value for recoveryCount but in OreGridVisualization.jsx and BlastResults.jsx the values that get there are completely different 
-  const addRecoveryRecord = (record) => {
-    window.alert(`record.recoveredCount: ${record.recoveredCount}`);
+  const addRecoveryRecord = useCallback((record) => {
+    // window.alert(`record.recoveredCount: ${record.recoveredCount}`); // This can be removed now.
     setGameState((prevState) => ({
       ...prevState,
       recoveryHistory: [
@@ -51,22 +48,33 @@ export const GameProvider = ({ children }) => {
         },
       ],
     }));
-  };
+  }, []);
+
+  // FIX: Memoize the entire context value object.
+  // It will only be recreated if `gameState` or `pendingDirection` changes.
+  // All consumer components will now receive a stable context value.
+  const contextValue = useMemo(
+    () => ({
+      gameState,
+      setGameState,
+      pendingDirection,
+      setPendingDirection,
+      setPlayerName,
+      updateGrid,
+      clearBlasts,
+      addRecoveryRecord,
+    }),
+    [
+      gameState,
+      pendingDirection,
+      setPlayerName,
+      updateGrid,
+      clearBlasts,
+      addRecoveryRecord,
+    ]
+  );
 
   return (
-    <GameContext.Provider
-      value={{
-        gameState,
-        setGameState,
-        pendingDirection,
-        setPendingDirection,
-        setPlayerName,
-        updateGrid,
-        clearBlasts,
-        addRecoveryRecord,
-      }}
-    >
-      {children}
-    </GameContext.Provider>
+    <GameContext.Provider value={contextValue}>{children}</GameContext.Provider>
   );
 };
