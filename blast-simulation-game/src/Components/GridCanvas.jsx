@@ -1224,7 +1224,7 @@ const GridCanvas = ({
             const puffX = center.x + Math.cos(angle) * distance;
             const puffY =
               center.y +
-              +Math.sin(angle) * distance -
+              Math.sin(angle) * distance -
               smokeProgress * blockSize * 1.5; // Rise up more
             const puffSize = blockSize * 0.6 * (1 + smokeProgress * 0.5);
 
@@ -1315,7 +1315,9 @@ const GridCanvas = ({
         if (body.velocity.x !== 0 || body.velocity.y !== 0) {
           ctx.save();
           ctx.globalAlpha = opacity * 0.5;
+          ctx.globalAlpha = opacity * 0.5;
           ctx.strokeStyle = body.render.fillStyle;
+          ctx.lineWidth = blockSize * 0.8;
           ctx.lineWidth = blockSize * 0.8;
           ctx.lineCap = "round";
           ctx.beginPath();
