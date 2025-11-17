@@ -34,12 +34,21 @@ export const GameProvider = ({ children }) => {
     setGameState((prevState) => ({ ...prevState, blasts: [] }));
   };
 
+  // Help me with this issue:
+  // For some reason, this function is not able to add the recoveredCount and the efficiency to the recoveryHistory.
+  // Sometimes it's able to do it and I wonder why.
+  // Another wonderful thing is that, the window.alert is able to alert a new value for recoveryCount but in OreGridVisualization.jsx and BlastResults.jsx the values that get there are completely different 
   const addRecoveryRecord = (record) => {
+    window.alert(`record.recoveredCount: ${record.recoveredCount}`);
     setGameState((prevState) => ({
       ...prevState,
       recoveryHistory: [
         ...prevState.recoveryHistory,
-        { ...record, timestamp: new Date() },
+        {
+          recoveredCount: record.recoveredCount,
+          efficiency: record.efficiency,
+          timestamp: new Date(),
+        },
       ],
     }));
   };

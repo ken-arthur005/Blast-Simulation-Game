@@ -452,6 +452,25 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     );
   }
 
+  // Help me with this issue:
+  // Sometimes the efficiency and recoveredCount prints out correctly and sometimes they don't.
+  // Sometimes you have to you can blast for the 3rd time and the recoveryHistory's length will still console log as 1.
+  // Looks like this piece of code here run multiple times after each blast.
+  const recoveryHistory = gameState.recoveryHistory;
+
+  console.log(`recoveryHistory: ${recoveryHistory}`);
+  console.log(`recoveryHistory.length: ${recoveryHistory.length}`);
+  const lastRecord =
+    recoveryHistory?.length > 0
+      ? recoveryHistory[recoveryHistory.length - 1]
+      : { recoveredCount: 0, efficiency: 0 };
+
+  console.log('History of recovery history: '.toUpperCase());
+  recoveryHistory.forEach((recovery) => {
+    console.log(`efficiency: ${recovery.efficiency}`);
+    console.log(`recoveredCount: ${recovery.recoveredCount}`);
+  });
+
   return (
     <div className="w-full min-h-screen relative">
       {/* center container */}
@@ -504,8 +523,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         score={gameState.score}
         materialsRemained={gameState.materialsRemainedAfterDestroy}
         resetCanvas={handleCanvasReset}
-        recoveredCount={gameState.recoveryHistory[0].recoveredCount}
-        efficiency={gameState.recoveryHistory[0].efficiency}
+        recoveredCount={lastRecord.recoveredCount}
+        efficiency={lastRecord.efficiency}
       />
     </div>
   );

@@ -935,11 +935,13 @@ const GridCanvas = ({
         recoveredCount: (recovered: ${recovered} efficiency: ${efficiency})
         `
       );
+
+      // This is the where I called addRecoveryRecord() in GameContext.jsx at.
       addRecoveryRecordToGameContext({
         recoveredCount: recovered,
         efficiency: efficiency,
       });
-    }, 5000);
+    }, 6000);
 
     // Shockwave animation state
     const shockwaves = blastCenters.map(() => ({
@@ -976,7 +978,7 @@ const GridCanvas = ({
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
     const startTime = performance.now();
-    const duration = 5000;
+    const duration = 9000;
     const shockwaveDuration = 500; // 0.5s for shockwave
     const flashDuration = 150; // Quick flash
     let animationFrame;
