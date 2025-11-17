@@ -1,13 +1,14 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+﻿import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "../utils/oreBlock";
 import { Engine, World, Runner, Events } from "matter-js";
 import {
   createBlastBodies,
   applyBlastForce,
-  cleanupPhysicsEngine,
+  // cleanupPhysicsEngine,
   createBoundaryWalls,
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
+import OreValueMapper from "../utils/oreValueMapper";
 
 // Helper utilities (module-level so identity is stable across renders)
 // Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
@@ -183,6 +184,7 @@ const GridCanvas = ({
   cellGap = 8, // optional prop to control spacing between cells
   selectedBlast = null,
   fileResetKey = 0, // Trigger to force cleanup when new file is uploaded
+  addRecoveryRecordToGameContext,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -195,6 +197,8 @@ const GridCanvas = ({
   // Cache for static grid during blast animation
   const staticGridCacheRef = useRef(null);
   const staticGridCacheParamsRef = useRef(null);
+  // Merged offscreen cache for batch drawing the entire grid
+  const gridRenderCacheRef = useRef(null);
   const cellSpacing = cellGap; // spacing between cells in pixels
   const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
 
@@ -429,75 +433,98 @@ const GridCanvas = ({
 
     // Save the context state
     ctx.save();
-    // Translate to center the grid
-    ctx.translate(offsetX, offsetY);
 
-    blocksRef.current.forEach((block) => {
-      const isDestroyed = destroyedCells.some(
-        (cell) => cell.x === block.gridX && cell.y === block.gridY
-      );
-
-      const renderX = block.gridX * (innerBlockSize + cellSpacing);
-      const renderY = block.gridY * (innerBlockSize + cellSpacing);
-
-      ctx.save();
-      ctx.translate(renderX, renderY);
-
-      // Draw faint grid with rounded corners
-      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-      ctx.lineWidth = 1.2;
-      const rx = 0;
-      const ry = 0;
-      const rrad = Math.max(4, innerBlockSize * 0.12);
-      // background fill
-      drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-      ctx.fill();
-
-      // If we have a cached canvas for this block and it's not destroyed, draw the cache
-      if (block.cachedCanvas && !isDestroyed) {
-        // Draw the cached pre-rendered block (already includes texture + border)
-        ctx.drawImage(block.cachedCanvas, 0, 0);
-      } else if (isDestroyed) {
-        // Simple destroyed block fallback (cheap)
-        ctx.fillStyle = "#9ca3af"; // gray
-        ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
-        ctx.strokeStyle = "rgba(0,0,0,0.12)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
-      } else {
-        // Fallback: render procedurally when cache unavailable
-        ctx.save();
-        drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-        ctx.clip();
-        const seedA = (block.gridX * 73856093) ^ (block.gridY * 19349663);
-        const colorHashA = (block.getBlockColor() || "#ffffff")
-          .split("")
-          .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-        const rockScale = 0.72;
-        const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
-        const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
-        ctx.translate(rockOffset, rockOffset);
-        drawRockTexture(
-          ctx,
-          rockSize,
-          block.getBlockColor(),
-          seedA + colorHashA
-        );
-        ctx.restore();
-        drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-        ctx.stroke();
+    // FAST PATH: if we have a precomposed grid cache, draw it in one call.
+    if (gridRenderCacheRef.current) {
+      try {
+        // cache already contains the correct centering translation (created by createStaticGridCache)
+        ctx.drawImage(gridRenderCacheRef.current, 0, 0);
+      } catch {
+        // If the cache draw fails for any reason, clear cache and fall back to per-block rendering
+        gridRenderCacheRef.current = null;
       }
+    } else {
+      // Translate to center the grid for per-block rendering
+      ctx.translate(offsetX, offsetY);
 
-      ctx.restore();
-    });
+      blocksRef.current.forEach((block) => {
+        const isDestroyed = destroyedCells.some(
+          (cell) => cell.x === block.gridX && cell.y === block.gridY
+        );
+
+        const renderX = block.gridX * (innerBlockSize + cellSpacing);
+        const renderY = block.gridY * (innerBlockSize + cellSpacing);
+
+        ctx.save();
+        ctx.translate(renderX, renderY);
+
+        // Draw faint grid with rounded corners
+        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+        ctx.lineWidth = 1.2;
+        const rx = 0;
+        const ry = 0;
+        const rrad = Math.max(4, innerBlockSize * 0.12);
+        // background fill
+        drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+        ctx.fill();
+
+        // If we have a cached canvas for this block and it's not destroyed, draw the cache
+        if (block.cachedCanvas && !isDestroyed) {
+          // Draw the cached pre-rendered block (already includes texture + border)
+          ctx.drawImage(block.cachedCanvas, 0, 0);
+        } else if (isDestroyed) {
+          // Simple destroyed block fallback (cheap)
+          ctx.fillStyle = "#9ca3af"; // gray
+          ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
+          ctx.strokeStyle = "rgba(0,0,0,0.12)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
+        } else {
+          // Fallback: render procedurally when cache unavailable
+          ctx.save();
+          drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+          ctx.clip();
+          const seedA = (block.gridX * 73856093) ^ (block.gridY * 19349663);
+          const colorHashA = (block.getBlockColor() || "#ffffff")
+            .split("")
+            .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+          const rockScale = 0.72;
+          const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
+          const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
+          ctx.translate(rockOffset, rockOffset);
+          drawRockTexture(
+            ctx,
+            rockSize,
+            block.getBlockColor(),
+            seedA + colorHashA
+          );
+          ctx.restore();
+          drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      });
+    }
 
     // 2. Draw Blast Markers
     blasts.forEach((blast) => {
       const { x, y } = blast;
 
-      const centerX = x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
-      const centerY = y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+      // Compute base center within the grid (without centering offset)
+      const baseCenterX =
+        x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+      const baseCenterY =
+        y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+
+      // If we drew the precomposed cache (which already contains the offset), draw blasts at absolute coords
+      const centerX = gridRenderCacheRef.current
+        ? baseCenterX + offsetX
+        : baseCenterX;
+      const centerY = gridRenderCacheRef.current
+        ? baseCenterY + offsetY
+        : baseCenterY;
 
       // Draw a red circle (blast icon)
       ctx.beginPath();
@@ -572,6 +599,34 @@ const GridCanvas = ({
   useEffect(() => {
     renderCanvas();
   }, [renderCanvas]);
+
+  // Build or rebuild the merged offscreen cache used by the fast-path draw.
+  // This is purely visual optimization and does not change any UI or behavior.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !gridData || !gridData.grid) {
+      gridRenderCacheRef.current = null;
+      return;
+    }
+
+    try {
+      // createStaticGridCache returns an offscreen canvas sized to match the main canvas
+      gridRenderCacheRef.current = createStaticGridCache(destroyedCells || []);
+    } catch {
+      gridRenderCacheRef.current = null;
+    }
+
+    return () => {
+      gridRenderCacheRef.current = null;
+    };
+  }, [
+    gridData,
+    destroyedCells,
+    innerBlockSize,
+    cellSpacing,
+    canvasSize,
+    createStaticGridCache,
+  ]);
 
   // GridCanvas.jsx
 
@@ -653,8 +708,10 @@ const GridCanvas = ({
 
       // Get canvas-relative click coordinates
       const rect = canvasRef.current.getBoundingClientRect();
-      const pixelX = event.clientX - rect.left;
-      const pixelY = event.clientY - rect.top;
+      const scaleX = canvasRef.current.width / rect.width;
+      const scaleY = canvasRef.current.height / rect.height;
+      const pixelX = (event.clientX - rect.left) * scaleX;
+      const pixelY = (event.clientY - rect.top) * scaleY;
 
       const gridCoords = getGridCoords(pixelX, pixelY);
 
@@ -719,8 +776,10 @@ const GridCanvas = ({
     (event) => {
       // Throttle hover updates via requestAnimationFrame to reduce full-canvas redraws
       const rect = canvasRef.current.getBoundingClientRect();
-      const pixelX = event.clientX - rect.left;
-      const pixelY = event.clientY - rect.top;
+      const scaleX = canvasRef.current.width / rect.width;
+      const scaleY = canvasRef.current.height / rect.height;
+      const pixelX = (event.clientX - rect.left) * scaleX;
+      const pixelY = (event.clientY - rect.top) * scaleY;
 
       const gridCoords = getGridCoords(pixelX, pixelY);
       pendingHoverRef.current = gridCoords || null;
@@ -879,6 +938,68 @@ const GridCanvas = ({
 
     applyBlastForce(bodies, blastCenters, 0.02); // Reduce from 0.08 to 0.02 for more dramatic effect
 
+    // Set timeout to check blast results after simulation settles (5 seconds)
+    setTimeout(() => {
+      const recoveryY = canvas.height * 0.8;
+      const neighborRadius = 50; // Pixels to check for mixing
+      const highValueThreshold = 50; // From oreValueMapper
+
+      bodies.forEach((body) => {
+        const value = OreValueMapper.getValue(body.oreType);
+        let isDiluted = false;
+
+        if (body.position.y > recoveryY) {
+          // In recovery zone: check for mixing
+          const neighbors = bodies.filter((other) => {
+            if (other === body) return false;
+            const dist = Math.hypot(
+              body.position.x - other.position.x,
+              body.position.y - other.position.y
+            );
+            return dist <= neighborRadius;
+          });
+          const lowValueNeighbors = neighbors.filter(
+            (n) => OreValueMapper.getValue(n.oreType) < highValueThreshold
+          ).length;
+
+          if (value >= highValueThreshold && lowValueNeighbors >= 1) {
+            isDiluted = true; // High-value mixed with low-value
+          } else if (value < highValueThreshold) {
+            isDiluted = true; // Low-value is always diluted
+          }
+        } else {
+          isDiluted = true; // Outside zone
+        }
+
+        body.render.fillStyle = isDiluted ? "#FF0000" : "#00FF00";
+      });
+
+      // Calculate feedback
+      const recovered = bodies.filter(
+        (b) => b.render.fillStyle === "#00FF00"
+      ).length;
+      const totalValue = bodies.reduce(
+        (sum, b) => sum + OreValueMapper.getValue(b.oreType),
+        0
+      );
+      const recoveredValue = bodies
+        .filter((b) => b.render.fillStyle === "#00FF00")
+        .reduce((sum, b) => sum + OreValueMapper.getValue(b.oreType), 0);
+      const efficiency =
+        totalValue > 0 ? Math.round((recoveredValue / totalValue) * 100) : 0;
+      console.log(
+        `Recovery Info:
+        recoveredCount: (recovered: ${recovered} efficiency: ${efficiency})
+        `
+      );
+
+      // This is the where I called addRecoveryRecord() in GameContext.jsx at.
+      addRecoveryRecordToGameContext({
+        recoveredCount: recovered,
+        efficiency: efficiency,
+      });
+    }, 6000);
+
     // Shockwave animation state
     const shockwaves = blastCenters.map(() => ({
       radius: 0,
@@ -914,10 +1035,13 @@ const GridCanvas = ({
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
     const startTime = performance.now();
-    const duration = 3500; // Reduced from 5000ms to 2000ms for faster animation
-    const shockwaveDuration = 700; // 0.5s for shockwave
-    const flashDuration = 200; // Quick flash
+
+    const duration = 9000;
+    const shockwaveDuration = 350; // shockwave expansion duration (ms)
+    const flashDuration = 100; // flash fade duration (ms)
     let animationFrame;
+
+    const timeoutDuration = 9000; // Total duration of the animation
 
     const animatePhysics = (time) => {
       // Safety check - if grid data is gone, stop animation
@@ -925,8 +1049,8 @@ const GridCanvas = ({
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
         }
-        Runner.stop(runner);
-        cleanupPhysicsEngine(engine, null);
+        // Runner.stop(runner);
+        // cleanupPhysicsEngine(engine, null);
         isBlastRunningRef.current = false; // Reset flag
         return;
       }
@@ -1028,11 +1152,11 @@ const GridCanvas = ({
         shockwave.flashOpacity = Math.max(0, 1 - flashProgress * 2);
 
         // FIRE/EXPLOSION PARTICLES 🔥💥
-        if (elapsed < 900) {
-          // Reduced from 800ms to 600ms
-          // Fire particles last 0.6s
-          const particleProgress = Math.min(elapsed / 900, 1);
-          const numParticles = 15; // Reduced from 12 to 8 particles
+        if (elapsed < 600) {
+          // Fire particles last ~0.6s (visual window)
+          const particleProgress = Math.min(elapsed / 600, 1);
+          // Lower particle count to reduce CPU/GPU work while maintaining visual fidelity
+          const numParticles = 6;
 
           for (let p = 0; p < numParticles; p++) {
             const angle =
@@ -1088,11 +1212,10 @@ const GridCanvas = ({
         }
 
         // SMOKE PUFFS 💨
-        if (elapsed > 150 && elapsed < 1500) {
-          // Reduced smoke duration from 1500ms to 1000ms
-          // Smoke appears after initial flash
-          const smokeProgress = Math.min((elapsed - 150) / 1350, 1);
-          const numPuffs = 8; // Reduced from 6 to 4 puffs
+        if (elapsed > 200 && elapsed < 1000) {
+          // Smoke appears after initial flash; keep duration short to reduce work
+          const smokeProgress = Math.min((elapsed - 200) / 800, 1);
+          const numPuffs = 3; // fewer smoke puffs for performance
 
           for (let s = 0; s < numPuffs; s++) {
             const angle =
@@ -1186,7 +1309,7 @@ const GridCanvas = ({
 
       // Render physics bodies (affected cells as debris) with motion trails 🔥
       bodies.forEach((body) => {
-        const opacity = Math.max(0, 1 - progress * 0.8);
+        const opacity = 1;
 
         // Draw motion trail
         if (body.velocity.x !== 0 || body.velocity.y !== 0) {
@@ -1252,8 +1375,11 @@ const GridCanvas = ({
         }
 
         // Stop physics simulation and cleanup
+        // Runner.stop(runner);
+        // cleanupPhysicsEngine(engine, null);
         Runner.stop(runner);
-        cleanupPhysicsEngine(engine, null);
+        World.clear(engine.world);
+        Engine.clear(engine);
 
         // Clear cache immediately when animation completes to prevent next blast interference
         staticGridCacheRef.current = null;
@@ -1262,11 +1388,17 @@ const GridCanvas = ({
         // destroyedCells were marked at start of blast; no need to set again here
 
         // Allow time for destroyed cells to render before completion callback
-        setTimeout(() => {
-          isBlastRunningRef.current = false; // Reset flag BEFORE callback
-          console.log("Blast animation completed");
-          onBlastComplete?.();
-        }, 200);
+        // setTimeout(() => {
+        //   isBlastRunningRef.current = false; // Reset flag BEFORE callback
+        //   console.log("Blast animation completed");
+        //   onBlastComplete?.();
+        // }, 10000);
+
+        isBlastRunningRef.current = false;
+        console.log("Blast animation completed");
+
+        // Call the completion callback
+        if (onBlastComplete) onBlastComplete();
       }
     };
 
@@ -1276,11 +1408,25 @@ const GridCanvas = ({
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }
-      Runner.stop(runner);
-      cleanupPhysicsEngine(engine, null);
-      isBlastRunningRef.current = false; // Reset on cleanup
 
-      // Clear the static grid cache refs to prevent interference with next blast
+      // setTimeout(() => {
+      //   onBlastComplete();
+      //   // Runner.stop(runner);
+      //   // cleanupPhysicsEngine(engine, null);
+      //   isBlastRunningRef.current = false; // Reset on cleanup
+
+      //   // Clear the static grid cache refs to prevent interference with next blast
+      //   staticGridCacheRef.current = null;
+      //   staticGridCacheParamsRef.current = null;
+      // }, 6000);
+
+      // Stop any Matter.js processes that might still be running if the component unmounts mid-animation
+      Runner.stop(runner);
+      World.clear(engine.world);
+      Engine.clear(engine);
+
+      isBlastRunningRef.current = false;
+
       staticGridCacheRef.current = null;
       staticGridCacheParamsRef.current = null;
     };
@@ -1294,6 +1440,7 @@ const GridCanvas = ({
     onBlastComplete,
     blasts,
     createStaticGridCache,
+    addRecoveryRecordToGameContext,
   ]);
 
   if (!gridData) {

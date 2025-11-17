@@ -6,6 +6,8 @@ const BlastResult = ({
   materialsRemained,
   blastRadiusUsed,
   resetCanvas,
+  recoveredCount,
+  efficiency,
 }) => {
   if (!show) {
     return null;
@@ -34,6 +36,10 @@ const BlastResult = ({
               Number of materials remained: {materialsRemained}
             </li>
             <li>Blast Radius used: {blastRadiusUsed}</li>
+            <li className="me-15">
+              Ores recovered: {recoveredCount || 0}
+            </li>{" "}
+            <li>Efficiency: {efficiency || 0}%</li>
           </ul>
         </div>
         <div>

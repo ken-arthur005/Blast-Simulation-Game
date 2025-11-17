@@ -18,6 +18,7 @@ import {
 import BlastResults from "./BlastResults";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
+  const { addRecoveryRecord } = useContext(GameContext);
   const [gridData, setGridData] = useState(null);
   const [originalGridData, setOriginalGridData] = useState(null); // to keep an original deep copy of grid.
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
@@ -79,68 +80,61 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   };
 
   // Allow selecting a placed blast and updating its direction
-  const setBlastDirection = (x, y, dirKey) => {
-    console.debug("setBlastDirection called ->", { x, y, dirKey });
-    setGameState((prev) => ({
-      ...prev,
-      blasts: prev.blasts.map((b) => {
-        if (b.x === x && b.y === y) return { ...b, dirKey };
-        return b;
-      }),
-    }));
-  };
+  // Wrap setBlastDirection in useCallback
+  const setBlastDirection = useCallback(
+    (x, y, dirKey) => {
+      console.debug("setBlastDirection called ->", { x, y, dirKey });
+      setGameState((prev) => ({
+        ...prev,
+        blasts: prev.blasts.map((b) => {
+          if (b.x === x && b.y === y) return { ...b, dirKey };
+          return b;
+        }),
+      }));
+    },
+    [setGameState]
+  );
 
   // Handler passed to GridLegend: if a blast is selected, update that blast's dirKey,
   // otherwise update the global pendingDirection for future placements.
   // dir: direction key, opts: { applyToNext: boolean }
-  const onSelectDirection = (dir, opts = {}) => {
-    console.debug("onSelectDirection called ->", { dir, opts, selectedBlast });
-    const applyToNext = opts.applyToNext === true;
-    if (selectedBlast) {
-      // Update the selected blast
-      setBlastDirection(selectedBlast.x, selectedBlast.y, dir);
-      // If requested, also set this as default for future placements
-      if (applyToNext) {
-        if (setPendingDirection) setPendingDirection(dir);
-        nextPlacementDirRef.current = { dir, explicit: true };
-        console.debug(
-          "nextPlacementDirRef set (applyToNext) ->",
-          nextPlacementDirRef.current
-        );
-      }
-    } else {
-      // If there was a very recent placement, and the user clicked a direction
-      // immediately after placing, apply the direction to that last placed
-      // blast so the UX is: place -> choose direction (no extra select needed).
-      const last = lastPlacedRef.current;
-      const now = Date.now();
-      if (last && now - last.t < 2000) {
-        console.debug("Applying direction to recently placed blast ->", {
-          last,
-          dir,
-          applyToNext,
-        });
-        setBlastDirection(last.x, last.y, dir);
-        // If requested, also set this as default for future placements
+  // Wrap onSelectDirection in useCallback
+  const onSelectDirection = useCallback(
+    (dir, opts = {}) => {
+      console.debug("onSelectDirection called ->", {
+        dir,
+        opts,
+        selectedBlast,
+      });
+      const applyToNext = opts.applyToNext === true;
+      if (selectedBlast) {
+        setBlastDirection(selectedBlast.x, selectedBlast.y, dir);
         if (applyToNext) {
           if (setPendingDirection) setPendingDirection(dir);
           nextPlacementDirRef.current = { dir, explicit: true };
         }
-        // Clear lastPlaced marker after applying
-        lastPlacedRef.current = null;
-        return;
+      } else {
+        const last = lastPlacedRef.current;
+        const now = Date.now();
+        if (last && now - last.t < 2000) {
+          setBlastDirection(last.x, last.y, dir);
+          if (applyToNext) {
+            if (setPendingDirection) setPendingDirection(dir);
+            nextPlacementDirRef.current = { dir, explicit: true };
+          }
+          lastPlacedRef.current = null;
+          return;
+        }
+        if (setPendingDirection) setPendingDirection(dir);
+        nextPlacementDirRef.current = { dir, explicit: true };
       }
-      if (setPendingDirection) setPendingDirection(dir);
-      // update ref synchronously so immediate next placement reads correct value
-      nextPlacementDirRef.current = { dir, explicit: true };
-      console.debug(
-        "nextPlacementDirRef set (global select) ->",
-        nextPlacementDirRef.current
-      );
-    }
-  };
+    },
+    [selectedBlast, setBlastDirection, setPendingDirection]
+  );
 
-  const handleBlastComplete = () => {
+  // FIX: Wrap handleBlastComplete in useCallback.
+  // This is crucial because it's passed as a prop to GridCanvas and used in a useEffect.
+  const handleBlastComplete = useCallback(() => {
     if (!gridData || !gridData.grid) {
       console.error("Grid data not ready yet.");
       return;
@@ -157,11 +151,12 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     const remainingBlocks = totalBlocks - affectedCells.length;
     console.log("Remaining blocks:", remainingBlocks);
 
-    setGameState({
-      ...gameState,
+    setGameState((prev) => ({
+      ...prev,
       materialsRemainedAfterDestroy: remainingBlocks,
       numberOfMaterialsDestroyed: affectedCells.length,
-    });
+      canPlaceExplosives: false,
+    }));
 
     // Don't store destroyed grid in GameContext - only update local state
     setGridData((prevState) => ({
@@ -179,25 +174,21 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     // clear next-placement ref
     if (nextPlacementDirRef) nextPlacementDirRef.current = null;
 
-    // Add delay to ensure destroyed cells are rendered before showing alert
-    setTimeout(() => {
-      handleOpenBlastResults();
-
-      setGameState((prev) => ({
-        ...prev,
-        canPlaceExplosives: false,
-      }));
-    }, 1500); // Wait 0.1 seconds to ensure gray cells are visible
+    handleOpenBlastResults();
 
     console.log(
       "Blast complete! Destroyed:",
       affectedCells.length,
       "Remaining:",
-      remainingBlocks,
-      "TotalBlocks: ",
-      totalBlocks
+      remainingBlocks
     );
-  };
+  }, [
+    gridData,
+    gameState.blasts,
+    setGameState,
+    clearBlasts,
+    setPendingDirection,
+  ]);
 
   const calculateOptimalSizing = useCallback((processedGrid) => {
     const { dimensions } = processedGrid;
@@ -451,6 +442,21 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     );
   }
 
+  const recoveryHistory = gameState.recoveryHistory;
+
+  console.log(`recoveryHistory: ${recoveryHistory}`);
+  console.log(`recoveryHistory.length: ${recoveryHistory.length}`);
+  const lastRecord =
+    recoveryHistory?.length > 0
+      ? recoveryHistory[recoveryHistory.length - 1]
+      : { recoveredCount: 0, efficiency: 0 };
+
+  console.log("History of recovery history: ".toUpperCase());
+  recoveryHistory.forEach((recovery) => {
+    console.log(`efficiency: ${recovery.efficiency}`);
+    console.log(`recoveredCount: ${recovery.recoveredCount}`);
+  });
+
   return (
     <div className="w-full min-h-screen relative">
       {/* center container */}
@@ -475,6 +481,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           blastTrigger={blastTrigger}
           onBlastComplete={handleBlastComplete}
           fileResetKey={fileResetKey}
+          addRecoveryRecordToGameContext={addRecoveryRecord}
         />
       </div>
 
@@ -502,6 +509,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         score={gameState.score}
         materialsRemained={gameState.materialsRemainedAfterDestroy}
         resetCanvas={handleCanvasReset}
+        recoveredCount={lastRecord.recoveredCount}
+        efficiency={lastRecord.efficiency}
       />
     </div>
   );

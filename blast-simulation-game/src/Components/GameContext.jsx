@@ -1,4 +1,4 @@
-import React, { useState, createContext } from "react";
+import React, { useState, createContext, useCallback, useMemo } from "react";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const GameContext = createContext();
@@ -14,38 +14,67 @@ export const GameProvider = ({ children }) => {
     numberOfMaterialsDestroyed: 0,
     materialsRemainedAfterDestroy: 0,
     blastRadius: 3,
+    recoveryHistory: [],
   });
   // pendingDirection stores the currently selected direction for the next blast placement
   // If null, no default direction is applied; players must choose a direction explicitly or edit per-blast
   const [pendingDirection, setPendingDirection] = useState(null);
 
-  const setPlayerName = (name) => {
+  const setPlayerName = useCallback((name) => {
     setGameState((prevState) => ({
       ...prevState,
       playerName: name,
     }));
-  };
-  const updateGrid = (newGrid) => {
-    setGameState((prevState) => ({ ...prevState, grid: newGrid }));
-  };
+  }, []);
 
-  const clearBlasts = () => {
+  const updateGrid = useCallback((newGrid) => {
+    setGameState((prevState) => ({ ...prevState, grid: newGrid }));
+  }, []);
+
+  const clearBlasts = useCallback(() => {
     setGameState((prevState) => ({ ...prevState, blasts: [] }));
-  };
+  }, []);
+
+  const addRecoveryRecord = useCallback((record) => {
+    // window.alert(`record.recoveredCount: ${record.recoveredCount}`); // This can be removed now.
+    setGameState((prevState) => ({
+      ...prevState,
+      recoveryHistory: [
+        ...prevState.recoveryHistory,
+        {
+          recoveredCount: record.recoveredCount,
+          efficiency: record.efficiency,
+          timestamp: new Date(),
+        },
+      ],
+    }));
+  }, []);
+
+  // FIX: Memoize the entire context value object.
+  // It will only be recreated if `gameState` or `pendingDirection` changes.
+  // All consumer components will now receive a stable context value.
+  const contextValue = useMemo(
+    () => ({
+      gameState,
+      setGameState,
+      pendingDirection,
+      setPendingDirection,
+      setPlayerName,
+      updateGrid,
+      clearBlasts,
+      addRecoveryRecord,
+    }),
+    [
+      gameState,
+      pendingDirection,
+      setPlayerName,
+      updateGrid,
+      clearBlasts,
+      addRecoveryRecord,
+    ]
+  );
 
   return (
-    <GameContext.Provider
-      value={{
-        gameState,
-        setGameState,
-        pendingDirection,
-        setPendingDirection,
-        setPlayerName,
-        updateGrid,
-        clearBlasts,
-      }}
-    >
-      {children}
-    </GameContext.Provider>
+    <GameContext.Provider value={contextValue}>{children}</GameContext.Provider>
   );
 };
