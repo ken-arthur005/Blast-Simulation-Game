@@ -1041,6 +1041,8 @@ const GridCanvas = ({
     const flashDuration = 100; // flash fade duration (ms)
     let animationFrame;
 
+    const timeoutDuration = 9000; // Total duration of the animation
+
     const animatePhysics = (time) => {
       // Safety check - if grid data is gone, stop animation
       if (!gridData || !gridData.grid || !gridData.grid.length) {
@@ -1157,7 +1159,8 @@ const GridCanvas = ({
           const numParticles = 6;
 
           for (let p = 0; p < numParticles; p++) {
-            const angle = (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + (p * 0.2);
+            const angle =
+              (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + p * 0.2;
             const distance =
               particleProgress *
               blockSize *
@@ -1215,11 +1218,14 @@ const GridCanvas = ({
           const numPuffs = 3; // fewer smoke puffs for performance
 
           for (let s = 0; s < numPuffs; s++) {
-            const angle = (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + (s * 0.5);
+            const angle =
+              (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + s * 0.5;
             const distance = smokeProgress * blockSize * 1.8;
             const puffX = center.x + Math.cos(angle) * distance;
-            const puffY =center.y +
-+           Math.sin(angle) * distance - smokeProgress * blockSize * 1.5; // Rise up more
+            const puffY =
+              center.y +
+              +Math.sin(angle) * distance -
+              smokeProgress * blockSize * 1.5; // Rise up more
             const puffSize = blockSize * 0.6 * (1 + smokeProgress * 0.5);
 
             ctx.save();
@@ -1369,6 +1375,9 @@ const GridCanvas = ({
         // Stop physics simulation and cleanup
         // Runner.stop(runner);
         // cleanupPhysicsEngine(engine, null);
+        Runner.stop(runner);
+        World.clear(engine.world);
+        Engine.clear(engine);
 
         // Clear cache immediately when animation completes to prevent next blast interference
         staticGridCacheRef.current = null;
@@ -1377,11 +1386,17 @@ const GridCanvas = ({
         // destroyedCells were marked at start of blast; no need to set again here
 
         // Allow time for destroyed cells to render before completion callback
-        setTimeout(() => {
-          isBlastRunningRef.current = false; // Reset flag BEFORE callback
-          console.log("Blast animation completed");
-          onBlastComplete?.();
-        }, 10000);
+        // setTimeout(() => {
+        //   isBlastRunningRef.current = false; // Reset flag BEFORE callback
+        //   console.log("Blast animation completed");
+        //   onBlastComplete?.();
+        // }, 10000);
+
+        isBlastRunningRef.current = false;
+        console.log("Blast animation completed");
+
+        // Call the completion callback
+        if (onBlastComplete) onBlastComplete();
       }
     };
 
@@ -1392,16 +1407,26 @@ const GridCanvas = ({
         cancelAnimationFrame(animationFrame);
       }
 
-      setTimeout(() => {
-        onBlastComplete();
-        // Runner.stop(runner);
-        // cleanupPhysicsEngine(engine, null);
-        isBlastRunningRef.current = false; // Reset on cleanup
+      // setTimeout(() => {
+      //   onBlastComplete();
+      //   // Runner.stop(runner);
+      //   // cleanupPhysicsEngine(engine, null);
+      //   isBlastRunningRef.current = false; // Reset on cleanup
 
-        // Clear the static grid cache refs to prevent interference with next blast
-        staticGridCacheRef.current = null;
-        staticGridCacheParamsRef.current = null;
-      }, 6000);
+      //   // Clear the static grid cache refs to prevent interference with next blast
+      //   staticGridCacheRef.current = null;
+      //   staticGridCacheParamsRef.current = null;
+      // }, 6000);
+
+      // Stop any Matter.js processes that might still be running if the component unmounts mid-animation
+      Runner.stop(runner);
+      World.clear(engine.world);
+      Engine.clear(engine);
+
+      isBlastRunningRef.current = false;
+
+      staticGridCacheRef.current = null;
+      staticGridCacheParamsRef.current = null;
     };
   }, [
     blastTrigger,
