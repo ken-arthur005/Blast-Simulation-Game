@@ -252,7 +252,7 @@ const GridCanvas = ({
         row.forEach((cell, x) => {
           const isAffected = affectedCells.some((c) => c.x === x && c.y === y);
 
-          if (!isAffected) {
+          if (!isAffected && cell) {
             const block = new OreBlock(cell, x, y, innerBlockSize);
             cacheCtx.save();
             cacheCtx.translate(
@@ -448,9 +448,9 @@ const GridCanvas = ({
       ctx.translate(offsetX, offsetY);
 
       blocksRef.current.forEach((block) => {
-        const isDestroyed = destroyedCells.some(
-          (cell) => cell.x === block.gridX && cell.y === block.gridY
-        );
+        // const isDestroyed = destroyedCells.some(
+        //   (cell) => cell.x === block.gridX && cell.y === block.gridY
+        // );
 
         const renderX = block.gridX * (innerBlockSize + cellSpacing);
         const renderY = block.gridY * (innerBlockSize + cellSpacing);
@@ -469,21 +469,17 @@ const GridCanvas = ({
         drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
         ctx.fill();
 
-        // If we have a cached canvas for this block and it's not destroyed, draw the cache
-        if (block.cachedCanvas && !isDestroyed) {
+        ctx.stroke(); // Stroke the border too
+
+        // THEN, if the block has data (i.e., it's not destroyed/null), draw the rock
+        if (block.cachedCanvas && block.cell && block.cell.oreType) {
           // Draw the cached pre-rendered block (already includes texture + border)
           ctx.drawImage(block.cachedCanvas, 0, 0);
-        } else if (isDestroyed) {
-          // Simple destroyed block fallback (cheap)
-          ctx.fillStyle = "#9ca3af"; // gray
-          ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
-          ctx.strokeStyle = "rgba(0,0,0,0.12)";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
-        } else {
-          // Fallback: render procedurally when cache unavailable
+        } // If a cell is null, only the background slot drawn above will be visible.
+        else if (!block.cachedCanvas && block.cell && block.cell.oreType) {
+          // Fallback procedural rendering for non-destroyed blocks if cache is missing
           ctx.save();
-          drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
           ctx.clip();
           const seedA = (block.gridX * 73856093) ^ (block.gridY * 19349663);
           const colorHashA = (block.getBlockColor() || "#ffffff")
@@ -500,8 +496,8 @@ const GridCanvas = ({
             seedA + colorHashA
           );
           ctx.restore();
-          drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-          ctx.stroke();
+          // drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
+          // ctx.stroke();
         }
 
         ctx.restore();
@@ -589,7 +585,6 @@ const GridCanvas = ({
   }, [
     gridData,
     blasts,
-    destroyedCells,
     innerBlockSize,
     cellSpacing,
     blockSize,
