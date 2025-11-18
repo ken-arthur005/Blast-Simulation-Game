@@ -192,6 +192,7 @@ const GridCanvas = ({
   // Use a ref for hover to avoid frequent React state updates on mousemove
   const hoveredBlockRef = useRef(null);
   const [destroyedCells, setDestroyedCells] = useState([]);
+  const [fallenDebris, setFallenDebris] = useState([]);
   const hoverRafRef = useRef(null);
   const pendingHoverRef = useRef(null);
   // Cache for static grid during blast animation
@@ -199,6 +200,7 @@ const GridCanvas = ({
   const staticGridCacheParamsRef = useRef(null);
   // Merged offscreen cache for batch drawing the entire grid
   const gridRenderCacheRef = useRef(null);
+  const [blastCompleted, setBlastCompleted] = useState(false);
   const cellSpacing = cellGap; // spacing between cells in pixels
   const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
 
@@ -297,10 +299,13 @@ const GridCanvas = ({
             );
             const rockOffsetB = Math.round((innerBlockSize - rockSizeB) / 2);
             cacheCtx.translate(rockOffsetB, rockOffsetB);
+            const colorToUse = blastCompleted
+              ? "#808080"
+              : block.getBlockColor();
             drawRockTexture(
               cacheCtx,
               rockSizeB,
-              block.getBlockColor(),
+              colorToUse,
               seedB + colorHashB
             );
             cacheCtx.restore();
@@ -326,7 +331,7 @@ const GridCanvas = ({
 
       return cacheCanvas;
     },
-    [gridData, innerBlockSize, cellSpacing]
+    [gridData, innerBlockSize, cellSpacing, blastCompleted]
   );
 
   // Create OreBlock instances for each cell in the grid
@@ -398,11 +403,66 @@ const GridCanvas = ({
     if (gridData && gridData.grid) {
       blocksRef.current = createBlocks();
       setDestroyedCells([]);
+      setFallenDebris([]); // Clear fallen debris on reset
+      setBlastCompleted(false); // Reset blast state
+      // Clear gray caches
+      // blocksRef.current.forEach((b) => (b.grayCachedCanvas = null));
       console.log(
-        "Grid reset: blocks reinitalized and destroyed cells cleared"
+        "Grid reset: blocks reinitialized and destroyed cells cleared"
       );
     }
-  }, [gridData, createBlocks, fileResetKey]);
+  }, [fileResetKey]);
+
+  // Create gray caches when blast completes
+  useEffect(() => {
+    if (!blastCompleted || !blocksRef.current.length) return;
+
+    blocksRef.current.forEach((block) => {
+      const isAffected = destroyedCells.some(
+        (c) => c.x === block.gridX && c.y === block.gridY
+      );
+
+      if (
+        !isAffected &&
+        block.cell &&
+        block.cell.oreType &&
+        !block.grayCachedCanvas
+      ) {
+        const grayCanvas = document.createElement("canvas");
+        grayCanvas.width = innerBlockSize;
+        grayCanvas.height = innerBlockSize;
+        const gctx = grayCanvas.getContext("2d");
+
+        const rrad = Math.max(4, innerBlockSize * 0.12);
+        drawRoundedRect(gctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+        gctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        gctx.fill();
+
+        gctx.save();
+        drawRoundedRect(gctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+        gctx.clip();
+        const seed = (block.gridX * 73856093) ^ (block.gridY * 19349663);
+        const hash = "#808080"
+          .split("")
+          .reduce((acc, c) => acc + c.charCodeAt(0), 0);
+        const rockScale = 0.72;
+        const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
+        const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
+        gctx.translate(rockOffset, rockOffset);
+        drawRockTexture(gctx, rockSize, "#808080", seed + hash);
+        gctx.restore();
+
+        drawRoundedRect(gctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+        gctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+        gctx.lineWidth = 1.2;
+        gctx.stroke();
+
+        block.grayCachedCanvas = grayCanvas;
+      }
+    });
+
+    console.log("Gray caches created for unaffected blocks");
+  }, [blastCompleted, destroyedCells, innerBlockSize]);
 
   // Render all blocks on the canvas
   const renderCanvas = useCallback(() => {
@@ -412,176 +472,159 @@ const GridCanvas = ({
     const ctx = canvas.getContext("2d");
     const { grid } = gridData;
 
-    // Avoid accessing grid[0] if grid is empty
     const columns = grid[0]?.length || 0;
     const rows = grid.length;
-
-    if (columns === 0 || rows === 0) return; //stop if empty grid
+    if (columns === 0 || rows === 0) return;
 
     const actualGridWidth =
       grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
     const actualGridHeight =
       grid.length * (innerBlockSize + cellSpacing) - cellSpacing;
-
     const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
     const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-    // Clear & fill background
+    // 1. Clear & fill background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; // light gray background
+    ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Save the context state
-    ctx.save();
+    // --- START: NEW RENDER LOGIC ---
 
-    // FAST PATH: if we have a precomposed grid cache, draw it in one call.
-    if (gridRenderCacheRef.current) {
-      try {
-        // cache already contains the correct centering translation (created by createStaticGridCache)
-        ctx.drawImage(gridRenderCacheRef.current, 0, 0);
-      } catch {
-        // If the cache draw fails for any reason, clear cache and fall back to per-block rendering
-        gridRenderCacheRef.current = null;
-      }
-    } else {
-      // Translate to center the grid for per-block rendering
+    if (blastCompleted) {
+      // --- RENDER PATH 1: POST-BLAST STATE ---
+      // Draw the final state: a grayed-out grid with colored debris on top.
+
+      // A. Draw the grayed-out background grid
+      ctx.save();
       ctx.translate(offsetX, offsetY);
+      grid.forEach((row, y) => {
+        row.forEach((cell, x) => {
+          const renderX = x * (innerBlockSize + cellSpacing);
+          const renderY = y * (innerBlockSize + cellSpacing);
+          const rrad = Math.max(4, innerBlockSize * 0.12);
 
-      blocksRef.current.forEach((block) => {
-        // const isDestroyed = destroyedCells.some(
-        //   (cell) => cell.x === block.gridX && cell.y === block.gridY
-        // );
-
-        const renderX = block.gridX * (innerBlockSize + cellSpacing);
-        const renderY = block.gridY * (innerBlockSize + cellSpacing);
-
-        ctx.save();
-        ctx.translate(renderX, renderY);
-
-        // Draw faint grid with rounded corners
-        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-        ctx.lineWidth = 1.2;
-        const rx = 0;
-        const ry = 0;
-        const rrad = Math.max(4, innerBlockSize * 0.12);
-        // background fill
-        drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-        ctx.fill();
-
-        ctx.stroke(); // Stroke the border too
-
-        // THEN, if the block has data (i.e., it's not destroyed/null), draw the rock
-        if (block.cachedCanvas && block.cell && block.cell.oreType) {
-          // Draw the cached pre-rendered block (already includes texture + border)
-          ctx.drawImage(block.cachedCanvas, 0, 0);
-        } // If a cell is null, only the background slot drawn above will be visible.
-        else if (!block.cachedCanvas && block.cell && block.cell.oreType) {
-          // Fallback procedural rendering for non-destroyed blocks if cache is missing
           ctx.save();
-          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
-          ctx.clip();
-          const seedA = (block.gridX * 73856093) ^ (block.gridY * 19349663);
-          const colorHashA = (block.getBlockColor() || "#ffffff")
-            .split("")
-            .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-          const rockScale = 0.72;
-          const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
-          const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
-          ctx.translate(rockOffset, rockOffset);
-          drawRockTexture(
-            ctx,
-            rockSize,
-            block.getBlockColor(),
-            seedA + colorHashA
-          );
-          ctx.restore();
-          // drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-          // ctx.stroke();
-        }
+          ctx.translate(renderX, renderY);
 
+          // Draw the empty grid slot background and border
+          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          // If the cell still exists (was not destroyed), draw it in gray
+          if (cell) {
+            const seed = (x * 73856093) ^ (y * 19349663);
+            const colorHash = "#808080"
+              .split("")
+              .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+            const rockSize = Math.max(2, Math.round(innerBlockSize * 0.72));
+            const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
+
+            ctx.save();
+            ctx.clip(); // Clip to the rounded rect of the slot
+            ctx.translate(rockOffset, rockOffset);
+            drawRockTexture(ctx, rockSize, "#808080", seed + colorHash);
+            ctx.restore();
+          }
+
+          ctx.restore();
+        });
+      });
+      ctx.restore(); // Restore from the grid's main translation
+
+      // B. Draw the colored fallen debris on top
+      fallenDebris.forEach((debris) => {
+        ctx.save();
+        ctx.translate(debris.x, debris.y);
+        ctx.rotate(debris.angle);
+        ctx.translate(-debris.width / 2, -debris.height / 2);
+
+        const seedDebris =
+          (debris.gridX * 73856093) ^ (debris.gridY * 19349663);
+        const colorHashDebris = (debris.color || "#ffffff")
+          .split("")
+          .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+
+        drawRockTexture(
+          ctx,
+          Math.max(2, debris.width),
+          debris.color,
+          seedDebris + colorHashDebris
+        );
         ctx.restore();
       });
+    } else {
+      // --- RENDER PATH 2: PRE-BLAST STATE ---
+      // Draw the normal, full-color grid with blast markers.
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+      blocksRef.current.forEach((block) => {
+        if (block.cachedCanvas && block.cell && block.cell.oreType) {
+          const renderX = block.gridX * (innerBlockSize + cellSpacing);
+          const renderY = block.gridY * (innerBlockSize + cellSpacing);
+          ctx.drawImage(block.cachedCanvas, renderX, renderY);
+        }
+      });
+
+      // Draw Blast Markers
+      blasts.forEach((blast) => {
+        const { x, y } = blast;
+        const centerX = x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+        const centerY = y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, innerBlockSize * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = "#dc2626";
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, innerBlockSize * 0.1, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+
+        if (blast.dirKey) {
+          const arrowLen = blockSize * 0.28;
+          const angleMap = {
+            left: Math.PI,
+            right: 0,
+            up: -Math.PI / 2,
+            down: Math.PI / 2,
+            "up-left": (-3 * Math.PI) / 4,
+            "up-right": -Math.PI / 4,
+            "down-right": Math.PI / 4,
+            "down-left": (3 * Math.PI) / 4,
+          };
+          const ang = angleMap[blast.dirKey] ?? 0;
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          ctx.rotate(ang);
+          ctx.beginPath();
+          ctx.moveTo(0, -arrowLen * 0.2);
+          ctx.lineTo(arrowLen, 0);
+          ctx.lineTo(0, arrowLen * 0.2);
+          ctx.closePath();
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
+        if (selectedBlast && selectedBlast.x === x && selectedBlast.y === y) {
+          ctx.beginPath();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "rgba(37, 99, 235, 0.9)";
+          ctx.arc(centerX, centerY, blockSize * 0.42, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      });
+      ctx.restore();
     }
 
-    // 2. Draw Blast Markers
-    blasts.forEach((blast) => {
-      const { x, y } = blast;
-
-      // Compute base center within the grid (without centering offset)
-      const baseCenterX =
-        x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
-      const baseCenterY =
-        y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
-
-      // If we drew the precomposed cache (which already contains the offset), draw blasts at absolute coords
-      const centerX = gridRenderCacheRef.current
-        ? baseCenterX + offsetX
-        : baseCenterX;
-      const centerY = gridRenderCacheRef.current
-        ? baseCenterY + offsetY
-        : baseCenterY;
-
-      // Draw a red circle (blast icon)
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, innerBlockSize * 0.3, 0, Math.PI * 2); // Radius 30% of inner block size
-      ctx.fillStyle = "#dc2626"; // Red
-      ctx.fill();
-
-      // Optional: Add a white flash/dot for visibility
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, innerBlockSize * 0.1, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
-
-      // Draw direction overlay for this blast (small arrow) so users can see per-blast dirKey
-      if (blast.dirKey) {
-        const arrowLen = blockSize * 0.28;
-        const angleMap = {
-          left: Math.PI,
-          right: 0,
-          up: -Math.PI / 2,
-          down: Math.PI / 2,
-          "up-left": (-3 * Math.PI) / 4,
-          "up-right": -Math.PI / 4,
-          "down-right": Math.PI / 4,
-          "down-left": (3 * Math.PI) / 4,
-        };
-        const ang = angleMap[blast.dirKey] ?? 0;
-
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(ang);
-        ctx.beginPath();
-        ctx.moveTo(0, -arrowLen * 0.2);
-        ctx.lineTo(arrowLen, 0);
-        ctx.lineTo(0, arrowLen * 0.2);
-        ctx.closePath();
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.6)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // If this blast is selected, draw a selection ring
-      if (selectedBlast && selectedBlast.x === x && selectedBlast.y === y) {
-        ctx.beginPath();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "rgba(37, 99, 235, 0.9)"; // indigo-600
-        ctx.arc(centerX, centerY, blockSize * 0.42, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    });
-    // END NEW RENDERING LOGIC
-
-    // Restore the context state
-    ctx.restore();
-
-    console.debug(
-      `Canvas rendered: ${blocksRef.current.length} blocks, centered with offset (${offsetX}, ${offsetY})`
-    );
+    // --- END: NEW RENDER LOGIC ---
   }, [
     gridData,
     blasts,
@@ -589,7 +632,10 @@ const GridCanvas = ({
     cellSpacing,
     blockSize,
     selectedBlast,
+    blastCompleted,
+    fallenDebris,
   ]);
+
   // Re-render when dependencies change
   useEffect(() => {
     renderCanvas();
@@ -607,6 +653,11 @@ const GridCanvas = ({
     try {
       // createStaticGridCache returns an offscreen canvas sized to match the main canvas
       gridRenderCacheRef.current = createStaticGridCache(destroyedCells || []);
+      console.log("Grid render cache rebuilt", {
+        blastCompleted,
+        destroyedCellsCount: destroyedCells?.length || 0,
+        cacheCreated: !!gridRenderCacheRef.current,
+      });
     } catch {
       gridRenderCacheRef.current = null;
     }
@@ -621,6 +672,7 @@ const GridCanvas = ({
     cellSpacing,
     canvasSize,
     createStaticGridCache,
+    blastCompleted,
   ]);
 
   // GridCanvas.jsx
@@ -818,6 +870,7 @@ const GridCanvas = ({
 
   // Add a ref to track if blast is already running
   const isBlastRunningRef = useRef(false);
+  const bodiesRef = useRef([]);
 
   useEffect(() => {
     if (!blastTrigger || !gridData || !gridData.grid || !gridData.grid.length)
@@ -897,6 +950,9 @@ const GridCanvas = ({
     // Add bodies to the world
     World.add(engine.world, bodies);
 
+    // Store bodies in ref so we can access them later with updated colors
+    bodiesRef.current = bodies;
+
     // Calculate blast centers in pixel coordinates and include dirKey for directional bias
     const uniqueCoords = [
       ...new Set(affectedCells.map((c) => `${c.blastX},${c.blastY}`)),
@@ -968,6 +1024,9 @@ const GridCanvas = ({
 
         body.render.fillStyle = isDiluted ? "#FF0000" : "#00FF00";
       });
+
+      // Update the ref with the colored bodies so snapshot can use them
+      bodiesRef.current = bodies;
 
       // Calculate feedback
       const recovered = bodies.filter(
@@ -1390,9 +1449,30 @@ const GridCanvas = ({
         // }, 10000);
 
         isBlastRunningRef.current = false;
-        console.log("Blast animation completed");
+        setBlastCompleted(true);
 
-        // Call the completion callback
+        // Save fallen debris positions WITH their final colors (green/red)
+        // Use bodiesRef which has been updated with colors from the recovery timeout
+        const debrisSnapshot = bodiesRef.current.map((body) => ({
+          x: body.position.x,
+          y: body.position.y,
+          angle: body.angle,
+          width: innerBlockSize * 0.8,
+          height: innerBlockSize * 0.8,
+          color: body.render?.fillStyle || "#999999",
+          gridX: body.gridX,
+          gridY: body.gridY,
+          oreType: body.oreType,
+        }));
+        setFallenDebris(debrisSnapshot);
+
+        // Invalidate grid cache to trigger rebuild with gray colors
+        gridRenderCacheRef.current = null;
+
+        console.log("Blast animation completed", {
+          debrisCount: debrisSnapshot.length,
+          blastCompletedSet: true,
+        });
         if (onBlastComplete) onBlastComplete();
       }
     };
@@ -1421,6 +1501,7 @@ const GridCanvas = ({
       Engine.clear(engine);
 
       isBlastRunningRef.current = false;
+      bodiesRef.current = [];
 
       staticGridCacheRef.current = null;
       staticGridCacheParamsRef.current = null;
@@ -1436,6 +1517,7 @@ const GridCanvas = ({
     blasts,
     createStaticGridCache,
     addRecoveryRecordToGameContext,
+    renderCanvas,
   ]);
 
   if (!gridData) {
