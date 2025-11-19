@@ -864,6 +864,9 @@ const GridCanvas = ({
   // Click Handler
   const handleClick = useCallback(
     (event) => {
+      // this guard clause disables clicks during the animation.
+      if (isBlastRunningRef.current) return;
+
       if (!onBlockClick || !canvasRef.current) return;
 
       // Get canvas-relative click coordinates
@@ -934,6 +937,9 @@ const GridCanvas = ({
 
   const handleMouseMove = useCallback(
     (event) => {
+      // this guard clause disables the entire hover effect during the animation.
+      if (isBlastRunningRef.current) return;
+
       // Throttle hover updates via requestAnimationFrame to reduce full-canvas redraws
       const rect = canvasRef.current.getBoundingClientRect();
       const scaleX = canvasRef.current.width / rect.width;
@@ -970,6 +976,9 @@ const GridCanvas = ({
 
   // Mouse Leave Handler
   const handleMouseLeave = useCallback(() => {
+    // this guard clause prevents clearing the canvas when the mouse leaves during an animation.
+    if (isBlastRunningRef.current) return;
+
     // cancel pending RAF and clear
     if (hoverRafRef.current) {
       cancelAnimationFrame(hoverRafRef.current);
@@ -1593,7 +1602,6 @@ const GridCanvas = ({
         //   oreType: body.oreType,
         // }));
 
-
         const debrisSnapshot = trajectories.map((trajectory) => {
           const finalState =
             trajectory.keyframes[trajectory.keyframes.length - 1];
@@ -1614,7 +1622,6 @@ const GridCanvas = ({
             oreType: trajectory.body.oreType,
           };
         });
-
 
         setFallenDebris(debrisSnapshot);
 
