@@ -12,8 +12,8 @@
   }
 }
 .logo {
-  font-family: 'Tiki Tropic';
-  src: url('./fonts/tiki-tropic.regular.ttf') format('truetype');
+  font-family: "Tiki Tropic";
+  src: url("./fonts/tiki-tropic.regular.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
 }
@@ -59,7 +59,7 @@
   background-image: linear-gradient(
       to bottom,
       rgba(0, 0, 0, 0.5),
-      rgba(0, 0, 0, 0.4) ,
+      rgba(0, 0, 0, 0.4),
       rgba(0, 0, 0, 0)
     ),
     url("./images/bg3.jpg");
@@ -71,12 +71,24 @@
   width: 100vw;
 }
 
-
-
-
 .ui-font {
   font-family: "GrilledCheese BTN Toasted";
 }
 .leaderboard-font {
   font-family: "Poppins", sans-serif;
+}
+
+@keyframes border-glow {
+  0% {
+    box-shadow: 0 0 5px rgba(34, 197, 94, 0.3);
+    background-position: -100% 0;
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.6), 0 0 30px rgba(34, 197, 94, 0.4);
+    background-position: 100% 0;
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+    background-position: 200% 0;
+  }
 }

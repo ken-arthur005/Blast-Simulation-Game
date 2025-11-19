@@ -137,56 +137,48 @@ const SimulationPage = () => {
             {({ getRootProps, acceptedFile }) => (
               <div
                 {...getRootProps()}
-                className={`relative rounded-lg p-2 text-center cursor-pointer transition-all duration-200 ease-in-out ${
-                  zoneHover
+                className={`relative rounded-lg p-2 text-center cursor-pointer transition-all duration-200 ease-in-out border-b-2 ${
+                  acceptedFile
+                    ? "border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-[border-pulse_3s_ease-in-out]"
+                    : zoneHover
                     ? "border-blue-500 bg-blue-50 transform scale-105"
-                    : "border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50"
-                } ${acceptedFile ? "border-green-500 bg-green-50" : ""}`}
+                    : "border-b-gray-300 bg-amber-600 hover:border-b-gray-400 hover:bg-amber-900"
+                }`}
+                style={
+                  acceptedFile
+                    ? {
+                        animation: "border-glow 3s ease-in-out",
+                        backgroundImage:
+                          "linear-gradient(90deg, transparent, rgba(34,197,94,0.3), transparent)",
+                        backgroundSize: "200% 100%",
+                        backgroundPosition: "-100% 0",
+                      }
+                    : {}
+                }
               >
-                {acceptedFile ? (
-                  <div className="space-y-4 ">
-                    <div className="flex items-center justify-center space-x-3">
-                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg
-                          className="w-6 h-6 text-green-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {acceptedFile.name}
+                <div>
+                  <div className="flex justify-center">
+                    <AiOutlineCloudUpload
+                      className={`w-8 h-6 transition-colors duration-200 ${
+                        acceptedFile
+                          ? "text-green-500"
+                          : zoneHover
+                          ? "text-blue-500"
+                          : "text-white"
+                      }`}
+                    />
+                    <span>
+                      <p className="text-sm font-medium text-white">
+                        Import CSV
                       </p>
-                    </div>
+                    </span>
                   </div>
-                ) : (
-                  <div>
-                    <div className="flex justify-center">
-                      <AiOutlineCloudUpload
-                        className={`w-8 h-6 transition-colors duration-200 ${
-                          zoneHover ? "text-blue-500" : "text-gray-400"
-                        }`}
-                      />
-                      <span>
-                        <p className="text-sm font-medium text-gray-700">
-                          Import CSV
-                        </p>
-                      </span>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             )}
           </CSVReader>
 
-          <div className="p-2 mx-4 bg-gray-200 rounded-full border border-gray-400 w-12 h-12 flex items-center justify-center text-lg font-semibold text-gray-700">
+          <div className="p-2 mx-4 bg-[#C6D662] rounded-full border border-gray-400 w-12 h-12 flex items-center justify-center text-lg font-semibold text-gray-700">
             <p className="flex flex-row items-center">
               {getInitials(playerName)}
             </p>
