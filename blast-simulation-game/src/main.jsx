@@ -1,10 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.jsx";
 import "./App.css";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import HomePage from "./Pages/HomePage.jsx";
-import CsvParse from "./Pages/SimulationPage.jsx";
+import HomePage from "./pages/HomePage.jsx";
+import CsvParse from "./pages/SimulationPage.jsx";
 import { GameProvider } from "./Components/GameContext.jsx";
 
 const router = createBrowserRouter([

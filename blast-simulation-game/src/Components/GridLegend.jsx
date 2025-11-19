@@ -36,11 +36,11 @@ const GridLegend = ({
 
   if (!oreTypes || oreTypes.length === 0) return null;
 
-  const colorMapping = OreColorMapper.getColorsForOreTypes(oreTypes);
+  // const colorMapping = OreColorMapper.getColorsForOreTypes(oreTypes);
 
   return (
     <div>
-      <div
+      {/* <div
         className={`mt-4 p-4 backdrop-blur-[20px] bg-[rgba(255,255,255,0.2)] rounded-lg ${className}`}
       >
         <h3 className="text-lg font-semibold mb-3">Ore Types Legend</h3>
@@ -57,7 +57,7 @@ const GridLegend = ({
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
 
       <div className="mt-3 flex items-center gap-3">
         <button
@@ -83,7 +83,7 @@ const GridLegend = ({
       <div className="mt-4">
         {gameState.blasts && gameState.blasts.length > 0 ? (
           <>
-            <div className="mb-2 text-center text-sm text-gray-600">
+            <div className="mb-2 text-center text-sm text-black-600">
               {selectedBlast
                 ? `Selected blast: (${selectedBlast.x}, ${
                     selectedBlast.y
@@ -101,7 +101,7 @@ const GridLegend = ({
                   onChange={(e) => setApplyToNext(e.target.checked)}
                   className="form-checkbox"
                 />
-                <span>
+                <span className="text-white">
                   Also set this direction as default for next placements
                 </span>
               </label>
@@ -191,7 +191,7 @@ const GridLegend = ({
             </div>
           </>
         ) : (
-          <div className="mb-2 text-center text-sm text-gray-600">
+          <div className="mb-2 text-center text-sm text-white/60">
             Place an explosive first — after the first placement you'll be able
             to select each explosive and choose a direction for it.
           </div>
