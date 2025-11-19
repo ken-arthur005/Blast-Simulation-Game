@@ -1,14 +1,116 @@
 ﻿import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "../utils/oreBlock";
-import { Engine, World, Runner, Events } from "matter-js";
+import { Engine, World, Runner, Events, Body } from "matter-js";
 import {
   createBlastBodies,
   applyBlastForce,
   // cleanupPhysicsEngine,
   createBoundaryWalls,
+  cleanupPhysicsEngine,
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
 import OreValueMapper from "../utils/oreValueMapper";
+
+const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
+  const trajectories = new Map();
+  
+  // Initialize trajectory storage with original positions
+  bodies.forEach(body => {
+    trajectories.set(body.id, {
+      body: body,
+      keyframes: [{
+        x: body.position.x,
+        y: body.position.y,
+        angle: body.angle,
+        time: 0
+      }]
+    });
+  });
+
+  // Run physics simulation and capture keyframes
+  const sampleInterval = 4; // Capture every 4th frame for efficiency
+  
+  for (let i = 0; i < steps; i++) {
+    Engine.update(engine, 1000 / 60); // 60fps simulation
+    
+    if (i % sampleInterval === 0 || i === steps - 1) {
+      bodies.forEach(body => {
+        const trajectory = trajectories.get(body.id);
+        trajectory.keyframes.push({
+          x: body.position.x,
+          y: body.position.y,
+          angle: body.angle,
+          velocityX: body.velocity.x,
+          velocityY: body.velocity.y,
+          time: (i / steps)
+        });
+      });
+    }
+  }
+
+  return Array.from(trajectories.values());
+};
+
+const animateBlastWithGSAP = (
+  trajectories,
+  duration = 2.5
+) => {
+  const timeline = gsap.timeline();
+
+  // Create animation state objects for each body
+  const animStates = trajectories.map(traj => {
+    const body = traj.body;
+    const startFrame = traj.keyframes[0];
+    const finalFrame = traj.keyframes[traj.keyframes.length - 1];
+    
+    return {
+      body: body,
+      animX: startFrame.x,
+      animY: startFrame.y,
+      animAngle: startFrame.angle,
+      animVelocityX: 0,
+      animVelocityY: 0,
+      targetX: finalFrame.x,
+      targetY: finalFrame.y,
+      targetAngle: finalFrame.angle,
+      keyframes: traj.keyframes
+    };
+  });
+
+  // Animate each body with stagger effect
+  animStates.forEach((state) => {
+    const delay = (state.body.blastDistance || 0) * 0.008;
+    
+    timeline.to(state, {
+      animX: state.targetX,
+      animY: state.targetY,
+      animAngle: state.targetAngle,
+      duration: duration,
+      delay: delay,
+      ease: "power2.out",
+      onUpdate: function() {
+        // Calculate current keyframe for velocity (for motion trails)
+        const progress = this.progress();
+        const kfIndex = Math.floor(progress * (state.keyframes.length - 1));
+        const kf = state.keyframes[Math.min(kfIndex, state.keyframes.length - 1)];
+        
+        state.animVelocityX = kf.velocityX || 0;
+        state.animVelocityY = kf.velocityY || 0;
+        
+        // Update body's animated position for rendering
+        state.body.animatedPosition = {
+          x: state.animX,
+          y: state.animY,
+          angle: state.animAngle,
+          velocityX: state.animVelocityX,
+          velocityY: state.animVelocityY
+        };
+      }
+    }, 0);
+  });
+
+  return { timeline, animStates };
+};
 
 // Helper utilities (module-level so identity is stable across renders)
 // Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
@@ -200,9 +302,17 @@ const GridCanvas = ({
   const staticGridCacheParamsRef = useRef(null);
   // Merged offscreen cache for batch drawing the entire grid
   const gridRenderCacheRef = useRef(null);
+
+
   const [blastCompleted, setBlastCompleted] = useState(false);
+  const isBlastRunningRef = useRef(false);
+
   const cellSpacing = cellGap; // spacing between cells in pixels
   const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
+
+   // Store current animation timeline for cleanup
+  const animationTimelineRef = useRef(null);
+  const animationStatesRef = useRef(null);
 
   // Helper: draw rounded rectangle path (does not fill/stroke)
   const drawRoundedRect = (ctx, x, y, width, height, radius = 6) => {
@@ -868,8 +978,9 @@ const GridCanvas = ({
     renderCanvas();
   }, [renderCanvas]);
 
+
   // Add a ref to track if blast is already running
-  const isBlastRunningRef = useRef(false);
+  // const isBlastRunningRef = useRef(false);
   const bodiesRef = useRef([]);
 
   useEffect(() => {
@@ -927,7 +1038,7 @@ const GridCanvas = ({
       gravity: { x: 0, y: 0.6 }, // Reduced gravity from 0.8 to 0.6 for faster settling
     });
 
-    const runner = Runner.create();
+    // const runner = Runner.create();
 
     // Create boundary walls to contain debris
     const walls = createBoundaryWalls(canvasSize);
@@ -989,6 +1100,20 @@ const GridCanvas = ({
 
     applyBlastForce(bodies, blastCenters, 0.02); // Reduce from 0.08 to 0.02 for more dramatic effect
 
+    console.log("📊 Capturing physics trajectories...");
+    const trajectories = capturePhysicsTrajectories(bodies, engine, 120);
+    console.log(`✅ Captured ${trajectories.length} trajectories`);
+
+    // Step 6: Reset bodies to original positions for animation
+    bodies.forEach(body => {
+      const startPos = trajectories.find(t => t.body.id === body.id)?.keyframes[0];
+      if (startPos) {
+        Body.setPosition(body, { x: startPos.x, y: startPos.y });
+        Body.setAngle(body, 0);
+        Body.setVelocity(body, { x: 0, y: 0 });
+        Body.setAngularVelocity(body, 0);
+      }
+    });
     // Set timeout to check blast results after simulation settles (5 seconds)
     setTimeout(() => {
       const recoveryY = canvas.height * 0.8;
@@ -1061,13 +1186,6 @@ const GridCanvas = ({
       flashOpacity: 1,
     }));
 
-    // Start physics simulation
-    Runner.run(runner, engine);
-
-    console.debug(
-      "GridCanvas: runner started, bodies in world:",
-      engine.world.bodies.length
-    );
 
     // Pre-render static grid cache for faster animation rendering
     const staticGridCache = createStaticGridCache(affectedCells);
@@ -1088,6 +1206,13 @@ const GridCanvas = ({
     // so they disappear from the grid right away
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
+    console.log("🎨 Starting GSAP animation...");
+    const animationDuration = 2.5; // seconds
+    const { timeline, animStates } = animateBlastWithGSAP(trajectories, animationDuration);
+    
+    animationTimelineRef.current = timeline;
+    animationStatesRef.current = animStates;
+
     const startTime = performance.now();
 
     const duration = 9000;
@@ -1104,7 +1229,8 @@ const GridCanvas = ({
           cancelAnimationFrame(animationFrame);
         }
         // Runner.stop(runner);
-        // cleanupPhysicsEngine(engine, null);
+        timeline.kill();
+        cleanupPhysicsEngine(engine, null);
         isBlastRunningRef.current = false; // Reset flag
         return;
       }
@@ -1362,23 +1488,31 @@ const GridCanvas = ({
       });
 
       // Render physics bodies (affected cells as debris) with motion trails 🔥
-      bodies.forEach((body) => {
-        const opacity = 1;
+      animStates.forEach((state) => {
+        const body = state.body;
+        const animPos = body.animatedPosition;
+        
+        if (!animPos) return;
+
+        const opacity = Math.max(0, 1 - progress * 0.8);
 
         // Draw motion trail
-        if (body.velocity.x !== 0 || body.velocity.y !== 0) {
+        const velocityX = animPos.velocityX || 0;
+        const velocityY = animPos.velocityY || 0;
+
+        // Draw motion trail
+        if (velocityX !== 0 || velocityY !== 0) {
           ctx.save();
-          ctx.globalAlpha = opacity * 0.5;
-          ctx.globalAlpha = opacity * 0.5;
+          ctx.globalAlpha = opacity * 0.05;
           ctx.strokeStyle = body.render.fillStyle;
-          ctx.lineWidth = blockSize * 0.8;
-          ctx.lineWidth = blockSize * 0.8;
+          ctx.lineWidth = blockSize * 0.4;
+          ctx.lineWidth = blockSize * 0.5;
           ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(body.position.x, body.position.y);
           ctx.lineTo(
-            body.position.x - body.velocity.x * 2,
-            body.position.y - body.velocity.y * 2
+            animPos.x - velocityX * 2,
+            animPos.y - velocityY * 2
           );
           ctx.stroke();
           ctx.restore();
@@ -1386,7 +1520,7 @@ const GridCanvas = ({
 
         // Draw debris block
         ctx.save();
-        ctx.translate(body.position.x, body.position.y);
+        ctx.translate(animPos.x, animPos.y);
         ctx.rotate(body.angle);
 
         // Draw debris as a rock-shaped piece using the same procedural texture
@@ -1429,24 +1563,16 @@ const GridCanvas = ({
         }
 
         // Stop physics simulation and cleanup
-        // Runner.stop(runner);
-        // cleanupPhysicsEngine(engine, null);
-        Runner.stop(runner);
-        World.clear(engine.world);
-        Engine.clear(engine);
+        timeline.kill();
+        cleanupPhysicsEngine(engine, null);
+        staticGridCacheRef.current = null;
+        staticGridCacheParamsRef.current = null;
+        animationTimelineRef.current = null;
+        animationStatesRef.current = null;
 
         // Clear cache immediately when animation completes to prevent next blast interference
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
-
-        // destroyedCells were marked at start of blast; no need to set again here
-
-        // Allow time for destroyed cells to render before completion callback
-        // setTimeout(() => {
-        //   isBlastRunningRef.current = false; // Reset flag BEFORE callback
-        //   console.log("Blast animation completed");
-        //   onBlastComplete?.();
-        // }, 10000);
 
         isBlastRunningRef.current = false;
         setBlastCompleted(true);
@@ -1483,22 +1609,13 @@ const GridCanvas = ({
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }
-
-      // setTimeout(() => {
-      //   onBlastComplete();
-      //   // Runner.stop(runner);
-      //   // cleanupPhysicsEngine(engine, null);
-      //   isBlastRunningRef.current = false; // Reset on cleanup
-
-      //   // Clear the static grid cache refs to prevent interference with next blast
-      //   staticGridCacheRef.current = null;
-      //   staticGridCacheParamsRef.current = null;
-      // }, 6000);
-
-      // Stop any Matter.js processes that might still be running if the component unmounts mid-animation
-      Runner.stop(runner);
-      World.clear(engine.world);
-      Engine.clear(engine);
+      if (timeline) timeline.kill();
+      cleanupPhysicsEngine(engine, null);
+      isBlastRunningRef.current = false;
+      staticGridCacheRef.current = null;
+      staticGridCacheParamsRef.current = null;
+      animationTimelineRef.current = null;
+      animationStatesRef.current = null;
 
       isBlastRunningRef.current = false;
       bodiesRef.current = [];
