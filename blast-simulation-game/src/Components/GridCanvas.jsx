@@ -13,28 +13,30 @@ import OreValueMapper from "../utils/oreValueMapper";
 
 const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
   const trajectories = new Map();
-  
+
   // Initialize trajectory storage with original positions
-  bodies.forEach(body => {
+  bodies.forEach((body) => {
     trajectories.set(body.id, {
       body: body,
-      keyframes: [{
-        x: body.position.x,
-        y: body.position.y,
-        angle: body.angle,
-        time: 0
-      }]
+      keyframes: [
+        {
+          x: body.position.x,
+          y: body.position.y,
+          angle: body.angle,
+          time: 0,
+        },
+      ],
     });
   });
 
   // Run physics simulation and capture keyframes
   const sampleInterval = 4; // Capture every 4th frame for efficiency
-  
+
   for (let i = 0; i < steps; i++) {
     Engine.update(engine, 1000 / 60); // 60fps simulation
-    
+
     if (i % sampleInterval === 0 || i === steps - 1) {
-      bodies.forEach(body => {
+      bodies.forEach((body) => {
         const trajectory = trajectories.get(body.id);
         trajectory.keyframes.push({
           x: body.position.x,
@@ -42,7 +44,7 @@ const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
           angle: body.angle,
           velocityX: body.velocity.x,
           velocityY: body.velocity.y,
-          time: (i / steps)
+          time: i / steps,
         });
       });
     }
@@ -51,18 +53,15 @@ const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
   return Array.from(trajectories.values());
 };
 
-const animateBlastWithGSAP = (
-  trajectories,
-  duration = 2.5
-) => {
+const animateBlastWithGSAP = (trajectories, duration = 2.5) => {
   const timeline = gsap.timeline();
 
   // Create animation state objects for each body
-  const animStates = trajectories.map(traj => {
+  const animStates = trajectories.map((traj) => {
     const body = traj.body;
     const startFrame = traj.keyframes[0];
     const finalFrame = traj.keyframes[traj.keyframes.length - 1];
-    
+
     return {
       body: body,
       animX: startFrame.x,
@@ -73,40 +72,45 @@ const animateBlastWithGSAP = (
       targetX: finalFrame.x,
       targetY: finalFrame.y,
       targetAngle: finalFrame.angle,
-      keyframes: traj.keyframes
+      keyframes: traj.keyframes,
     };
   });
 
   // Animate each body with stagger effect
   animStates.forEach((state) => {
     const delay = (state.body.blastDistance || 0) * 0.008;
-    
-    timeline.to(state, {
-      animX: state.targetX,
-      animY: state.targetY,
-      animAngle: state.targetAngle,
-      duration: duration,
-      delay: delay,
-      ease: "power2.out",
-      onUpdate: function() {
-        // Calculate current keyframe for velocity (for motion trails)
-        const progress = this.progress();
-        const kfIndex = Math.floor(progress * (state.keyframes.length - 1));
-        const kf = state.keyframes[Math.min(kfIndex, state.keyframes.length - 1)];
-        
-        state.animVelocityX = kf.velocityX || 0;
-        state.animVelocityY = kf.velocityY || 0;
-        
-        // Update body's animated position for rendering
-        state.body.animatedPosition = {
-          x: state.animX,
-          y: state.animY,
-          angle: state.animAngle,
-          velocityX: state.animVelocityX,
-          velocityY: state.animVelocityY
-        };
-      }
-    }, 0);
+
+    timeline.to(
+      state,
+      {
+        animX: state.targetX,
+        animY: state.targetY,
+        animAngle: state.targetAngle,
+        duration: duration,
+        delay: delay,
+        ease: "power2.out",
+        onUpdate: function () {
+          // Calculate current keyframe for velocity (for motion trails)
+          const progress = this.progress();
+          const kfIndex = Math.floor(progress * (state.keyframes.length - 1));
+          const kf =
+            state.keyframes[Math.min(kfIndex, state.keyframes.length - 1)];
+
+          state.animVelocityX = kf.velocityX || 0;
+          state.animVelocityY = kf.velocityY || 0;
+
+          // Update body's animated position for rendering
+          state.body.animatedPosition = {
+            x: state.animX,
+            y: state.animY,
+            angle: state.animAngle,
+            velocityX: state.animVelocityX,
+            velocityY: state.animVelocityY,
+          };
+        },
+      },
+      0
+    );
   });
 
   return { timeline, animStates };
@@ -303,14 +307,13 @@ const GridCanvas = ({
   // Merged offscreen cache for batch drawing the entire grid
   const gridRenderCacheRef = useRef(null);
 
-
   const [blastCompleted, setBlastCompleted] = useState(false);
   const isBlastRunningRef = useRef(false);
 
   const cellSpacing = cellGap; // spacing between cells in pixels
   const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
 
-   // Store current animation timeline for cleanup
+  // Store current animation timeline for cleanup
   const animationTimelineRef = useRef(null);
   const animationStatesRef = useRef(null);
 
@@ -978,7 +981,6 @@ const GridCanvas = ({
     renderCanvas();
   }, [renderCanvas]);
 
-
   // Add a ref to track if blast is already running
   // const isBlastRunningRef = useRef(false);
   const bodiesRef = useRef([]);
@@ -1105,8 +1107,9 @@ const GridCanvas = ({
     console.log(`✅ Captured ${trajectories.length} trajectories`);
 
     // Step 6: Reset bodies to original positions for animation
-    bodies.forEach(body => {
-      const startPos = trajectories.find(t => t.body.id === body.id)?.keyframes[0];
+    bodies.forEach((body) => {
+      const startPos = trajectories.find((t) => t.body.id === body.id)
+        ?.keyframes[0];
       if (startPos) {
         Body.setPosition(body, { x: startPos.x, y: startPos.y });
         Body.setAngle(body, 0);
@@ -1186,7 +1189,6 @@ const GridCanvas = ({
       flashOpacity: 1,
     }));
 
-
     // Pre-render static grid cache for faster animation rendering
     const staticGridCache = createStaticGridCache(affectedCells);
     staticGridCacheRef.current = staticGridCache;
@@ -1208,8 +1210,11 @@ const GridCanvas = ({
 
     console.log("🎨 Starting GSAP animation...");
     const animationDuration = 2.5; // seconds
-    const { timeline, animStates } = animateBlastWithGSAP(trajectories, animationDuration);
-    
+    const { timeline, animStates } = animateBlastWithGSAP(
+      trajectories,
+      animationDuration
+    );
+
     animationTimelineRef.current = timeline;
     animationStatesRef.current = animStates;
 
@@ -1491,7 +1496,7 @@ const GridCanvas = ({
       animStates.forEach((state) => {
         const body = state.body;
         const animPos = body.animatedPosition;
-        
+
         if (!animPos) return;
 
         const opacity = Math.max(0, 1 - progress * 0.8);
@@ -1510,10 +1515,7 @@ const GridCanvas = ({
           ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(body.position.x, body.position.y);
-          ctx.lineTo(
-            animPos.x - velocityX * 2,
-            animPos.y - velocityY * 2
-          );
+          ctx.lineTo(animPos.x - velocityX * 2, animPos.y - velocityY * 2);
           ctx.stroke();
           ctx.restore();
         }
@@ -1579,17 +1581,41 @@ const GridCanvas = ({
 
         // Save fallen debris positions WITH their final colors (green/red)
         // Use bodiesRef which has been updated with colors from the recovery timeout
-        const debrisSnapshot = bodiesRef.current.map((body) => ({
-          x: body.position.x,
-          y: body.position.y,
-          angle: body.angle,
-          width: innerBlockSize * 0.8,
-          height: innerBlockSize * 0.8,
-          color: body.render?.fillStyle || "#999999",
-          gridX: body.gridX,
-          gridY: body.gridY,
-          oreType: body.oreType,
-        }));
+        // const debrisSnapshot = bodiesRef.current.map((body) => ({
+        //   x: body.position.x,
+        //   y: body.position.y,
+        //   angle: body.angle,
+        //   width: innerBlockSize * 0.8,
+        //   height: innerBlockSize * 0.8,
+        //   color: body.render?.fillStyle || "#999999",
+        //   gridX: body.gridX,
+        //   gridY: body.gridY,
+        //   oreType: body.oreType,
+        // }));
+
+
+        const debrisSnapshot = trajectories.map((trajectory) => {
+          const finalState =
+            trajectory.keyframes[trajectory.keyframes.length - 1];
+          // Find the corresponding body in bodiesRef to get its final calculated color
+          const bodyWithColor = bodiesRef.current.find(
+            (b) => b.id === trajectory.body.id
+          );
+
+          return {
+            x: finalState.x, // Use the final X from the trajectory
+            y: finalState.y, // Use the final Y from the trajectory
+            angle: finalState.angle, // Use the final angle
+            width: innerBlockSize * 0.8,
+            height: innerBlockSize * 0.8,
+            color: bodyWithColor?.render?.fillStyle || "#999999", // Get color from the body
+            gridX: trajectory.body.gridX,
+            gridY: trajectory.body.gridY,
+            oreType: trajectory.body.oreType,
+          };
+        });
+
+
         setFallenDebris(debrisSnapshot);
 
         // Invalidate grid cache to trigger rebuild with gray colors
