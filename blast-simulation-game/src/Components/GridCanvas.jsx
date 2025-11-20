@@ -1,16 +1,284 @@
 ﻿import React, { useState, useRef, useEffect, useCallback } from "react";
 import OreBlock from "../utils/oreBlock";
-import { Engine, World, Runner, Events } from "matter-js";
+import { Engine, World, Runner, Events, Body } from "matter-js";
 import {
   createBlastBodies,
   applyBlastForce,
   // cleanupPhysicsEngine,
   createBoundaryWalls,
+  cleanupPhysicsEngine,
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
 import OreValueMapper from "../utils/oreValueMapper";
 import GridTooltip from "./GridTooltip";
-import { drawRockTexture } from "../utils/rockTextureUtils";
+
+// Helper function to capture physics trajectories for GSAP animation
+const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
+  const trajectories = new Map();
+
+  // Initialize trajectory storage with original positions
+  bodies.forEach((body) => {
+    trajectories.set(body.id, {
+      body: body,
+      keyframes: [
+        {
+          x: body.position.x,
+          y: body.position.y,
+          angle: body.angle,
+          time: 0,
+        },
+      ],
+    });
+  });
+
+  // Run physics simulation and capture keyframes
+  const sampleInterval = 4; // Capture every 4th frame for efficiency
+
+  for (let i = 0; i < steps; i++) {
+    Engine.update(engine, 1000 / 60); // 60fps simulation
+
+    if (i % sampleInterval === 0 || i === steps - 1) {
+      bodies.forEach((body) => {
+        const trajectory = trajectories.get(body.id);
+        trajectory.keyframes.push({
+          x: body.position.x,
+          y: body.position.y,
+          angle: body.angle,
+          velocityX: body.velocity.x,
+          velocityY: body.velocity.y,
+          time: i / steps,
+        });
+      });
+    }
+  }
+
+  return Array.from(trajectories.values());
+};
+
+const animateBlastWithGSAP = (trajectories, duration = 2.5) => {
+  const timeline = gsap.timeline();
+
+  // Create animation state objects for each body
+  const animStates = trajectories.map((traj) => {
+    const body = traj.body;
+    const startFrame = traj.keyframes[0];
+    const finalFrame = traj.keyframes[traj.keyframes.length - 1];
+
+    return {
+      body: body,
+      animX: startFrame.x,
+      animY: startFrame.y,
+      animAngle: startFrame.angle,
+      animVelocityX: 0,
+      animVelocityY: 0,
+      targetX: finalFrame.x,
+      targetY: finalFrame.y,
+      targetAngle: finalFrame.angle,
+      keyframes: traj.keyframes,
+    };
+  });
+
+  // Animate each body with stagger effect
+  animStates.forEach((state) => {
+    const delay = (state.body.blastDistance || 0) * 0.008;
+
+    timeline.to(
+      state,
+      {
+        animX: state.targetX,
+        animY: state.targetY,
+        animAngle: state.targetAngle,
+        duration: duration,
+        delay: delay,
+        ease: "power2.out",
+        onUpdate: function () {
+          // Calculate current keyframe for velocity (for motion trails)
+          const progress = this.progress();
+          const kfIndex = Math.floor(progress * (state.keyframes.length - 1));
+          const kf =
+            state.keyframes[Math.min(kfIndex, state.keyframes.length - 1)];
+
+          state.animVelocityX = kf.velocityX || 0;
+          state.animVelocityY = kf.velocityY || 0;
+
+          // Update body's animated position for rendering
+          state.body.animatedPosition = {
+            x: state.animX,
+            y: state.animY,
+            angle: state.animAngle,
+            velocityX: state.animVelocityX,
+            velocityY: state.animVelocityY,
+          };
+        },
+      },
+      0
+    );
+  });
+
+  return { timeline, animStates };
+};
+
+// Helper utilities (module-level so identity is stable across renders)
+// Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
+const mulberry32 = (a) => {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const hexToRgb = (hex) => {
+  // Defensive: if not provided or not a string, return a neutral gray
+  if (!hex || typeof hex !== "string") return { r: 200, g: 200, b: 200 };
+  const h = hex.replace("#", "").trim();
+  // If it's already an rgb(...) string, try to parse numbers
+  if (h.startsWith("rgb")) {
+    const nums = h
+      .replace(/[^0-9,.-]/g, "")
+      .split(",")
+      .map(Number);
+    if (nums.length >= 3 && nums.every((n) => !Number.isNaN(n))) {
+      return { r: nums[0], g: nums[1], b: nums[2] };
+    }
+    return { r: 200, g: 200, b: 200 };
+  }
+
+  // Fallback for hex parsing
+  const bigint = parseInt(h, 16);
+  if (!Number.isNaN(bigint) && (h.length === 6 || h.length === 3)) {
+    if (h.length === 6) {
+      return {
+        r: (bigint >> 16) & 255,
+        g: (bigint >> 8) & 255,
+        b: bigint & 255,
+      };
+    }
+    // short hex like 'abc' -> 'aabbcc'
+    const r = parseInt(h[0] + h[0], 16);
+    const g = parseInt(h[1] + h[1], 16);
+    const b = parseInt(h[2] + h[2], 16);
+    return { r, g, b };
+  }
+
+  // fallback
+  return { r: 200, g: 200, b: 200 };
+};
+
+const rgbToHex = (r, g, b) => {
+  const toHex = (v) => {
+    const h = Math.max(0, Math.min(255, Math.round(v))).toString(16);
+    return h.length === 1 ? "0" + h : h;
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
+const adjustColor = (hex, factor) => {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToHex(r * (1 + factor), g * (1 + factor), b * (1 + factor));
+};
+
+// Draw a simple rock-like texture inside current origin (0,0) sized to (size)
+// baseColor is a hex string, seedNumber is a deterministic seed per cell
+const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
+  const rand = mulberry32(seedNumber);
+  const prevGlobalAlpha = ctx.globalAlpha ?? 1;
+
+  // Create a jagged blob silhouette (centered) to emulate a rock outline
+  const cx = size / 2;
+  const cy = size / 2;
+  const points = 8 + Math.floor(rand() * 6);
+  const outerR = size * 0.48;
+  const jagged = [];
+  for (let i = 0; i < points; i++) {
+    const ang = (i / points) * Math.PI * 2;
+    const r = outerR * (0.75 + rand() * 0.5); // vary radius
+    jagged.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r });
+  }
+
+  // Fill jagged blob with the base color so the rock takes the cell's color
+  ctx.beginPath();
+  jagged.forEach((p, i) =>
+    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
+  );
+  ctx.closePath();
+  ctx.fillStyle = baseColor;
+  ctx.globalAlpha = 1 * alpha;
+  ctx.fill();
+
+  // Stroke with a darker ring to emphasize the rock edge
+  ctx.lineWidth = Math.max(1, size * 0.04);
+  ctx.strokeStyle = adjustColor(baseColor, -0.35);
+  ctx.stroke();
+
+  // Clip to jagged blob so subsequent speckles sit inside the rock silhouette
+  ctx.save();
+  ctx.beginPath();
+  jagged.forEach((p, i) =>
+    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
+  );
+  ctx.closePath();
+  ctx.clip();
+
+  // blotches: a few soft, slightly lighter/darker blobs
+  const blotches = 6 + Math.floor(rand() * 6);
+  for (let i = 0; i < blotches; i++) {
+    const bx = cx + (rand() * 2 - 1) * outerR * 0.6;
+    const by = cy + (rand() * 2 - 1) * outerR * 0.5;
+    const br = (0.08 + rand() * 0.18) * size;
+    const shade = (rand() - 0.4) * 0.4; // slight variation
+    ctx.beginPath();
+    ctx.fillStyle = adjustColor(baseColor, shade);
+    ctx.globalAlpha = (0.55 + rand() * 0.35) * alpha;
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // speckles: small mineral flecks
+  const speckles = 18 + Math.floor(rand() * 36);
+  for (let i = 0; i < speckles; i++) {
+    const sx = cx + (rand() * 2 - 1) * outerR * 0.85;
+    const sy = cy + (rand() * 2 - 1) * outerR * 0.85;
+    const sr = Math.max(0.4, rand() * 1.8);
+    const shade = (rand() - 0.7) * 0.6;
+    ctx.beginPath();
+    ctx.fillStyle = adjustColor(baseColor, shade);
+    ctx.globalAlpha = 0.6 * rand() * alpha;
+    ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // subtle veins: short lines
+  const veins = 1 + Math.floor(rand() * 3);
+  ctx.lineWidth = Math.max(0.5, size * 0.01);
+  for (let v = 0; v < veins; v++) {
+    ctx.beginPath();
+    const sx = cx + (rand() * 2 - 1) * outerR * 0.5;
+    const sy = cy + (rand() * 2 - 1) * outerR * 0.5;
+    ctx.moveTo(sx, sy);
+    const segs = 2 + Math.floor(rand() * 3);
+    for (let s = 0; s < segs; s++) {
+      const nx = sx + (rand() - 0.5) * size * 0.25;
+      const ny = sy + (rand() - 0.5) * size * 0.25;
+      ctx.lineTo(nx, ny);
+    }
+    ctx.strokeStyle = adjustColor(baseColor, -0.28);
+    ctx.globalAlpha = 0.45 * rand() * alpha;
+    ctx.stroke();
+  }
+
+  // inner highlight to give a 'bouncy' stylized rock look (optional)
+  ctx.beginPath();
+  ctx.arc(cx - size * 0.08, cy - size * 0.12, outerR * 0.35, 0, Math.PI * 2);
+  ctx.fillStyle = adjustColor(baseColor, 0.28);
+  ctx.globalAlpha = 0.18 * alpha;
+  ctx.fill();
+
+  // restore alpha and clipping
+  ctx.restore();
+  ctx.globalAlpha = prevGlobalAlpha;
+};
 
 const GridCanvas = ({
   gridData,
@@ -43,6 +311,7 @@ const GridCanvas = ({
   };
   const [tooltipData, setTooltipData] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [fallenDebris, setFallenDebris] = useState([]);
   const hoverRafRef = useRef(null);
   const pendingHoverRef = useRef(null);
   // Cache for static grid during blast animation
@@ -50,8 +319,16 @@ const GridCanvas = ({
   const staticGridCacheParamsRef = useRef(null);
   // Merged offscreen cache for batch drawing the entire grid
   const gridRenderCacheRef = useRef(null);
+
+  const [blastCompleted, setBlastCompleted] = useState(false);
+  const isBlastRunningRef = useRef(false);
+
   const cellSpacing = cellGap; // spacing between cells in pixels
   const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
+
+  // Store current animation timeline for cleanup
+  const animationTimelineRef = useRef(null);
+  const animationStatesRef = useRef(null);
 
   // Helper: draw rounded rectangle path (does not fill/stroke)
   const drawRoundedRect = (ctx, x, y, width, height, radius = 6) => {
@@ -103,7 +380,7 @@ const GridCanvas = ({
         row.forEach((cell, x) => {
           const isAffected = affectedCells.some((c) => c.x === x && c.y === y);
 
-          if (!isAffected) {
+          if (!isAffected && cell) {
             const block = new OreBlock(cell, x, y, innerBlockSize);
             cacheCtx.save();
             cacheCtx.translate(
@@ -148,10 +425,13 @@ const GridCanvas = ({
             );
             const rockOffsetB = Math.round((innerBlockSize - rockSizeB) / 2);
             cacheCtx.translate(rockOffsetB, rockOffsetB);
+            const colorToUse = blastCompleted
+              ? "#808080"
+              : block.getBlockColor();
             drawRockTexture(
               cacheCtx,
               rockSizeB,
-              block.getBlockColor(),
+              colorToUse,
               seedB + colorHashB
             );
             cacheCtx.restore();
@@ -177,7 +457,7 @@ const GridCanvas = ({
 
       return cacheCanvas;
     },
-    [gridData, innerBlockSize, cellSpacing]
+    [gridData, innerBlockSize, cellSpacing, blastCompleted]
   );
 
   // Create OreBlock instances for each cell in the grid
@@ -249,11 +529,66 @@ const GridCanvas = ({
     if (gridData && gridData.grid) {
       blocksRef.current = createBlocks();
       setDestroyedCells([]);
+      setFallenDebris([]); // Clear fallen debris on reset
+      setBlastCompleted(false); // Reset blast state
+      // Clear gray caches
+      // blocksRef.current.forEach((b) => (b.grayCachedCanvas = null));
       console.log(
-        "Grid reset: blocks reinitalized and destroyed cells cleared"
+        "Grid reset: blocks reinitialized and destroyed cells cleared"
       );
     }
-  }, [gridData, createBlocks, fileResetKey]);
+  }, [fileResetKey]);
+
+  // Create gray caches when blast completes
+  useEffect(() => {
+    if (!blastCompleted || !blocksRef.current.length) return;
+
+    blocksRef.current.forEach((block) => {
+      const isAffected = destroyedCells.some(
+        (c) => c.x === block.gridX && c.y === block.gridY
+      );
+
+      if (
+        !isAffected &&
+        block.cell &&
+        block.cell.oreType &&
+        !block.grayCachedCanvas
+      ) {
+        const grayCanvas = document.createElement("canvas");
+        grayCanvas.width = innerBlockSize;
+        grayCanvas.height = innerBlockSize;
+        const gctx = grayCanvas.getContext("2d");
+
+        const rrad = Math.max(4, innerBlockSize * 0.12);
+        drawRoundedRect(gctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+        gctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        gctx.fill();
+
+        gctx.save();
+        drawRoundedRect(gctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+        gctx.clip();
+        const seed = (block.gridX * 73856093) ^ (block.gridY * 19349663);
+        const hash = "#808080"
+          .split("")
+          .reduce((acc, c) => acc + c.charCodeAt(0), 0);
+        const rockScale = 0.72;
+        const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
+        const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
+        gctx.translate(rockOffset, rockOffset);
+        drawRockTexture(gctx, rockSize, "#808080", seed + hash);
+        gctx.restore();
+
+        drawRoundedRect(gctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+        gctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+        gctx.lineWidth = 1.2;
+        gctx.stroke();
+
+        block.grayCachedCanvas = grayCanvas;
+      }
+    });
+
+    console.log("Gray caches created for unaffected blocks");
+  }, [blastCompleted, destroyedCells, innerBlockSize]);
 
   // Render all blocks on the canvas
   const renderCanvas = useCallback(() => {
@@ -263,189 +598,170 @@ const GridCanvas = ({
     const ctx = canvas.getContext("2d");
     const { grid } = gridData;
 
-    // Avoid accessing grid[0] if grid is empty
     const columns = grid[0]?.length || 0;
     const rows = grid.length;
-
-    if (columns === 0 || rows === 0) return; //stop if empty grid
+    if (columns === 0 || rows === 0) return;
 
     const actualGridWidth =
       grid[0].length * (innerBlockSize + cellSpacing) - cellSpacing;
     const actualGridHeight =
       grid.length * (innerBlockSize + cellSpacing) - cellSpacing;
-
     const offsetX = Math.floor((canvas.width - actualGridWidth) / 2);
     const offsetY = Math.floor((canvas.height - actualGridHeight) / 2);
 
-    // Clear & fill background
+    // 1. Clear & fill background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; // light gray background
+    ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Save the context state
-    ctx.save();
+    // --- START: NEW RENDER LOGIC ---
 
-    // FAST PATH: if we have a precomposed grid cache, draw it in one call.
-    if (gridRenderCacheRef.current) {
-      try {
-        // cache already contains the correct centering translation (created by createStaticGridCache)
-        ctx.drawImage(gridRenderCacheRef.current, 0, 0);
-      } catch {
-        // If the cache draw fails for any reason, clear cache and fall back to per-block rendering
-        gridRenderCacheRef.current = null;
-      }
-    } else {
-      // Translate to center the grid for per-block rendering
+    if (blastCompleted) {
+      // --- RENDER PATH 1: POST-BLAST STATE ---
+      // Draw the final state: a grayed-out grid with colored debris on top.
+
+      // A. Draw the grayed-out background grid
+      ctx.save();
       ctx.translate(offsetX, offsetY);
+      grid.forEach((row, y) => {
+        row.forEach((cell, x) => {
+          const renderX = x * (innerBlockSize + cellSpacing);
+          const renderY = y * (innerBlockSize + cellSpacing);
+          const rrad = Math.max(4, innerBlockSize * 0.12);
 
-      blocksRef.current.forEach((block) => {
-        const isDestroyed = destroyedCells.some(
-          (cell) => cell.x === block.gridX && cell.y === block.gridY
-        );
-
-        const renderX = block.gridX * (innerBlockSize + cellSpacing);
-        const renderY = block.gridY * (innerBlockSize + cellSpacing);
-
-        ctx.save();
-        ctx.translate(renderX, renderY);
-
-        // Draw faint grid with rounded corners
-        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-        ctx.lineWidth = 1.2;
-        const rx = 0;
-        const ry = 0;
-        const rrad = Math.max(4, innerBlockSize * 0.12);
-        // background fill
-        drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-        ctx.fill();
-
-        // If we have a cached canvas for this block and it's not destroyed, draw the cache
-        if (block.cachedCanvas && !isDestroyed) {
-          // Draw the cached pre-rendered block (already includes texture + border)
-          ctx.drawImage(block.cachedCanvas, 0, 0);
-        } else if (isDestroyed) {
-          // Simple destroyed block fallback (cheap)
-          ctx.fillStyle = "#9ca3af"; // gray
-          ctx.fillRect(0, 0, innerBlockSize, innerBlockSize);
-          ctx.strokeStyle = "rgba(0,0,0,0.12)";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(0, 0, innerBlockSize, innerBlockSize);
-        } else {
-          // Fallback: render procedurally when cache unavailable
           ctx.save();
-          drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-          ctx.clip();
-          const seedA = (block.gridX * 73856093) ^ (block.gridY * 19349663);
-          const colorHashA = (block.getBlockColor() || "#ffffff")
-            .split("")
-            .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-          const rockScale = 0.72;
-          const rockSize = Math.max(2, Math.round(innerBlockSize * rockScale));
-          const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
-          ctx.translate(rockOffset, rockOffset);
-          drawRockTexture(
-            ctx,
-            rockSize,
-            block.getBlockColor(),
-            seedA + colorHashA
-          );
-          ctx.restore();
-          drawRoundedRect(ctx, rx, ry, innerBlockSize, innerBlockSize, rrad);
-          ctx.stroke();
-        }
+          ctx.translate(renderX, renderY);
 
+          // Draw the empty grid slot background and border
+          drawRoundedRect(ctx, 0, 0, innerBlockSize, innerBlockSize, rrad);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          // If the cell still exists (was not destroyed), draw it in gray
+          if (cell) {
+            const seed = (x * 73856093) ^ (y * 19349663);
+            const colorHash = "#808080"
+              .split("")
+              .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+            const rockSize = Math.max(2, Math.round(innerBlockSize * 0.72));
+            const rockOffset = Math.round((innerBlockSize - rockSize) / 2);
+
+            ctx.save();
+            ctx.clip(); // Clip to the rounded rect of the slot
+            ctx.translate(rockOffset, rockOffset);
+            drawRockTexture(ctx, rockSize, "#808080", seed + colorHash);
+            ctx.restore();
+          }
+
+          ctx.restore();
+        });
+      });
+      ctx.restore(); // Restore from the grid's main translation
+
+      // B. Draw the colored fallen debris on top
+      fallenDebris.forEach((debris) => {
+        ctx.save();
+        ctx.translate(debris.x, debris.y);
+        ctx.rotate(debris.angle);
+        ctx.translate(-debris.width / 2, -debris.height / 2);
+
+        const seedDebris =
+          (debris.gridX * 73856093) ^ (debris.gridY * 19349663);
+        const colorHashDebris = (debris.color || "#ffffff")
+          .split("")
+          .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+
+        drawRockTexture(
+          ctx,
+          Math.max(2, debris.width),
+          debris.color,
+          seedDebris + colorHashDebris
+        );
         ctx.restore();
       });
+    } else {
+      // --- RENDER PATH 2: PRE-BLAST STATE ---
+      // Draw the normal, full-color grid with blast markers.
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+      blocksRef.current.forEach((block) => {
+        if (block.cachedCanvas && block.cell && block.cell.oreType) {
+          const renderX = block.gridX * (innerBlockSize + cellSpacing);
+          const renderY = block.gridY * (innerBlockSize + cellSpacing);
+          ctx.drawImage(block.cachedCanvas, renderX, renderY);
+        }
+      });
+
+      // Draw Blast Markers
+      blasts.forEach((blast) => {
+        const { x, y } = blast;
+        const centerX = x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+        const centerY = y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, innerBlockSize * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = "#dc2626";
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, innerBlockSize * 0.1, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+
+        if (blast.dirKey) {
+          const arrowLen = blockSize * 0.28;
+          const angleMap = {
+            left: Math.PI,
+            right: 0,
+            up: -Math.PI / 2,
+            down: Math.PI / 2,
+            "up-left": (-3 * Math.PI) / 4,
+            "up-right": -Math.PI / 4,
+            "down-right": Math.PI / 4,
+            "down-left": (3 * Math.PI) / 4,
+          };
+          const ang = angleMap[blast.dirKey] ?? 0;
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          ctx.rotate(ang);
+          ctx.beginPath();
+          ctx.moveTo(0, -arrowLen * 0.2);
+          ctx.lineTo(arrowLen, 0);
+          ctx.lineTo(0, arrowLen * 0.2);
+          ctx.closePath();
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
+        if (selectedBlast && selectedBlast.x === x && selectedBlast.y === y) {
+          ctx.beginPath();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "rgba(37, 99, 235, 0.9)";
+          ctx.arc(centerX, centerY, blockSize * 0.42, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      });
+      ctx.restore();
     }
 
-    // 2. Draw Blast Markers
-    blasts.forEach((blast) => {
-      const { x, y } = blast;
-
-      // Compute base center within the grid (without centering offset)
-      const baseCenterX =
-        x * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
-      const baseCenterY =
-        y * (innerBlockSize + cellSpacing) + innerBlockSize / 2;
-
-      // If we drew the precomposed cache (which already contains the offset), draw blasts at absolute coords
-      const centerX = gridRenderCacheRef.current
-        ? baseCenterX + offsetX
-        : baseCenterX;
-      const centerY = gridRenderCacheRef.current
-        ? baseCenterY + offsetY
-        : baseCenterY;
-
-      // Draw a red circle (blast icon)
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, innerBlockSize * 0.3, 0, Math.PI * 2); // Radius 30% of inner block size
-      ctx.fillStyle = "#dc2626"; // Red
-      ctx.fill();
-
-      // Optional: Add a white flash/dot for visibility
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, innerBlockSize * 0.1, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
-
-      // Draw direction overlay for this blast (small arrow) so users can see per-blast dirKey
-      if (blast.dirKey) {
-        const arrowLen = blockSize * 0.28;
-        const angleMap = {
-          left: Math.PI,
-          right: 0,
-          up: -Math.PI / 2,
-          down: Math.PI / 2,
-          "up-left": (-3 * Math.PI) / 4,
-          "up-right": -Math.PI / 4,
-          "down-right": Math.PI / 4,
-          "down-left": (3 * Math.PI) / 4,
-        };
-        const ang = angleMap[blast.dirKey] ?? 0;
-
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(ang);
-        ctx.beginPath();
-        ctx.moveTo(0, -arrowLen * 0.2);
-        ctx.lineTo(arrowLen, 0);
-        ctx.lineTo(0, arrowLen * 0.2);
-        ctx.closePath();
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.6)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // If this blast is selected, draw a selection ring
-      if (selectedBlast && selectedBlast.x === x && selectedBlast.y === y) {
-        ctx.beginPath();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "rgba(37, 99, 235, 0.9)"; // indigo-600
-        ctx.arc(centerX, centerY, blockSize * 0.42, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    });
-    // END NEW RENDERING LOGIC
-
-    // Restore the context state
-    ctx.restore();
-
-    console.debug(
-      `Canvas rendered: ${blocksRef.current.length} blocks, centered with offset (${offsetX}, ${offsetY})`
-    );
+    // --- END: NEW RENDER LOGIC ---
   }, [
     gridData,
     blasts,
-    destroyedCells,
     innerBlockSize,
     cellSpacing,
     blockSize,
     selectedBlast,
+    blastCompleted,
+    fallenDebris,
   ]);
+
   // Re-render when dependencies change
   useEffect(() => {
     renderCanvas();
@@ -463,6 +779,11 @@ const GridCanvas = ({
     try {
       // createStaticGridCache returns an offscreen canvas sized to match the main canvas
       gridRenderCacheRef.current = createStaticGridCache(destroyedCells || []);
+      console.log("Grid render cache rebuilt", {
+        blastCompleted,
+        destroyedCellsCount: destroyedCells?.length || 0,
+        cacheCreated: !!gridRenderCacheRef.current,
+      });
     } catch {
       gridRenderCacheRef.current = null;
     }
@@ -477,6 +798,7 @@ const GridCanvas = ({
     cellSpacing,
     canvasSize,
     createStaticGridCache,
+    blastCompleted,
   ]);
 
   // GridCanvas.jsx
@@ -555,6 +877,9 @@ const GridCanvas = ({
   // Click Handler
   const handleClick = useCallback(
     (event) => {
+      // this guard clause disables clicks during the animation.
+      if (isBlastRunningRef.current) return;
+
       if (!onBlockClick || !canvasRef.current) return;
 
       // Get canvas-relative click coordinates
@@ -680,6 +1005,9 @@ const GridCanvas = ({
 
   // Mouse Leave Handler
   const handleMouseLeave = useCallback(() => {
+    // this guard clause prevents clearing the canvas when the mouse leaves during an animation.
+    if (isBlastRunningRef.current) return;
+
     // cancel pending RAF and clear
     if (hoverRafRef.current) {
       cancelAnimationFrame(hoverRafRef.current);
@@ -694,7 +1022,8 @@ const GridCanvas = ({
   }, [renderCanvas]);
 
   // Add a ref to track if blast is already running
-  const isBlastRunningRef = useRef(false);
+  // const isBlastRunningRef = useRef(false);
+  const bodiesRef = useRef([]);
 
   useEffect(() => {
     if (!blastTrigger || !gridData || !gridData.grid || !gridData.grid.length)
@@ -751,7 +1080,7 @@ const GridCanvas = ({
       gravity: { x: 0, y: 0.6 }, // Reduced gravity from 0.8 to 0.6 for faster settling
     });
 
-    const runner = Runner.create();
+    // const runner = Runner.create();
 
     // Create boundary walls to contain debris
     const walls = createBoundaryWalls(canvasSize);
@@ -773,6 +1102,9 @@ const GridCanvas = ({
 
     // Add bodies to the world
     World.add(engine.world, bodies);
+
+    // Store bodies in ref so we can access them later with updated colors
+    bodiesRef.current = bodies;
 
     // Calculate blast centers in pixel coordinates and include dirKey for directional bias
     const uniqueCoords = [
@@ -810,6 +1142,21 @@ const GridCanvas = ({
 
     applyBlastForce(bodies, blastCenters, 0.02); // Reduce from 0.08 to 0.02 for more dramatic effect
 
+    console.log("📊 Capturing physics trajectories...");
+    const trajectories = capturePhysicsTrajectories(bodies, engine, 120);
+    console.log(`✅ Captured ${trajectories.length} trajectories`);
+
+    // Step 6: Reset bodies to original positions for animation
+    bodies.forEach((body) => {
+      const startPos = trajectories.find((t) => t.body.id === body.id)
+        ?.keyframes[0];
+      if (startPos) {
+        Body.setPosition(body, { x: startPos.x, y: startPos.y });
+        Body.setAngle(body, 0);
+        Body.setVelocity(body, { x: 0, y: 0 });
+        Body.setAngularVelocity(body, 0);
+      }
+    });
     // Set timeout to check blast results after simulation settles (5 seconds)
     setTimeout(() => {
       const recoveryY = canvas.height * 0.8;
@@ -846,6 +1193,9 @@ const GridCanvas = ({
         body.render.fillStyle = isDiluted ? "#FF0000" : "#00FF00";
       });
 
+      // Update the ref with the colored bodies so snapshot can use them
+      bodiesRef.current = bodies;
+
       // Calculate feedback
       const recovered = bodies.filter(
         (b) => b.render.fillStyle === "#00FF00"
@@ -879,14 +1229,6 @@ const GridCanvas = ({
       flashOpacity: 1,
     }));
 
-    // Start physics simulation
-    Runner.run(runner, engine);
-
-    console.debug(
-      "GridCanvas: runner started, bodies in world:",
-      engine.world.bodies.length
-    );
-
     // Pre-render static grid cache for faster animation rendering
     const staticGridCache = createStaticGridCache(affectedCells);
     staticGridCacheRef.current = staticGridCache;
@@ -906,6 +1248,16 @@ const GridCanvas = ({
     // so they disappear from the grid right away
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
+    console.log("🎨 Starting GSAP animation...");
+    const animationDuration = 2.5; // seconds
+    const { timeline, animStates } = animateBlastWithGSAP(
+      trajectories,
+      animationDuration
+    );
+
+    animationTimelineRef.current = timeline;
+    animationStatesRef.current = animStates;
+
     const startTime = performance.now();
 
     const duration = 9000;
@@ -920,7 +1272,8 @@ const GridCanvas = ({
           cancelAnimationFrame(animationFrame);
         }
         // Runner.stop(runner);
-        // cleanupPhysicsEngine(engine, null);
+        timeline.kill();
+        cleanupPhysicsEngine(engine, null);
         isBlastRunningRef.current = false; // Reset flag
         return;
       }
@@ -1178,31 +1531,36 @@ const GridCanvas = ({
       });
 
       // Render physics bodies (affected cells as debris) with motion trails 🔥
-      bodies.forEach((body) => {
-        const opacity = 1;
+      animStates.forEach((state) => {
+        const body = state.body;
+        const animPos = body.animatedPosition;
+
+        if (!animPos) return;
+
+        const opacity = Math.max(0, 1 - progress * 0.8);
 
         // Draw motion trail
-        if (body.velocity.x !== 0 || body.velocity.y !== 0) {
+        const velocityX = animPos.velocityX || 0;
+        const velocityY = animPos.velocityY || 0;
+
+        // Draw motion trail
+        if (velocityX !== 0 || velocityY !== 0) {
           ctx.save();
-          ctx.globalAlpha = opacity * 0.5;
-          ctx.globalAlpha = opacity * 0.5;
+          ctx.globalAlpha = opacity * 0.05;
           ctx.strokeStyle = body.render.fillStyle;
-          ctx.lineWidth = blockSize * 0.8;
-          ctx.lineWidth = blockSize * 0.8;
+          ctx.lineWidth = blockSize * 0.4;
+          ctx.lineWidth = blockSize * 0.5;
           ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(body.position.x, body.position.y);
-          ctx.lineTo(
-            body.position.x - body.velocity.x * 2,
-            body.position.y - body.velocity.y * 2
-          );
+          ctx.lineTo(animPos.x - velocityX * 2, animPos.y - velocityY * 2);
           ctx.stroke();
           ctx.restore();
         }
 
         // Draw debris block
         ctx.save();
-        ctx.translate(body.position.x, body.position.y);
+        ctx.translate(animPos.x, animPos.y);
         ctx.rotate(body.angle);
 
         // Draw debris as a rock-shaped piece using the same procedural texture
@@ -1245,29 +1603,64 @@ const GridCanvas = ({
         }
 
         // Stop physics simulation and cleanup
-        // Runner.stop(runner);
-        // cleanupPhysicsEngine(engine, null);
-        Runner.stop(runner);
-        World.clear(engine.world);
-        Engine.clear(engine);
+        timeline.kill();
+        cleanupPhysicsEngine(engine, null);
+        staticGridCacheRef.current = null;
+        staticGridCacheParamsRef.current = null;
+        animationTimelineRef.current = null;
+        animationStatesRef.current = null;
 
         // Clear cache immediately when animation completes to prevent next blast interference
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
 
-        // destroyedCells were marked at start of blast; no need to set again here
-
-        // Allow time for destroyed cells to render before completion callback
-        // setTimeout(() => {
-        //   isBlastRunningRef.current = false; // Reset flag BEFORE callback
-        //   console.log("Blast animation completed");
-        //   onBlastComplete?.();
-        // }, 10000);
-
         isBlastRunningRef.current = false;
-        console.log("Blast animation completed");
+        setBlastCompleted(true);
 
-        // Call the completion callback
+        // Save fallen debris positions WITH their final colors (green/red)
+        // Use bodiesRef which has been updated with colors from the recovery timeout
+        // const debrisSnapshot = bodiesRef.current.map((body) => ({
+        //   x: body.position.x,
+        //   y: body.position.y,
+        //   angle: body.angle,
+        //   width: innerBlockSize * 0.8,
+        //   height: innerBlockSize * 0.8,
+        //   color: body.render?.fillStyle || "#999999",
+        //   gridX: body.gridX,
+        //   gridY: body.gridY,
+        //   oreType: body.oreType,
+        // }));
+
+        const debrisSnapshot = trajectories.map((trajectory) => {
+          const finalState =
+            trajectory.keyframes[trajectory.keyframes.length - 1];
+          // Find the corresponding body in bodiesRef to get its final calculated color
+          const bodyWithColor = bodiesRef.current.find(
+            (b) => b.id === trajectory.body.id
+          );
+
+          return {
+            x: finalState.x, // Use the final X from the trajectory
+            y: finalState.y, // Use the final Y from the trajectory
+            angle: finalState.angle, // Use the final angle
+            width: innerBlockSize * 0.8,
+            height: innerBlockSize * 0.8,
+            color: bodyWithColor?.render?.fillStyle || "#999999", // Get color from the body
+            gridX: trajectory.body.gridX,
+            gridY: trajectory.body.gridY,
+            oreType: trajectory.body.oreType,
+          };
+        });
+
+        setFallenDebris(debrisSnapshot);
+
+        // Invalidate grid cache to trigger rebuild with gray colors
+        gridRenderCacheRef.current = null;
+
+        console.log("Blast animation completed", {
+          debrisCount: debrisSnapshot.length,
+          blastCompletedSet: true,
+        });
         if (onBlastComplete) onBlastComplete();
       }
     };
@@ -1278,24 +1671,16 @@ const GridCanvas = ({
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }
-
-      // setTimeout(() => {
-      //   onBlastComplete();
-      //   // Runner.stop(runner);
-      //   // cleanupPhysicsEngine(engine, null);
-      //   isBlastRunningRef.current = false; // Reset on cleanup
-
-      //   // Clear the static grid cache refs to prevent interference with next blast
-      //   staticGridCacheRef.current = null;
-      //   staticGridCacheParamsRef.current = null;
-      // }, 6000);
-
-      // Stop any Matter.js processes that might still be running if the component unmounts mid-animation
-      Runner.stop(runner);
-      World.clear(engine.world);
-      Engine.clear(engine);
+      if (timeline) timeline.kill();
+      cleanupPhysicsEngine(engine, null);
+      isBlastRunningRef.current = false;
+      staticGridCacheRef.current = null;
+      staticGridCacheParamsRef.current = null;
+      animationTimelineRef.current = null;
+      animationStatesRef.current = null;
 
       isBlastRunningRef.current = false;
+      bodiesRef.current = [];
 
       staticGridCacheRef.current = null;
       staticGridCacheParamsRef.current = null;
@@ -1311,6 +1696,7 @@ const GridCanvas = ({
     blasts,
     createStaticGridCache,
     addRecoveryRecordToGameContext,
+    renderCanvas,
   ]);
 
   if (!gridData) {

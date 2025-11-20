@@ -442,6 +442,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     // also clear next-placement ref
     if (nextPlacementDirRef) nextPlacementDirRef.current = null;
 
+    // this line trigger the reset effect in GridCanvas.jsx
+    setFileResetKey((prevKey) => prevKey + 1);
+
     console.log("Canvas reset to original state");
   };
 
