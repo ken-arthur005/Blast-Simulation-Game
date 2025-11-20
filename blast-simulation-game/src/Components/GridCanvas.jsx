@@ -10,168 +10,7 @@ import {
 import { gsap } from "gsap";
 import OreValueMapper from "../utils/oreValueMapper";
 import GridTooltip from "./GridTooltip";
-
-// Helper utilities (module-level so identity is stable across renders)
-// Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
-const mulberry32 = (a) => {
-  return function () {
-    let t = (a += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
-
-const hexToRgb = (hex) => {
-  // Defensive: if not provided or not a string, return a neutral gray
-  if (!hex || typeof hex !== "string") return { r: 200, g: 200, b: 200 };
-  const h = hex.replace("#", "").trim();
-  // If it's already an rgb(...) string, try to parse numbers
-  if (h.startsWith("rgb")) {
-    const nums = h
-      .replace(/[^0-9,.-]/g, "")
-      .split(",")
-      .map(Number);
-    if (nums.length >= 3 && nums.every((n) => !Number.isNaN(n))) {
-      return { r: nums[0], g: nums[1], b: nums[2] };
-    }
-    return { r: 200, g: 200, b: 200 };
-  }
-
-  // Fallback for hex parsing
-  const bigint = parseInt(h, 16);
-  if (!Number.isNaN(bigint) && (h.length === 6 || h.length === 3)) {
-    if (h.length === 6) {
-      return {
-        r: (bigint >> 16) & 255,
-        g: (bigint >> 8) & 255,
-        b: bigint & 255,
-      };
-    }
-    // short hex like 'abc' -> 'aabbcc'
-    const r = parseInt(h[0] + h[0], 16);
-    const g = parseInt(h[1] + h[1], 16);
-    const b = parseInt(h[2] + h[2], 16);
-    return { r, g, b };
-  }
-
-  // fallback
-  return { r: 200, g: 200, b: 200 };
-};
-
-const rgbToHex = (r, g, b) => {
-  const toHex = (v) => {
-    const h = Math.max(0, Math.min(255, Math.round(v))).toString(16);
-    return h.length === 1 ? "0" + h : h;
-  };
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-};
-
-const adjustColor = (hex, factor) => {
-  const { r, g, b } = hexToRgb(hex);
-  return rgbToHex(r * (1 + factor), g * (1 + factor), b * (1 + factor));
-};
-
-// Draw a simple rock-like texture inside current origin (0,0) sized to (size)
-// baseColor is a hex string, seedNumber is a deterministic seed per cell
-const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
-  const rand = mulberry32(seedNumber);
-  const prevGlobalAlpha = ctx.globalAlpha ?? 1;
-
-  // Create a jagged blob silhouette (centered) to emulate a rock outline
-  const cx = size / 2;
-  const cy = size / 2;
-  const points = 8 + Math.floor(rand() * 6);
-  const outerR = size * 0.48;
-  const jagged = [];
-  for (let i = 0; i < points; i++) {
-    const ang = (i / points) * Math.PI * 2;
-    const r = outerR * (0.75 + rand() * 0.5); // vary radius
-    jagged.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r });
-  }
-
-  // Fill jagged blob with the base color so the rock takes the cell's color
-  ctx.beginPath();
-  jagged.forEach((p, i) =>
-    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
-  );
-  ctx.closePath();
-  ctx.fillStyle = baseColor;
-  ctx.globalAlpha = 1 * alpha;
-  ctx.fill();
-
-  // Stroke with a darker ring to emphasize the rock edge
-  ctx.lineWidth = Math.max(1, size * 0.04);
-  ctx.strokeStyle = adjustColor(baseColor, -0.35);
-  ctx.stroke();
-
-  // Clip to jagged blob so subsequent speckles sit inside the rock silhouette
-  ctx.save();
-  ctx.beginPath();
-  jagged.forEach((p, i) =>
-    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
-  );
-  ctx.closePath();
-  ctx.clip();
-
-  // blotches: a few soft, slightly lighter/darker blobs
-  const blotches = 6 + Math.floor(rand() * 6);
-  for (let i = 0; i < blotches; i++) {
-    const bx = cx + (rand() * 2 - 1) * outerR * 0.6;
-    const by = cy + (rand() * 2 - 1) * outerR * 0.5;
-    const br = (0.08 + rand() * 0.18) * size;
-    const shade = (rand() - 0.4) * 0.4; // slight variation
-    ctx.beginPath();
-    ctx.fillStyle = adjustColor(baseColor, shade);
-    ctx.globalAlpha = (0.55 + rand() * 0.35) * alpha;
-    ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // speckles: small mineral flecks
-  const speckles = 18 + Math.floor(rand() * 36);
-  for (let i = 0; i < speckles; i++) {
-    const sx = cx + (rand() * 2 - 1) * outerR * 0.85;
-    const sy = cy + (rand() * 2 - 1) * outerR * 0.85;
-    const sr = Math.max(0.4, rand() * 1.8);
-    const shade = (rand() - 0.7) * 0.6;
-    ctx.beginPath();
-    ctx.fillStyle = adjustColor(baseColor, shade);
-    ctx.globalAlpha = 0.6 * rand() * alpha;
-    ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // subtle veins: short lines
-  const veins = 1 + Math.floor(rand() * 3);
-  ctx.lineWidth = Math.max(0.5, size * 0.01);
-  for (let v = 0; v < veins; v++) {
-    ctx.beginPath();
-    const sx = cx + (rand() * 2 - 1) * outerR * 0.5;
-    const sy = cy + (rand() * 2 - 1) * outerR * 0.5;
-    ctx.moveTo(sx, sy);
-    const segs = 2 + Math.floor(rand() * 3);
-    for (let s = 0; s < segs; s++) {
-      const nx = sx + (rand() - 0.5) * size * 0.25;
-      const ny = sy + (rand() - 0.5) * size * 0.25;
-      ctx.lineTo(nx, ny);
-    }
-    ctx.strokeStyle = adjustColor(baseColor, -0.28);
-    ctx.globalAlpha = 0.45 * rand() * alpha;
-    ctx.stroke();
-  }
-
-  // inner highlight to give a 'bouncy' stylized rock look (optional)
-  ctx.beginPath();
-  ctx.arc(cx - size * 0.08, cy - size * 0.12, outerR * 0.35, 0, Math.PI * 2);
-  ctx.fillStyle = adjustColor(baseColor, 0.28);
-  ctx.globalAlpha = 0.18 * alpha;
-  ctx.fill();
-
-  // restore alpha and clipping
-  ctx.restore();
-  ctx.globalAlpha = prevGlobalAlpha;
-};
+import { drawRockTexture } from "../utils/rockTextureUtils";
 
 const GridCanvas = ({
   gridData,
@@ -193,7 +32,15 @@ const GridCanvas = ({
   // Use a ref for hover to avoid frequent React state updates on mousemove
   const hoveredBlockRef = useRef(null);
   const [destroyedCells, setDestroyedCells] = useState([]);
-  // Tooltip state
+  // Tooltip state - disable on mobile devices based on screen width and user agent
+  const isMobileDevice = () => {
+    const userAgent =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+    const smallScreen = window.innerWidth < 768;
+    return userAgent || smallScreen;
+  };
   const [tooltipData, setTooltipData] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const hoverRafRef = useRef(null);
@@ -791,8 +638,8 @@ const GridCanvas = ({
       const gridCoords = getGridCoords(pixelX, pixelY);
       pendingHoverRef.current = gridCoords || null;
 
-      // Update tooltip data
-      if (gridCoords && gridData?.grid) {
+      // Update tooltip data - skip on mobile devices
+      if (!isMobileDevice() && gridCoords && gridData?.grid) {
         const cell = gridData.grid[gridCoords.y]?.[gridCoords.x];
         if (cell) {
           setTooltipData({
@@ -1065,8 +912,6 @@ const GridCanvas = ({
     const shockwaveDuration = 350; // shockwave expansion duration (ms)
     const flashDuration = 100; // flash fade duration (ms)
     let animationFrame;
-
-    const timeoutDuration = 9000; // Total duration of the animation
 
     const animatePhysics = (time) => {
       // Safety check - if grid data is gone, stop animation

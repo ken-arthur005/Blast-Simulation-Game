@@ -11,32 +11,40 @@ const GridInfo = ({ gridData, blockSize, canvasSize, className = "" }) => {
   const { dimensions, metadata } = gridData;
 
   return (
-    <div className={`mb-4 text-sm text-[#E5E4E2] ${className}`}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div
+      className={`mb-2 md:mb-4 text-xs md:text-sm text-[#E5E4E2] ${className}`}
+    >
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <div>
-          <span className="font-medium">Grid Size:</span>
+          <span className="font-medium text-xs md:text-sm">Grid Size:</span>
           <br />
-          {dimensions.width} × {dimensions.height}
+          <span className="text-xs md:text-sm">
+            {dimensions.width} × {dimensions.height}
+          </span>
         </div>
         <div>
-          <span className="font-medium">Total Blocks:</span>
+          <span className="font-medium text-xs md:text-sm">Total Blocks:</span>
           <br />
-          {metadata.totalBlocks.toLocaleString()}
+          <span className="text-xs md:text-sm">
+            {metadata.totalBlocks.toLocaleString()}
+          </span>
         </div>
         <div>
-          <span className="font-medium">Ore Types:</span>
+          <span className="font-medium text-xs md:text-sm">Ore Types:</span>
           <br />
-          {metadata.oreTypes.length}
+          <span className="text-xs md:text-sm">{metadata.oreTypes.length}</span>
         </div>
         <div>
-          <span className="font-medium ">Block Size:</span>
+          <span className="font-medium text-xs md:text-sm">Block Size:</span>
           <br />
-          {blockSize}px
+          <span className="text-xs md:text-sm">{blockSize}px</span>
         </div>
       </div>
-      <div className="mt-2 ">
-        <span className="font-medium ">Canvas Size:</span> {canvasSize.width} ×{" "}
-        {canvasSize.height}
+      <div className="mt-2 text-xs md:text-sm">
+        <span className="font-medium">Canvas Size:</span>{" "}
+        <span className="text-xs md:text-sm">
+          {canvasSize.width} × {canvasSize.height}
+        </span>
       </div>
     </div>
   );

@@ -25,7 +25,7 @@ export const calculateTooltipPosition = (
   const isTopSide = mouseY < viewportHeight / 2;
 
   if (isLeftSide) {
-    left = tooltipWidth + offset - mouseX;
+    left = tooltipWidth + offset - mouseX ;
     if (left < edgeMargin) {
       left = edgeMargin;
     }

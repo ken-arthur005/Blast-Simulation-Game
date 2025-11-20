@@ -16,6 +16,7 @@ import {
   applyBlastToGrid,
 } from "../utils/blastCalculator";
 import BlastResults from "./BlastResults";
+import Toast from "./Toast";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const { addRecoveryRecord } = useContext(GameContext);
@@ -48,6 +49,12 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   // can be applied to that blast even if React state hasn't updated selectedBlast yet.
   const lastPlacedRef = useRef(null);
   const [showBlastResults, setShowBlastResults] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = "error") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
   const handleCloseBlastResults = () => setShowBlastResults(false);
   const handleOpenBlastResults = () => setShowBlastResults(true);
 
@@ -193,17 +200,28 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const calculateOptimalSizing = useCallback((processedGrid) => {
     const { dimensions } = processedGrid;
 
-    const preferredWidth = 576;
-    const preferredHeight = 456;
+    // Detect mobile device
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      ) || window.innerWidth < 768;
+
+    // Use smaller preferred sizes for mobile, larger for desktop
+    const preferredWidth = isMobile
+      ? Math.min(window.innerWidth - 40, 360)
+      : 576;
+    const preferredHeight = isMobile
+      ? Math.min(window.innerHeight * 0.5, 400)
+      : 456;
 
     // Calculate what block size would be needed for preferred size
     const blockSizeByWidth = Math.floor(preferredWidth / dimensions.width);
     const blockSizeByHeight = Math.floor(preferredHeight / dimensions.height);
     let blockSize = Math.min(blockSizeByWidth, blockSizeByHeight);
 
-    // Size constraints for readability
-    const minBlockSize = 6;
-    const maxBlockSize = 80;
+    // Size constraints for readability - make blocks significantly bigger on mobile for thumb-friendly touch targets
+    const minBlockSize = isMobile ? 35 : 6;
+    const maxBlockSize = isMobile ? 60 : 80;
 
     if (blockSize < minBlockSize || blockSize > maxBlockSize) {
       // Fall back to adaptive sizing if fixed size doesn't work well
@@ -283,6 +301,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       // Check if we've reached the maximum number of blasts
       if (gameState.blasts.length >= MAX_BLASTS) {
         console.log(`Maximum number of blasts (${MAX_BLASTS}) reached.`);
+        showToast(
+          `Maximum number of explosives that can be placed is ${MAX_BLASTS}`,
+          "error"
+        );
         return;
       }
 
@@ -459,9 +481,18 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
   return (
     <div className="w-full min-h-screen relative">
-      {/* center container */}
-      <div className="absolute left-1/2 transform -translate-x-1/2  max-w-[70%]">
-        <h2 className="text-xl font-bold mb-4">2D Ore Grid Visualization</h2>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+      {/* center container - responsive layout */}
+      <div className="md:absolute md:left-1/2 md:transform md:-translate-x-1/2 md:max-w-[70%]  px-2 md:px-0">
+        <h2 className="text-base md:text-xl font-bold mb-2 md:mb-4  md:text-left text-amber-500">
+          2D Ore Grid Visualization
+        </h2>
 
         {/* Grid Information */}
         <GridInfo
@@ -471,23 +502,37 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         />
 
         {/* Canvas */}
-        <GridCanvas
-          gridData={gridData}
-          canvasSize={canvasSize}
-          blockSize={blockSize}
-          blasts={gameState.blasts}
-          selectedBlast={selectedBlast}
-          onBlockClick={handleCellClick}
-          blastTrigger={blastTrigger}
-          onBlastComplete={handleBlastComplete}
-          fileResetKey={fileResetKey}
-          addRecoveryRecordToGameContext={addRecoveryRecord}
-        />
+        <div className="flex justify-center">
+          <GridCanvas
+            gridData={gridData}
+            canvasSize={canvasSize}
+            blockSize={blockSize}
+            blasts={gameState.blasts}
+            selectedBlast={selectedBlast}
+            onBlockClick={handleCellClick}
+            blastTrigger={blastTrigger}
+            onBlastComplete={handleBlastComplete}
+            fileResetKey={fileResetKey}
+            addRecoveryRecordToGameContext={addRecoveryRecord}
+          />
+        </div>
+
+        {/* Mobile: Show buttons beneath canvas */}
+        <div className="md:hidden mt-4">
+          <GridLegend
+            oreTypes={gridData.metadata.oreTypes}
+            onTriggerBlast={handleTriggerBlast}
+            resetCanvas={handleCanvasReset}
+            isBlasting={isBlasting}
+            selectedBlast={selectedBlast}
+            onSelectDirection={onSelectDirection}
+          />
+        </div>
       </div>
 
-      {/* Legend */}
+      {/* Desktop: Legend on right side */}
       <div
-        className="absolute top-8 right-4 w-66 z-50"
+        className="hidden md:block absolute top-8 right-4 w-66 z-50"
         style={{ zIndex: 50, pointerEvents: "auto" }}
       >
         <GridLegend
