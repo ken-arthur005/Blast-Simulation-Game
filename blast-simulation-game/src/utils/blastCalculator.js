@@ -66,7 +66,7 @@ export function applyBlastToGrid(grid, affectedCells) {
   if (!Array.isArray(grid)) return grid;
   if (!Array.isArray(affectedCells) || affectedCells.length === 0) {
     // return deep copy to avoid accidental mutation elsewhere
-    return grid.map(row => row.map(cell => ({ ...cell })));
+    return grid.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
   }
 
   const hitSet = new Set(affectedCells.map(c => `${c.x},${c.y}`));
@@ -76,11 +76,11 @@ export function applyBlastToGrid(grid, affectedCells) {
     row.map((cell, x) => {
       const key = `${x},${y}`;
       if (hitSet.has(key)) {
-        // Return a new object with oreType marked destroyed
-        return { ...(cell || {}), oreType: "destroyed" };
+        // Instead of marking as destroyed, set the cell to null to remove it.
+        return null;
       }
-      // Return a shallow clone to preserve immutability guarantees
-      return { ...(cell || {}) };
+      // Return a clone of the existing cell if it's not null.
+      return cell ? { ...cell } : null;
     })
   );
 
