@@ -1248,7 +1248,7 @@ const GridCanvas = ({
     // so they disappear from the grid right away
     setDestroyedCells((prev) => [...prev, ...affectedCells]);
 
-    console.log("🎨 Starting GSAP animation...");
+    console.log(" Starting GSAP animation...");
     const animationDuration = 2.5; // seconds
     const { timeline, animStates } = animateBlastWithGSAP(
       trajectories,
@@ -1258,11 +1258,35 @@ const GridCanvas = ({
     animationTimelineRef.current = timeline;
     animationStatesRef.current = animStates;
 
+  
+    // After GSAP animation ends, keep syncing animatedPosition with physics positions
+    let physicsSyncTicker = null;
+    timeline.eventCallback("onComplete", () => {
+      console.log("GSAP animation complete - switching to physics-driven rendering");
+      
+      // Create a ticker function that updates animatedPosition from physics
+      physicsSyncTicker = () => {
+        animStates.forEach((state) => {
+          // Sync visual position with physics position
+          state.body.animatedPosition = {
+            x: state.body.position.x,
+            y: state.body.position.y,
+            angle: state.body.angle,
+            velocityX: state.body.velocity.x,
+            velocityY: state.body.velocity.y
+          };
+        });
+      };
+      
+      // Add ticker to GSAP's global ticker (runs every frame)
+      gsap.ticker.add(physicsSyncTicker);
+    });
+
     const startTime = performance.now();
 
     const duration = 9000;
-    const shockwaveDuration = 350; // shockwave expansion duration (ms)
-    const flashDuration = 100; // flash fade duration (ms)
+    const shockwaveDuration = 350; 
+    const flashDuration = 100; 
     let animationFrame;
 
     const animatePhysics = (time) => {
@@ -1283,6 +1307,25 @@ const GridCanvas = ({
       const shockwaveProgress = Math.min(elapsed / shockwaveDuration, 1);
       const flashProgress = Math.min(elapsed / flashDuration, 1);
 
+      Engine.update(engine, 1000 / 60);
+  
+  // During GSAP animation phase (first 3s): sync physics bodies to GSAP positions
+      if (elapsed < 3000) {
+        animStates.forEach((state) => {
+          const animPos = state.body.animatedPosition;
+          if (animPos) {
+            // Override physics positions with GSAP animated positions
+            Body.setPosition(state.body, { x: animPos.x, y: animPos.y });
+            Body.setAngle(state.body, animPos.angle);
+            //  Apply some velocity for momentum carry-over
+            Body.setVelocity(state.body, { 
+              x: state.animVelocityX * 0.5, 
+              y: state.animVelocityY * 0.5 
+            });
+          }
+        });
+      }
+
       // Clear canvas with background
       ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
       // ctx.fillStyle = "#f0f0f0";
@@ -1298,13 +1341,11 @@ const GridCanvas = ({
         }
       }
 
-      // Draw affected cells at their original grid positions
-      // (the debris bodies are flying around, but we show fading ores for visual continuity)
+     
       ctx.save();
       ctx.translate(offsetX, offsetY);
 
-      // Only show affected cells at the very start of blast (first 3ms)
-      // then hide them to let debris take center stage
+    
       if (elapsed < 3) {
         affectedCells.forEach((cell) => {
           const block = new OreBlock(
@@ -1533,9 +1574,16 @@ const GridCanvas = ({
       // Render physics bodies (affected cells as debris) with motion trails 🔥
       animStates.forEach((state) => {
         const body = state.body;
-        const animPos = body.animatedPosition;
-
-        if (!animPos) return;
+          // Use GSAP position during animation phase, physics position after
+        const animPos = body.animatedPosition || {
+          x: body.position.x,      // ← Fallback to actual physics position
+          y: body.position.y,
+          angle: body.angle,
+          velocityX: body.velocity.x,
+          velocityY: body.velocity.y
+        };
+        
+        // if (!animPos) return;
 
         const opacity = Math.max(0, 1 - progress * 0.8);
 
@@ -1604,6 +1652,12 @@ const GridCanvas = ({
 
         // Stop physics simulation and cleanup
         timeline.kill();
+        
+        if (physicsSyncTicker) {
+          gsap.ticker.remove(physicsSyncTicker);
+          physicsSyncTicker = null;
+        }
+        
         cleanupPhysicsEngine(engine, null);
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
@@ -1672,6 +1726,12 @@ const GridCanvas = ({
         cancelAnimationFrame(animationFrame);
       }
       if (timeline) timeline.kill();
+      
+    
+      if (physicsSyncTicker) {
+        gsap.ticker.remove(physicsSyncTicker);
+      }
+      
       cleanupPhysicsEngine(engine, null);
       isBlastRunningRef.current = false;
       staticGridCacheRef.current = null;
