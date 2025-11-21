@@ -10,7 +10,9 @@ import {
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
 import OreValueMapper from "../utils/oreValueMapper";
+import GridTooltip from "./GridTooltip";
 
+// Helper function to capture physics trajectories for GSAP animation
 const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
   const trajectories = new Map();
 
@@ -298,6 +300,17 @@ const GridCanvas = ({
   // Use a ref for hover to avoid frequent React state updates on mousemove
   const hoveredBlockRef = useRef(null);
   const [destroyedCells, setDestroyedCells] = useState([]);
+  // Tooltip state - disable on mobile devices based on screen width and user agent
+  const isMobileDevice = () => {
+    const userAgent =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+    const smallScreen = window.innerWidth < 768;
+    return userAgent || smallScreen;
+  };
+  const [tooltipData, setTooltipData] = useState(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [fallenDebris, setFallenDebris] = useState([]);
   const hoverRafRef = useRef(null);
   const pendingHoverRef = useRef(null);
@@ -937,8 +950,8 @@ const GridCanvas = ({
 
   const handleMouseMove = useCallback(
     (event) => {
-      // this guard clause disables the entire hover effect during the animation.
-      if (isBlastRunningRef.current) return;
+      // Update mouse position for tooltip
+      setMousePosition({ x: event.clientX, y: event.clientY });
 
       // Throttle hover updates via requestAnimationFrame to reduce full-canvas redraws
       const rect = canvasRef.current.getBoundingClientRect();
@@ -949,6 +962,22 @@ const GridCanvas = ({
 
       const gridCoords = getGridCoords(pixelX, pixelY);
       pendingHoverRef.current = gridCoords || null;
+
+      // Update tooltip data - skip on mobile devices
+      if (!isMobileDevice() && gridCoords && gridData?.grid) {
+        const cell = gridData.grid[gridCoords.y]?.[gridCoords.x];
+        if (cell) {
+          setTooltipData({
+            cell,
+            gridX: gridCoords.x,
+            gridY: gridCoords.y,
+          });
+        } else {
+          setTooltipData(null);
+        }
+      } else {
+        setTooltipData(null);
+      }
 
       if (hoverRafRef.current) return;
       hoverRafRef.current = requestAnimationFrame(() => {
@@ -971,7 +1000,7 @@ const GridCanvas = ({
         hoverRafRef.current = null;
       });
     },
-    [getGridCoords, renderCanvas, drawHoverOverlay]
+    [getGridCoords, renderCanvas, drawHoverOverlay, gridData]
   ); // Dependency on 'getGridCoords' and 'hoveredBlock'
 
   // Mouse Leave Handler
@@ -986,6 +1015,8 @@ const GridCanvas = ({
     }
     pendingHoverRef.current = null;
     hoveredBlockRef.current = null;
+    // Clear tooltip
+    setTooltipData(null);
     // re-render base canvas to clear overlays
     renderCanvas();
   }, [renderCanvas]);
@@ -1257,8 +1288,6 @@ const GridCanvas = ({
     const shockwaveDuration = 350; 
     const flashDuration = 100; 
     let animationFrame;
-
-   
 
     const animatePhysics = (time) => {
       // Safety check - if grid data is gone, stop animation
@@ -1742,37 +1771,47 @@ const GridCanvas = ({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative flex items-center justify-center ${className}`}
-      style={{
-        width: canvasSize.width,
-        height: canvasSize.height,
-        borderRadius: "20px",
-        backdropFilter: "blur(12px)",
-        background: "rgba(255, 255, 255, 0.15)",
-        border: "2px solid rgba(255, 255, 255, 0.3)",
-        boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-        padding: "10px",
-        overflow: "hidden", // clip canvas to rounded container so textures can't escape
-        boxSizing: "border-box",
-      }}
-    >
-      <canvas
-        ref={canvasRef}
-        width={canvasSize.width}
-        height={canvasSize.height}
+    <>
+      <div
+        ref={containerRef}
+        className={`relative flex items-center justify-center ${className}`}
         style={{
-          display: "block",
-          width: "100%",
-          height: "100%",
-          borderRadius: "inherit",
+          width: canvasSize.width,
+          height: canvasSize.height,
+          borderRadius: "20px",
+          backdropFilter: "blur(12px)",
+          background: "rgba(255, 255, 255, 0.15)",
+          border: "2px solid rgba(255, 255, 255, 0.3)",
+          boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
+          padding: "10px",
+          overflow: "hidden", // clip canvas to rounded container so textures can't escape
+          boxSizing: "border-box",
         }}
-        onClick={handleClick}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
+      >
+        <canvas
+          ref={canvasRef}
+          width={canvasSize.width}
+          height={canvasSize.height}
+          style={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            borderRadius: "inherit",
+          }}
+          onClick={handleClick}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        />
+      </div>
+      <GridTooltip
+        cell={tooltipData?.cell}
+        gridX={tooltipData?.gridX}
+        gridY={tooltipData?.gridY}
+        mouseX={mousePosition.x}
+        mouseY={mousePosition.y}
+        visible={!!tooltipData}
       />
-    </div>
+    </>
   );
 };
 
