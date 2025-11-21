@@ -10,6 +10,7 @@ import {
 } from "../utils/physicsEngine";
 import { gsap } from "gsap";
 import OreValueMapper from "../utils/oreValueMapper";
+import scoringLogic from "../utils/scoringLogic";
 
 const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
   const trajectories = new Map();
@@ -291,6 +292,7 @@ const GridCanvas = ({
   selectedBlast = null,
   fileResetKey = 0, // Trigger to force cleanup when new file is uploaded
   addRecoveryRecordToGameContext,
+  updateScore,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -1166,8 +1168,12 @@ const GridCanvas = ({
       bodiesRef.current = bodies;
 
       // Calculate feedback
+      const totalOres = bodies.length;
       const recovered = bodies.filter(
         (b) => b.render.fillStyle === "#00FF00"
+      ).length;
+      const diluted = bodies.filter(
+        (b) => b.render.fillStyle === "#FF0000"
       ).length;
       const totalValue = bodies.reduce(
         (sum, b) => sum + OreValueMapper.getValue(b.oreType),
@@ -1178,15 +1184,27 @@ const GridCanvas = ({
         .reduce((sum, b) => sum + OreValueMapper.getValue(b.oreType), 0);
       const efficiency =
         totalValue > 0 ? Math.round((recoveredValue / totalValue) * 100) : 0;
+      
       console.log(
         `Recovery Info:
-        recoveredCount: (recovered: ${recovered} efficiency: ${efficiency})
+        Total: ${totalOres}, Recovered: ${recovered}, Diluted: ${diluted}, Efficiency: ${efficiency}%
         `
       );
 
+      // Calculate final score using scoringLogic
+      const scoreResult = scoringLogic(totalOres, recovered, diluted, 10);
+      console.log('📊 Score calculated:', scoreResult.finalScore);
+
+      // Update the game score
+      if (updateScore) {
+        updateScore(scoreResult.finalScore);
+      }
+
       // This is the where I called addRecoveryRecord() in GameContext.jsx at.
       addRecoveryRecordToGameContext({
+        totalOres: totalOres,
         recoveredCount: recovered,
+        dilutedCount: diluted,
         efficiency: efficiency,
       });
     }, 6000);
@@ -1727,6 +1745,7 @@ const GridCanvas = ({
     blasts,
     createStaticGridCache,
     addRecoveryRecordToGameContext,
+    updateScore,
     renderCanvas,
   ]);
 

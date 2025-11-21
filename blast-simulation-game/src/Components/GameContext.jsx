@@ -42,11 +42,21 @@ export const GameProvider = ({ children }) => {
       recoveryHistory: [
         ...prevState.recoveryHistory,
         {
+          totalOres: record.totalOres,
           recoveredCount: record.recoveredCount,
+          dilutedCount: record.dilutedCount,
           efficiency: record.efficiency,
           timestamp: new Date(),
         },
       ],
+    }));
+
+  }, []);
+
+  const updateScore = useCallback((newScore) => {
+    setGameState((prevState) => ({
+      ...prevState,
+      score: newScore,
     }));
   }, []);
 
@@ -63,6 +73,7 @@ export const GameProvider = ({ children }) => {
       updateGrid,
       clearBlasts,
       addRecoveryRecord,
+      updateScore,
     }),
     [
       gameState,
@@ -71,6 +82,7 @@ export const GameProvider = ({ children }) => {
       updateGrid,
       clearBlasts,
       addRecoveryRecord,
+      updateScore,
     ]
   );
 

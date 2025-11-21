@@ -1,3 +1,7 @@
+import { useContext } from "react";
+import { GameContext } from "./GameContext";
+import scoringLogic from "../utils/scoringLogic";
+
 const BlastResult = ({
   show,
   onClose,
@@ -9,6 +13,31 @@ const BlastResult = ({
   recoveredCount,
   efficiency,
 }) => {
+  const { gameState } = useContext(GameContext);
+
+  // Get the latest recovery record from game state
+  const latestRecovery =
+    gameState.recoveryHistory[gameState.recoveryHistory.length - 1];
+
+  // Calculate scoring using the stored recovery data
+  let scoringResult = null;
+  if (latestRecovery) {
+    console.log("📊 Calling scoringLogic with:", {
+      totalOres: latestRecovery.totalOres,
+      recoveredCount: latestRecovery.recoveredCount,
+      dilutedCount: latestRecovery.dilutedCount,
+    });
+
+    scoringResult = scoringLogic(
+      latestRecovery.totalOres,
+      latestRecovery.recoveredCount,
+      latestRecovery.dilutedCount,
+      10
+    );
+  } else {
+    console.warn("⚠️ No recovery data available");
+  }
+
   if (!show) {
     return null;
   }
@@ -28,18 +57,31 @@ const BlastResult = ({
         <h2 className="text-2xl font-bold">Blast Results</h2>
         <div>
           <ul className="list-disc flex flex-wrap px-5">
-            <li className="me-15">Blast score: {score}</li>
+            <li className="me-15">Blast score: {scoringResult?.finalScore || 0} units</li>
             <li className="me-15">
-              Number of materials destroyed: {materialsDestroyed}
+              Number of materials affected: {materialsDestroyed}
             </li>
             <li className="me-15">
               Number of materials remained: {materialsRemained}
             </li>
             <li>Blast Radius used: {blastRadiusUsed}</li>
             <li className="me-15">
-              Ores recovered: {recoveredCount || 0}
-            </li>{" "}
-            <li>Efficiency: {efficiency || 0}%</li>
+              Total Ores: {scoringResult?.totalOres || 0}
+            </li>
+            <li className="me-15">
+              Ores recovered:{" "}
+              {scoringResult?.recoveredOres || recoveredCount || 0}
+            </li>
+            <li className="me-15">
+              Ores diluted: {scoringResult?.dilutedOres || 0}
+            </li>
+            <li className="me-15">
+              Recovery Rate:{" "}
+              {scoringResult?.recoveryRate?.toFixed(2) || efficiency || 0}%
+            </li>
+            <li className="me-15">
+              Dilution Rate: {scoringResult?.dilutionRate?.toFixed(2) || 0}%
+            </li>
           </ul>
         </div>
         <div>
