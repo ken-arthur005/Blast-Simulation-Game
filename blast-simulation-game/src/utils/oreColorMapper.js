@@ -4,7 +4,7 @@ class OreColorMapper {
     // Metals
     iron: "#8B4513",
     gold: "#FFD700",
-    silver: "#FF0000",
+    silver: "#c0c0c0",
     copper: "#B87333",
     aluminum: "#A0A0A0",
     lead: "#2F4F4F",
