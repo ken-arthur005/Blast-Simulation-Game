@@ -517,7 +517,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             onBlastComplete={handleBlastComplete}
             fileResetKey={fileResetKey}
             addRecoveryRecordToGameContext={addRecoveryRecord}
-            updateScore={updatescore}
+            updateScore={updateScore}
           />
         </div>
 
