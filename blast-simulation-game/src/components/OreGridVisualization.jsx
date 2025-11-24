@@ -483,6 +483,42 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     console.log(`recoveredCount: ${recovery.recoveredCount}`);
   });
 
+
+  const handleSaveSimulation = () => {
+    if (!gridData || !originalGridData) {
+      showToast("Cannot save, grid data is not available.", "error");
+      return;
+    }
+
+    // Define the State Schema
+    const simulationState = {
+      // From GameContext
+      gameState: {
+        playerName: gameState.playerName,
+        score: gameState.score,
+        blasts: gameState.blasts,
+        recoveryHistory: gameState.recoveryHistory,
+        canPlaceExplosives: gameState.canPlaceExplosives,
+      },
+      // From local state
+      currentGrid: gridData.grid, // The grid as it is now (possibly with destroyed cells)
+      originalGrid: originalGridData.grid, // The initial grid from the CSV
+      gridDimensions: gridData.dimensions,
+      gridMetadata: gridData.metadata,
+      selectedBlast: selectedBlast,
+    };
+
+    // Use the utility to save the state
+    const success = saveSimulation(simulationState);
+
+    // Provide feedback
+    if (success) {
+      showToast("Simulation saved successfully!", "success");
+    } else {
+      showToast("Failed to save simulation.", "error");
+    }
+  };
+
   return (
     <div className="w-full min-h-screen relative">
       {toast && (
