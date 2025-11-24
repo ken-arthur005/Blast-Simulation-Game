@@ -952,6 +952,9 @@ const GridCanvas = ({
 
   const handleMouseMove = useCallback(
     (event) => {
+      // this guard clause disables the entire hover effect during the animation.
+      if (isBlastRunningRef.current) return;
+
       // Update mouse position for tooltip
       setMousePosition({ x: event.clientX, y: event.clientY });
 
