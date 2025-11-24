@@ -483,7 +483,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     console.log(`recoveredCount: ${recovery.recoveredCount}`);
   });
 
-
   const handleSaveSimulation = () => {
     if (!gridData || !originalGridData) {
       showToast("Cannot save, grid data is not available.", "error");
@@ -590,6 +589,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       <BlastResults
         show={showBlastResults}
         onClose={handleCloseBlastResults}
+        onSave={handleSaveSimulation}
         blastRadiusUsed={gameState.blastRadius}
         materialsDestroyed={gameState.numberOfMaterialsDestroyed}
         score={gameState.score}
