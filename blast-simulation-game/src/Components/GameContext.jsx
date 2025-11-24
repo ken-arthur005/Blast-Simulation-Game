@@ -15,6 +15,7 @@ export const GameProvider = ({ children }) => {
     materialsRemainedAfterDestroy: 0,
     blastRadius: 3,
     recoveryHistory: [],
+    blastHistory: [],
   });
   // pendingDirection stores the currently selected direction for the next blast placement
   // If null, no default direction is applied; players must choose a direction explicitly or edit per-blast
@@ -49,6 +50,18 @@ export const GameProvider = ({ children }) => {
           timestamp: new Date(),
         },
       ],
+
+      blastHistory: [
+        ...prevState.blastHistory,
+        {
+          round: prevState.blastHistory.length + 1, // Auto-increment round number
+          recovery: record.recoveryRate,
+          dilution: record.dilutionRate,
+          score: record.finalScore,
+          timestamp: new Date(),
+        },
+      ],
+      
     }));
 
   }, []);
