@@ -1,12 +1,12 @@
 import { useCSVReader } from "react-papaparse";
 import React, { useEffect, useState, useContext } from "react";
-import Toast from "../Components/Toast";
+import Toast from "../components/Toast";
 import Papa from "papaparse";
 import { Gamepad2 } from "lucide-react";
 import { AiOutlineCloudUpload } from "react-icons/ai";
 import csvDataValidation from "../utils/csvDataValidation";
-import OreGridVisualization from "../Components/OreGridVisualization";
-import { GameContext } from "../Components/GameContext";
+import OreGridVisualization from "../components/OreGridVisualization";
+import { GameContext } from "../components/GameContext";
 
 const SimulationPage = () => {
   const { CSVReader } = useCSVReader();
