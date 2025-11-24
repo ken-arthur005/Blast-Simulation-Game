@@ -181,6 +181,24 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
         label: "floor",
       }
     ),
+
+    //ceiling
+    Bodies.rectangle(
+      width / 2,
+      -wallThickness / 2,
+      width,
+      wallThickness,
+      {
+        isStatic: true,
+        friction: 0.5,
+        restitution: 0.3,
+        render: {
+          fillStyle: "#333333",
+          visible: true,
+        },
+        label: "ceiling",
+      }
+    ),
     // Left wall
     Bodies.rectangle(
       -wallThickness / 2,
