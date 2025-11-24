@@ -17,6 +17,7 @@ import {
 } from "../utils/blastCalculator";
 import BlastResults from "./BlastResults";
 import Toast from "./Toast";
+import { saveSimulation } from "../utils/simulationManager";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const { addRecoveryRecord, updateScore } = useContext(GameContext);
