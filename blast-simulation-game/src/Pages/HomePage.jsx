@@ -21,37 +21,44 @@ function HomePage() {
   };
 
   return (
-    <div className="bg3 text-center fixed inset-0 flex flex-col justify-center h-screen w-full p-3 sm:p-4 lg:p-4 overflow-hidden">
+    <div className="bg3 text-center fixed inset-0 flex flex-col justify-center h-screen w-full p-4 sm:p-6 md:p-8 overflow-hidden">
       {/* Title Section */}
-      <div className="ui-font text-center flex-shrink-0 pt-1 sm:pt-12 lg:pt-24 ">
-        <h1 className="text-white text-[32px]">
-          Welcome to <br /> <span className="text-[64px]">Rock Blasterz</span>
+      <div className="ui-font text-center flex-shrink-0 mb-4 sm:mb-6 md:mb-8">
+        <h1 className="text-white text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-tight">
+          Welcome to <br />
+          <span className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl block mt-2">
+            Rock Blasterz
+          </span>
         </h1>
-        <h2 className="text-white text-[32px]">Enter your name ☺️</h2>
+        <h2 className="text-white text-lg xs:text-xl sm:text-2xl md:text-3xl lg:text-4xl mt-3 sm:mt-4">
+          Enter your name ☺️
+        </h2>
       </div>
 
       {/* Form Section */}
-      <div className="flex flex-col items-center w-full max-w-[872px] mx-auto sm:mt-2">
-        <div>
+      <div className="flex flex-col items-center w-full max-w-[872px] mx-auto px-4 sm:px-6">
+        <div className="w-full max-w-[600px]">
           <input
             type="text"
             onChange={(e) => {
               setGameState({ ...gameState, playerName: e.target.value });
             }}
             value={gameState.playerName}
-            className="rounded-[10px] backdrop-blur-[12px] bg-[rgba(255,255,255,0.15)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] h-[80px] w-[600px] mb-7 text-center text-white placeholder:text-white/70 outline-none focus:border-white/50 focus:ring-0"
+            className="rounded-[10px] backdrop-blur-[12px] bg-[rgba(255,255,255,0.15)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] h-12 sm:h-16 md:h-20 w-full mb-4 sm:mb-6 md:mb-7 text-center text-white text-base sm:text-lg md:text-xl placeholder:text-white/70 outline-none focus:border-white/50 focus:ring-0 transition-all"
             placeholder="name"
           />
           {error && (
-            <p className="text-[#FF6B6B] text-m mt-2 font-semibold">{error}</p>
+            <p className="text-[#FF6B6B] text-sm sm:text-base mt-2 font-semibold">
+              {error}
+            </p>
           )}
         </div>
 
-        <div>
+        <div className=" flex justify-center">
           {gameState.playerName && gameState.playerName.trim() ? (
             <button
               onClick={handleStartGame}
-              className="rounded-[10px] backdrop-blur-[12px] bg-[rgb(112,171,117)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] text-white text-xl font-semibold px-8 py-4 hover:bg-[rgba(112,171,117,0.8)] hover:scale-105 transition-all duration-300"
+              className="rounded-[10px] backdrop-blur-[12px] bg-[rgb(112,171,117)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] text-white text-base sm:text-lg md:text-xl font-semibold px-6 py-3 sm:px-8 sm:py-4 hover:bg-[rgba(112,171,117,0.8)] hover:scale-105 transition-all duration-300 w-full max-w-xs sm:max-w-sm"
             >
               <Link to="/simulation">Start Game</Link>
             </button>
