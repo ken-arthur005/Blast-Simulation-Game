@@ -1,3 +1,6 @@
+import { useContext } from "react";
+import { GameContext } from "./GameContext";
+import scoringLogic from "../utils/scoringLogic";
 import { Save, Upload, Download, RefreshCw, Play, X } from "lucide-react";
 
 const BlastResult = ({
@@ -11,6 +14,31 @@ const BlastResult = ({
   recoveredCount,
   efficiency,
 }) => {
+  const { gameState } = useContext(GameContext);
+
+  // Get the latest recovery record from game state
+  const latestRecovery =
+    gameState.recoveryHistory[gameState.recoveryHistory.length - 1];
+
+  // Calculate scoring using the stored recovery data
+  let scoringResult = null;
+  if (latestRecovery) {
+    console.log("📊 Calling scoringLogic with:", {
+      totalOres: latestRecovery.totalOres,
+      recoveredCount: latestRecovery.recoveredCount,
+      dilutedCount: latestRecovery.dilutedCount,
+    });
+
+    scoringResult = scoringLogic(
+      latestRecovery.totalOres,
+      latestRecovery.recoveredCount,
+      latestRecovery.dilutedCount,
+      10
+    );
+  } else {
+    console.warn("⚠️ No recovery data available");
+  }
+
   if (!show) {
     return null;
   }
@@ -30,7 +58,7 @@ const BlastResult = ({
         <h2 className="text-lg md:text-2xl font-bold">Blast Results</h2>
         <div>
           <ul className="list-disc flex flex-col md:flex-row md:flex-wrap px-4 md:px-5 text-xs md:text-base">
-            <li className="md:me-15 mb-1 md:mb-0">Blast score: {score}</li>
+            <li className="md:me-15 mb-1 md:mb-0">Blast score: {scoringResult?.finalScore || 0} units</li>
             <li className="md:me-15 mb-1 md:mb-0">
               Materials destroyed: {materialsDestroyed}
             </li>

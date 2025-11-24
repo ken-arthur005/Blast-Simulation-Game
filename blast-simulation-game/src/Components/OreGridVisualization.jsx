@@ -19,7 +19,7 @@ import BlastResults from "./BlastResults";
 import Toast from "./Toast";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
-  const { addRecoveryRecord } = useContext(GameContext);
+  const { addRecoveryRecord, updateScore } = useContext(GameContext);
   const [gridData, setGridData] = useState(null);
   const [originalGridData, setOriginalGridData] = useState(null); // to keep an original deep copy of grid.
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
@@ -517,6 +517,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             onBlastComplete={handleBlastComplete}
             fileResetKey={fileResetKey}
             addRecoveryRecordToGameContext={addRecoveryRecord}
+            updateScore={updateScore}
           />
         </div>
 
