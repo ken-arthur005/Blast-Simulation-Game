@@ -468,13 +468,24 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   }
 
   const recoveryHistory = gameState.recoveryHistory;
+  const blastHistory = gameState.blastHistory;
 
   console.log(`recoveryHistory: ${recoveryHistory}`);
   console.log(`recoveryHistory.length: ${recoveryHistory.length}`);
-  const lastRecord =
+  
+  // 1. Get the last record from the original recoveryHistory (used for recoveredCount and efficiency)
+  const lastRecoveryDetail =
     recoveryHistory?.length > 0
       ? recoveryHistory[recoveryHistory.length - 1]
       : { recoveredCount: 0, efficiency: 0 };
+      
+  // 2. Get the last record from the NEW blastHistory (used for score, recovery rate, and dilution rate)
+  const lastBlastRecord =
+    blastHistory?.length > 0
+      ? blastHistory[blastHistory.length - 1]
+      // Ensure default structure if history is empty. NOTE: 'recovery' and 'dilution' are the keys used in GameContext.jsx
+      : { recovery: 0, dilution: 0, score: 0 };
+
 
   console.log("History of recovery history: ".toUpperCase());
   recoveryHistory.forEach((recovery) => {
@@ -555,11 +566,16 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         onClose={handleCloseBlastResults}
         blastRadiusUsed={gameState.blastRadius}
         materialsDestroyed={gameState.numberOfMaterialsDestroyed}
-        score={gameState.score}
+        // ✅ UPDATED: Pass the score from the new blast history
+        score={lastBlastRecord.score}
         materialsRemained={gameState.materialsRemainedAfterDestroy}
         resetCanvas={handleCanvasReset}
-        recoveredCount={lastRecord.recoveredCount}
-        efficiency={lastRecord.efficiency}
+        // Using lastRecoveryDetail for legacy props
+        recoveredCount={lastRecoveryDetail.recoveredCount}
+        efficiency={lastRecoveryDetail.efficiency}
+        // ✅ NEW PROPS: Pass the recovery and dilution rates from the new blast history
+        recoveryRate={lastBlastRecord.recovery}
+        dilutionRate={lastBlastRecord.dilution}
       />
     </div>
   );

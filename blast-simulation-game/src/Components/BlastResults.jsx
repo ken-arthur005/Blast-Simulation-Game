@@ -1,12 +1,14 @@
 import { useContext } from "react";
 import { GameContext } from "./GameContext";
-import scoringLogic from "../utils/scoringLogic";
+
 import { Save, Upload, Download, RefreshCw, Play, X } from "lucide-react";
 
 const BlastResult = ({
   show,
   onClose,
   score,
+  recoveryRate, 
+  dilutionRate, 
   materialsDestroyed,
   materialsRemained,
   blastRadiusUsed,
@@ -16,29 +18,10 @@ const BlastResult = ({
 }) => {
   const { gameState } = useContext(GameContext);
 
-  // Get the latest recovery record from game state
-  const latestRecovery =
-    gameState.recoveryHistory[gameState.recoveryHistory.length - 1];
-
-  // Calculate scoring using the stored recovery data
-  let scoringResult = null;
-  if (latestRecovery) {
-    console.log("📊 Calling scoringLogic with:", {
-      totalOres: latestRecovery.totalOres,
-      recoveredCount: latestRecovery.recoveredCount,
-      dilutedCount: latestRecovery.dilutedCount,
-    });
-
-    scoringResult = scoringLogic(
-      latestRecovery.totalOres,
-      latestRecovery.recoveredCount,
-      latestRecovery.dilutedCount,
-      10
-    );
-  } else {
-    console.warn("⚠️ No recovery data available");
-  }
-
+  const isOptimal = recoveryRate >= 70 && dilutionRate <= 10;
+  const tipMessage = isOptimal
+    ? "Excellent mining technique! Targeting different ore combinations may increase your total yield."
+    : `Try to increase recovery (currently ${recoveryRate}%) and reduce dilution (currently ${dilutionRate}%) by adjusting the blast direction.`;
   if (!show) {
     return null;
   }
@@ -58,7 +41,10 @@ const BlastResult = ({
         <h2 className="text-lg md:text-2xl font-bold">Blast Results</h2>
         <div>
           <ul className="list-disc flex flex-col md:flex-row md:flex-wrap px-4 md:px-5 text-xs md:text-base">
-            <li className="md:me-15 mb-1 md:mb-0">Blast score: {scoringResult?.finalScore || 0} units</li>
+            {/* 2. USE NEW PROPS FOR DISPLAY */}
+            <li className="md:me-15 mb-1 md:mb-0">Blast Score: {score || 0} units</li>
+            <li className="md:me-15 mb-1 md:mb-0">Recovery Rate: {recoveryRate || 0}%</li> 
+            <li className="md:me-15 mb-1 md:mb-0">Dilution Rate: {dilutionRate || 0}%</li>
             <li className="md:me-15 mb-1 md:mb-0">
               Materials destroyed: {materialsDestroyed}
             </li>
@@ -67,9 +53,9 @@ const BlastResult = ({
             </li>
             <li className="md:me-15 mb-1 md:mb-0">Blast Radius: {blastRadiusUsed}</li>
             <li className="md:me-15 mb-1 md:mb-0">
-              Ores recovered: {recoveredCount || 0}
+              Ores recovered (blocks): {recoveredCount || 0}
             </li>{" "}
-            <li>Efficiency: {efficiency || 0}%</li>
+            <li>Recovery Efficiency (value): {efficiency || 0}%</li>
           </ul>
         </div>
 
@@ -77,13 +63,11 @@ const BlastResult = ({
           <h3 className="text-sm md:text-l font-black mt-3">PERFORMANCE TIPS</h3>
           <ul className="list-disc px-4 md:px-5 text-xs md:text-base">
             <li>
-              Excellent mining technique! Try targeting different ore
-              combinations
+              {tipMessage}
             </li>
           </ul>
         </div>
         <div>
-          {/* <h3 className="text-l font-black mt-3">ACHIEVEMENTS UNLOCKED</h3> */}
           <div className="flex flex-col md:flex-row gap-2 md:gap-0 md:pr-10">
             <div className="relative group w-full md:w-auto">
               <button
@@ -127,18 +111,5 @@ const BlastResult = ({
     </div>
   );
 };
-
-// const Trophy = () => {
-//   return (
-//     <svg
-//       xmlns="http://www.w3.org/2000/svg"
-//       fill="currentColor"
-//       className="me-2 w-5 h-5"
-//       viewBox="0 0 16 16"
-//     >
-//       <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5q0 .807-.034 1.536a3 3 0 1 1-1.133 5.89c-.79 1.865-1.878 2.777-2.833 3.011v2.173l1.425.356c.194.048.377.135.537.255L13.3 15.1a.5.5 0 0 1-.3.9H3a.5.5 0 0 1-.3-.9l1.838-1.379c.16-.12.343-.207.537-.255L6.5 13.11v-2.173c-.955-.234-2.043-1.146-2.833-3.012a3 3 0 1 1-1.132-5.89A33 33 0 0 1 2.5.5m.099 2.54a2 2 0 0 0 .72 3.935c-.333-1.05-.588-2.346-.72-3.935m10.083 3.935a2 2 0 0 0 .72-3.935c-.133 1.59-.388 2.885-.72 3.935M3.504 1q.01.775.056 1.469c.13 2.028.457 3.546.87 4.667C5.294 9.48 6.484 10 7 10a.5.5 0 0 1 .5.5v2.61a1 1 0 0 1-.757.97l-1.426.356a.5.5 0 0 0-.179.085L4.5 15h7l-.638-.479a.5.5 0 0 0-.18-.085l-1.425-.356a1 1 0 0 1-.757-.97V10.5A.5.5 0 0 1 9 10c.516 0 1.706-.52 2.57-2.864.413-1.12.74-2.64.87-4.667q.045-.694.056-1.469z" />
-//     </svg>
-//   );
-// };
 
 export default BlastResult;
