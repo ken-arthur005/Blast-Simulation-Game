@@ -3,7 +3,7 @@ import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
 import ArrowButton from "./ArrowButton";
 import RockTexture from "./RockTexture";
-import { RotateCcw, Zap, Palette, Move3d } from "lucide-react";
+import { RotateCcw, Zap, Palette, Move3d, Save } from "lucide-react";
 
 /**
  * Legend component showing ore types and their colors and controls
@@ -15,6 +15,7 @@ const GridLegend = ({
   isBlasting,
   selectedBlast = null,
   onSelectDirection = null,
+  onSaveSimulation,
 }) => {
   const { gameState, pendingDirection, setPendingDirection } =
     useContext(GameContext);
@@ -256,6 +257,15 @@ const GridLegend = ({
           <RotateCcw className="inline-block w-4 h-4 mr-1" />
           Reset Canvas
         </button>
+
+        <button
+          className="bg-[rgb(112,171,117)] text-white px-3 py-2 rounded hover:bg-[rgba(112,171,117,0.5)] text-sm font-semibold flex-1"
+          onClick={onSaveSimulation}
+          disabled={isBlasting}
+        >
+          <Save className="inline-block w-4 h-4 mr-1" />
+          Save
+        </button>
       </div>
 
       {/* Desktop: Action buttons and direction selector */}
@@ -282,6 +292,14 @@ const GridLegend = ({
             Reset Canvas
           </button>
         </div>
+        <button
+          className="bg-[rgb(112,171,117)] text-white px-3 py-2 rounded hover:bg-[rgba(112,171,117,0.8)] text-base font-semibold w-full mt-3"
+          onClick={onSaveSimulation}
+          disabled={isBlasting}
+        >
+          <Save className="inline-block w-4 h-4 mr-1" />
+          Save
+        </button>
       </div>
 
       {/* Desktop: Direction selector always visible */}
