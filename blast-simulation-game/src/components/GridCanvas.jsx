@@ -12,274 +12,14 @@ import { gsap } from "gsap";
 import OreValueMapper from "../utils/oreValueMapper";
 import scoringLogic from "../utils/scoringLogic";
 import GridTooltip from "./GridTooltip";
+import {
+  capturePhysicsTrajectories,
+  animateBlastWithGSAP,
+} from "../utils/animationHelpers";
 
-// Helper function to capture physics trajectories for GSAP animation
-const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
-  const trajectories = new Map();
+import { drawRockTexture, drawRoundedRect } from "../utils/canvasUtils";
 
-  // Initialize trajectory storage with original positions
-  bodies.forEach((body) => {
-    trajectories.set(body.id, {
-      body: body,
-      keyframes: [
-        {
-          x: body.position.x,
-          y: body.position.y,
-          angle: body.angle,
-          time: 0,
-        },
-      ],
-    });
-  });
 
-  // Run physics simulation and capture keyframes
-  const sampleInterval = 4; // Capture every 4th frame for efficiency
-
-  for (let i = 0; i < steps; i++) {
-    Engine.update(engine, 1000 / 60); // 60fps simulation
-
-    if (i % sampleInterval === 0 || i === steps - 1) {
-      bodies.forEach((body) => {
-        const trajectory = trajectories.get(body.id);
-        trajectory.keyframes.push({
-          x: body.position.x,
-          y: body.position.y,
-          angle: body.angle,
-          velocityX: body.velocity.x,
-          velocityY: body.velocity.y,
-          time: i / steps,
-        });
-      });
-    }
-  }
-
-  return Array.from(trajectories.values());
-};
-
-const animateBlastWithGSAP = (trajectories, duration = 2.5) => {
-  const timeline = gsap.timeline();
-
-  // Create animation state objects for each body
-  const animStates = trajectories.map((traj) => {
-    const body = traj.body;
-    const startFrame = traj.keyframes[0];
-    const finalFrame = traj.keyframes[traj.keyframes.length - 1];
-
-    return {
-      body: body,
-      animX: startFrame.x,
-      animY: startFrame.y,
-      animAngle: startFrame.angle,
-      animVelocityX: 0,
-      animVelocityY: 0,
-      targetX: finalFrame.x,
-      targetY: finalFrame.y,
-      targetAngle: finalFrame.angle,
-      keyframes: traj.keyframes,
-    };
-  });
-
-  // Animate each body with stagger effect
-  animStates.forEach((state) => {
-    const delay = (state.body.blastDistance || 0) * 0.008;
-
-    timeline.to(
-      state,
-      {
-        animX: state.targetX,
-        animY: state.targetY,
-        animAngle: state.targetAngle,
-        duration: duration,
-        delay: delay,
-        ease: "power2.out",
-        onUpdate: function () {
-          // Calculate current keyframe for velocity (for motion trails)
-          const progress = this.progress();
-          const kfIndex = Math.floor(progress * (state.keyframes.length - 1));
-          const kf =
-            state.keyframes[Math.min(kfIndex, state.keyframes.length - 1)];
-
-          state.animVelocityX = kf.velocityX || 0;
-          state.animVelocityY = kf.velocityY || 0;
-
-          // Update body's animated position for rendering
-          state.body.animatedPosition = {
-            x: state.animX,
-            y: state.animY,
-            angle: state.animAngle,
-            velocityX: state.animVelocityX,
-            velocityY: state.animVelocityY,
-          };
-        },
-      },
-      0
-    );
-  });
-
-  return { timeline, animStates };
-};
-
-// Helper utilities (module-level so identity is stable across renders)
-// Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
-const mulberry32 = (a) => {
-  return function () {
-    let t = (a += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
-
-const hexToRgb = (hex) => {
-  // Defensive: if not provided or not a string, return a neutral gray
-  if (!hex || typeof hex !== "string") return { r: 200, g: 200, b: 200 };
-  const h = hex.replace("#", "").trim();
-  // If it's already an rgb(...) string, try to parse numbers
-  if (h.startsWith("rgb")) {
-    const nums = h
-      .replace(/[^0-9,.-]/g, "")
-      .split(",")
-      .map(Number);
-    if (nums.length >= 3 && nums.every((n) => !Number.isNaN(n))) {
-      return { r: nums[0], g: nums[1], b: nums[2] };
-    }
-    return { r: 200, g: 200, b: 200 };
-  }
-
-  // Fallback for hex parsing
-  const bigint = parseInt(h, 16);
-  if (!Number.isNaN(bigint) && (h.length === 6 || h.length === 3)) {
-    if (h.length === 6) {
-      return {
-        r: (bigint >> 16) & 255,
-        g: (bigint >> 8) & 255,
-        b: bigint & 255,
-      };
-    }
-    // short hex like 'abc' -> 'aabbcc'
-    const r = parseInt(h[0] + h[0], 16);
-    const g = parseInt(h[1] + h[1], 16);
-    const b = parseInt(h[2] + h[2], 16);
-    return { r, g, b };
-  }
-
-  // fallback
-  return { r: 200, g: 200, b: 200 };
-};
-
-const rgbToHex = (r, g, b) => {
-  const toHex = (v) => {
-    const h = Math.max(0, Math.min(255, Math.round(v))).toString(16);
-    return h.length === 1 ? "0" + h : h;
-  };
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-};
-
-const adjustColor = (hex, factor) => {
-  const { r, g, b } = hexToRgb(hex);
-  return rgbToHex(r * (1 + factor), g * (1 + factor), b * (1 + factor));
-};
-
-// Draw a simple rock-like texture inside current origin (0,0) sized to (size)
-// baseColor is a hex string, seedNumber is a deterministic seed per cell
-const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
-  const rand = mulberry32(seedNumber);
-  const prevGlobalAlpha = ctx.globalAlpha ?? 1;
-
-  // Create a jagged blob silhouette (centered) to emulate a rock outline
-  const cx = size / 2;
-  const cy = size / 2;
-  const points = 8 + Math.floor(rand() * 6);
-  const outerR = size * 0.48;
-  const jagged = [];
-  for (let i = 0; i < points; i++) {
-    const ang = (i / points) * Math.PI * 2;
-    const r = outerR * (0.75 + rand() * 0.5); // vary radius
-    jagged.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r });
-  }
-
-  // Fill jagged blob with the base color so the rock takes the cell's color
-  ctx.beginPath();
-  jagged.forEach((p, i) =>
-    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
-  );
-  ctx.closePath();
-  ctx.fillStyle = baseColor;
-  ctx.globalAlpha = 1 * alpha;
-  ctx.fill();
-
-  // Stroke with a darker ring to emphasize the rock edge
-  ctx.lineWidth = Math.max(1, size * 0.04);
-  ctx.strokeStyle = adjustColor(baseColor, -0.35);
-  ctx.stroke();
-
-  // Clip to jagged blob so subsequent speckles sit inside the rock silhouette
-  ctx.save();
-  ctx.beginPath();
-  jagged.forEach((p, i) =>
-    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
-  );
-  ctx.closePath();
-  ctx.clip();
-
-  // blotches: a few soft, slightly lighter/darker blobs
-  const blotches = 6 + Math.floor(rand() * 6);
-  for (let i = 0; i < blotches; i++) {
-    const bx = cx + (rand() * 2 - 1) * outerR * 0.6;
-    const by = cy + (rand() * 2 - 1) * outerR * 0.5;
-    const br = (0.08 + rand() * 0.18) * size;
-    const shade = (rand() - 0.4) * 0.4; // slight variation
-    ctx.beginPath();
-    ctx.fillStyle = adjustColor(baseColor, shade);
-    ctx.globalAlpha = (0.55 + rand() * 0.35) * alpha;
-    ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // speckles: small mineral flecks
-  const speckles = 18 + Math.floor(rand() * 36);
-  for (let i = 0; i < speckles; i++) {
-    const sx = cx + (rand() * 2 - 1) * outerR * 0.85;
-    const sy = cy + (rand() * 2 - 1) * outerR * 0.85;
-    const sr = Math.max(0.4, rand() * 1.8);
-    const shade = (rand() - 0.7) * 0.6;
-    ctx.beginPath();
-    ctx.fillStyle = adjustColor(baseColor, shade);
-    ctx.globalAlpha = 0.6 * rand() * alpha;
-    ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // subtle veins: short lines
-  const veins = 1 + Math.floor(rand() * 3);
-  ctx.lineWidth = Math.max(0.5, size * 0.01);
-  for (let v = 0; v < veins; v++) {
-    ctx.beginPath();
-    const sx = cx + (rand() * 2 - 1) * outerR * 0.5;
-    const sy = cy + (rand() * 2 - 1) * outerR * 0.5;
-    ctx.moveTo(sx, sy);
-    const segs = 2 + Math.floor(rand() * 3);
-    for (let s = 0; s < segs; s++) {
-      const nx = sx + (rand() - 0.5) * size * 0.25;
-      const ny = sy + (rand() - 0.5) * size * 0.25;
-      ctx.lineTo(nx, ny);
-    }
-    ctx.strokeStyle = adjustColor(baseColor, -0.28);
-    ctx.globalAlpha = 0.45 * rand() * alpha;
-    ctx.stroke();
-  }
-
-  // inner highlight to give a 'bouncy' stylized rock look (optional)
-  ctx.beginPath();
-  ctx.arc(cx - size * 0.08, cy - size * 0.12, outerR * 0.35, 0, Math.PI * 2);
-  ctx.fillStyle = adjustColor(baseColor, 0.28);
-  ctx.globalAlpha = 0.18 * alpha;
-  ctx.fill();
-
-  // restore alpha and clipping
-  ctx.restore();
-  ctx.globalAlpha = prevGlobalAlpha;
-};
 
 const GridCanvas = ({
   gridData,
@@ -332,21 +72,6 @@ const GridCanvas = ({
   const animationTimelineRef = useRef(null);
   const animationStatesRef = useRef(null);
 
-  // Helper: draw rounded rectangle path (does not fill/stroke)
-  const drawRoundedRect = (ctx, x, y, width, height, radius = 6) => {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + width - r, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-    ctx.lineTo(x + width, y + height - r);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-    ctx.lineTo(x + r, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  };
 
   // Helper: Create a cached canvas of static (non-affected) cells for fast rendering during blast
   const createStaticGridCache = useCallback(
@@ -952,6 +677,9 @@ const GridCanvas = ({
 
   const handleMouseMove = useCallback(
     (event) => {
+      // this guard clause disables the entire hover effect during the animation.
+      if (isBlastRunningRef.current) return;
+
       // Update mouse position for tooltip
       setMousePosition({ x: event.clientX, y: event.clientY });
 
@@ -1036,8 +764,6 @@ const GridCanvas = ({
       console.log("Blast already running, skipping duplicate trigger");
       return;
     }
-
-    
 
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -1217,7 +943,7 @@ const GridCanvas = ({
         .reduce((sum, b) => sum + OreValueMapper.getValue(b.oreType), 0);
       const efficiency =
         totalValue > 0 ? Math.round((recoveredValue / totalValue) * 100) : 0;
-      
+
       console.log(
         `Recovery Info:
         Total: ${totalOres}, Recovered: ${recovered}, Diluted: ${diluted}, Efficiency: ${efficiency}%
@@ -1226,9 +952,7 @@ const GridCanvas = ({
 
       // Calculate final score using scoringLogic
       const scoreResult = scoringLogic(totalOres, recovered, diluted, 10);
-      console.log('📊 Score calculated:', scoreResult.finalScore);
-
-      
+      console.log("📊 Score calculated:", scoreResult.finalScore);
 
       // Update the game score
       if (updateScore) {
@@ -1283,12 +1007,13 @@ const GridCanvas = ({
     animationTimelineRef.current = timeline;
     animationStatesRef.current = animStates;
 
-  
     // After GSAP animation ends, keep syncing animatedPosition with physics positions
     let physicsSyncTicker = null;
     timeline.eventCallback("onComplete", () => {
-      console.log("GSAP animation complete - switching to physics-driven rendering");
-      
+      console.log(
+        "GSAP animation complete - switching to physics-driven rendering"
+      );
+
       // Create a ticker function that updates animatedPosition from physics
       physicsSyncTicker = () => {
         animStates.forEach((state) => {
@@ -1298,11 +1023,11 @@ const GridCanvas = ({
             y: state.body.position.y,
             angle: state.body.angle,
             velocityX: state.body.velocity.x,
-            velocityY: state.body.velocity.y
+            velocityY: state.body.velocity.y,
           };
         });
       };
-      
+
       // Add ticker to GSAP's global ticker (runs every frame)
       gsap.ticker.add(physicsSyncTicker);
     });
@@ -1310,8 +1035,8 @@ const GridCanvas = ({
     const startTime = performance.now();
 
     const duration = 9000;
-    const shockwaveDuration = 350; 
-    const flashDuration = 100; 
+    const shockwaveDuration = 350;
+    const flashDuration = 100;
     let animationFrame;
 
     const animatePhysics = (time) => {
@@ -1333,8 +1058,8 @@ const GridCanvas = ({
       const flashProgress = Math.min(elapsed / flashDuration, 1);
 
       Engine.update(engine, 1000 / 60);
-  
-  // During GSAP animation phase (first 3s): sync physics bodies to GSAP positions
+
+      // During GSAP animation phase (first 3s): sync physics bodies to GSAP positions
       if (elapsed < 3000) {
         animStates.forEach((state) => {
           const animPos = state.body.animatedPosition;
@@ -1343,9 +1068,9 @@ const GridCanvas = ({
             Body.setPosition(state.body, { x: animPos.x, y: animPos.y });
             Body.setAngle(state.body, animPos.angle);
             //  Apply some velocity for momentum carry-over
-            Body.setVelocity(state.body, { 
-              x: state.animVelocityX * 0.5, 
-              y: state.animVelocityY * 0.5 
+            Body.setVelocity(state.body, {
+              x: state.animVelocityX * 0.5,
+              y: state.animVelocityY * 0.5,
             });
           }
         });
@@ -1366,11 +1091,9 @@ const GridCanvas = ({
         }
       }
 
-     
       ctx.save();
       ctx.translate(offsetX, offsetY);
 
-    
       if (elapsed < 3) {
         affectedCells.forEach((cell) => {
           const block = new OreBlock(
@@ -1599,15 +1322,15 @@ const GridCanvas = ({
       // Render physics bodies (affected cells as debris) with motion trails 🔥
       animStates.forEach((state) => {
         const body = state.body;
-          // Use GSAP position during animation phase, physics position after
+        // Use GSAP position during animation phase, physics position after
         const animPos = body.animatedPosition || {
-          x: body.position.x,      // ← Fallback to actual physics position
+          x: body.position.x, // ← Fallback to actual physics position
           y: body.position.y,
           angle: body.angle,
           velocityX: body.velocity.x,
-          velocityY: body.velocity.y
+          velocityY: body.velocity.y,
         };
-        
+
         // if (!animPos) return;
 
         const opacity = Math.max(0, 1 - progress * 0.8);
@@ -1677,12 +1400,12 @@ const GridCanvas = ({
 
         // Stop physics simulation and cleanup
         timeline.kill();
-        
+
         if (physicsSyncTicker) {
           gsap.ticker.remove(physicsSyncTicker);
           physicsSyncTicker = null;
         }
-        
+
         cleanupPhysicsEngine(engine, null);
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
@@ -1751,12 +1474,11 @@ const GridCanvas = ({
         cancelAnimationFrame(animationFrame);
       }
       if (timeline) timeline.kill();
-      
-    
+
       if (physicsSyncTicker) {
         gsap.ticker.remove(physicsSyncTicker);
       }
-      
+
       cleanupPhysicsEngine(engine, null);
       isBlastRunningRef.current = false;
       staticGridCacheRef.current = null;

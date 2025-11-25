@@ -1,5 +1,5 @@
 ﻿import { FaTrophy } from "react-icons/fa";
-import { GameContext } from "../Components/GameContext";
+import { GameContext } from "../components/GameContext";
 import React, { useState, useContext } from "react";
 import { Link } from "react-router-dom";
 

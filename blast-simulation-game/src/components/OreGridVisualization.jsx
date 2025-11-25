@@ -17,6 +17,7 @@ import {
 } from "../utils/blastCalculator";
 import BlastResults from "./BlastResults";
 import Toast from "./Toast";
+import { saveSimulation } from "../utils/simulationManager";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const { addRecoveryRecord, updateScore } = useContext(GameContext);
@@ -493,6 +494,41 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     console.log(`recoveredCount: ${recovery.recoveredCount}`);
   });
 
+  const handleSaveSimulation = () => {
+    if (!gridData || !originalGridData) {
+      showToast("Cannot save, grid data is not available.", "error");
+      return;
+    }
+
+    // Define the State Schema
+    const simulationState = {
+      // From GameContext
+      gameState: {
+        playerName: gameState.playerName,
+        score: gameState.score,
+        blasts: gameState.blasts,
+        recoveryHistory: gameState.recoveryHistory,
+        canPlaceExplosives: gameState.canPlaceExplosives,
+      },
+      // From local state
+      currentGrid: gridData.grid, // The grid as it is now (possibly with destroyed cells)
+      originalGrid: originalGridData.grid, // The initial grid from the CSV
+      gridDimensions: gridData.dimensions,
+      gridMetadata: gridData.metadata,
+      selectedBlast: selectedBlast,
+    };
+
+    // Use the utility to save the state
+    const success = saveSimulation(simulationState);
+
+    // Provide feedback
+    if (success) {
+      showToast("Simulation saved successfully!", "success");
+    } else {
+      showToast("Failed to save simulation.", "error");
+    }
+  };
+
   return (
     <div className="w-full min-h-screen relative">
       {toast && (
@@ -554,6 +590,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           oreTypes={gridData.metadata.oreTypes}
           onTriggerBlast={handleTriggerBlast}
           resetCanvas={handleCanvasReset}
+          onSaveSimulation={handleSaveSimulation}
           isBlasting={isBlasting}
           selectedBlast={selectedBlast}
           onSelectDirection={onSelectDirection}
@@ -564,6 +601,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       <BlastResults
         show={showBlastResults}
         onClose={handleCloseBlastResults}
+        onSave={handleSaveSimulation}
         blastRadiusUsed={gameState.blastRadius}
         materialsDestroyed={gameState.numberOfMaterialsDestroyed}
         // ✅ UPDATED: Pass the score from the new blast history
