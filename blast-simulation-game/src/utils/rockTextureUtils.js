@@ -1,3 +1,4 @@
+// Helper utilities (module-level so identity is stable across renders)
 // Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
 export const mulberry32 = (a) => {
   return function () {
