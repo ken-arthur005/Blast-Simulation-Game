@@ -12,112 +12,10 @@ import { gsap } from "gsap";
 import OreValueMapper from "../utils/oreValueMapper";
 import scoringLogic from "../utils/scoringLogic";
 import GridTooltip from "./GridTooltip";
-
-// Helper function to capture physics trajectories for GSAP animation
-const capturePhysicsTrajectories = (bodies, engine, steps = 120) => {
-  const trajectories = new Map();
-
-  // Initialize trajectory storage with original positions
-  bodies.forEach((body) => {
-    trajectories.set(body.id, {
-      body: body,
-      keyframes: [
-        {
-          x: body.position.x,
-          y: body.position.y,
-          angle: body.angle,
-          time: 0,
-        },
-      ],
-    });
-  });
-
-  // Run physics simulation and capture keyframes
-  const sampleInterval = 4; // Capture every 4th frame for efficiency
-
-  for (let i = 0; i < steps; i++) {
-    Engine.update(engine, 1000 / 60); // 60fps simulation
-
-    if (i % sampleInterval === 0 || i === steps - 1) {
-      bodies.forEach((body) => {
-        const trajectory = trajectories.get(body.id);
-        trajectory.keyframes.push({
-          x: body.position.x,
-          y: body.position.y,
-          angle: body.angle,
-          velocityX: body.velocity.x,
-          velocityY: body.velocity.y,
-          time: i / steps,
-        });
-      });
-    }
-  }
-
-  return Array.from(trajectories.values());
-};
-
-const animateBlastWithGSAP = (trajectories, duration = 2.5) => {
-  const timeline = gsap.timeline();
-
-  // Create animation state objects for each body
-  const animStates = trajectories.map((traj) => {
-    const body = traj.body;
-    const startFrame = traj.keyframes[0];
-    const finalFrame = traj.keyframes[traj.keyframes.length - 1];
-
-    return {
-      body: body,
-      animX: startFrame.x,
-      animY: startFrame.y,
-      animAngle: startFrame.angle,
-      animVelocityX: 0,
-      animVelocityY: 0,
-      targetX: finalFrame.x,
-      targetY: finalFrame.y,
-      targetAngle: finalFrame.angle,
-      keyframes: traj.keyframes,
-    };
-  });
-
-  // Animate each body with stagger effect
-  animStates.forEach((state) => {
-    const delay = (state.body.blastDistance || 0) * 0.008;
-
-    timeline.to(
-      state,
-      {
-        animX: state.targetX,
-        animY: state.targetY,
-        animAngle: state.targetAngle,
-        duration: duration,
-        delay: delay,
-        ease: "power2.out",
-        onUpdate: function () {
-          // Calculate current keyframe for velocity (for motion trails)
-          const progress = this.progress();
-          const kfIndex = Math.floor(progress * (state.keyframes.length - 1));
-          const kf =
-            state.keyframes[Math.min(kfIndex, state.keyframes.length - 1)];
-
-          state.animVelocityX = kf.velocityX || 0;
-          state.animVelocityY = kf.velocityY || 0;
-
-          // Update body's animated position for rendering
-          state.body.animatedPosition = {
-            x: state.animX,
-            y: state.animY,
-            angle: state.animAngle,
-            velocityX: state.animVelocityX,
-            velocityY: state.animVelocityY,
-          };
-        },
-      },
-      0
-    );
-  });
-
-  return { timeline, animStates };
-};
+import {
+  capturePhysicsTrajectories,
+  animateBlastWithGSAP,
+} from "../utils/animationHelpers";
 
 // Helper utilities (module-level so identity is stable across renders)
 // Simple deterministic PRNG (mulberry32) for per-cell deterministic textures
@@ -1040,8 +938,6 @@ const GridCanvas = ({
       return;
     }
 
-    
-
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -1220,7 +1116,7 @@ const GridCanvas = ({
         .reduce((sum, b) => sum + OreValueMapper.getValue(b.oreType), 0);
       const efficiency =
         totalValue > 0 ? Math.round((recoveredValue / totalValue) * 100) : 0;
-      
+
       console.log(
         `Recovery Info:
         Total: ${totalOres}, Recovered: ${recovered}, Diluted: ${diluted}, Efficiency: ${efficiency}%
@@ -1229,9 +1125,7 @@ const GridCanvas = ({
 
       // Calculate final score using scoringLogic
       const scoreResult = scoringLogic(totalOres, recovered, diluted, 10);
-      console.log('📊 Score calculated:', scoreResult.finalScore);
-
-      
+      console.log("📊 Score calculated:", scoreResult.finalScore);
 
       // Update the game score
       if (updateScore) {
@@ -1286,12 +1180,13 @@ const GridCanvas = ({
     animationTimelineRef.current = timeline;
     animationStatesRef.current = animStates;
 
-  
     // After GSAP animation ends, keep syncing animatedPosition with physics positions
     let physicsSyncTicker = null;
     timeline.eventCallback("onComplete", () => {
-      console.log("GSAP animation complete - switching to physics-driven rendering");
-      
+      console.log(
+        "GSAP animation complete - switching to physics-driven rendering"
+      );
+
       // Create a ticker function that updates animatedPosition from physics
       physicsSyncTicker = () => {
         animStates.forEach((state) => {
@@ -1301,11 +1196,11 @@ const GridCanvas = ({
             y: state.body.position.y,
             angle: state.body.angle,
             velocityX: state.body.velocity.x,
-            velocityY: state.body.velocity.y
+            velocityY: state.body.velocity.y,
           };
         });
       };
-      
+
       // Add ticker to GSAP's global ticker (runs every frame)
       gsap.ticker.add(physicsSyncTicker);
     });
@@ -1313,8 +1208,8 @@ const GridCanvas = ({
     const startTime = performance.now();
 
     const duration = 9000;
-    const shockwaveDuration = 350; 
-    const flashDuration = 100; 
+    const shockwaveDuration = 350;
+    const flashDuration = 100;
     let animationFrame;
 
     const animatePhysics = (time) => {
@@ -1336,8 +1231,8 @@ const GridCanvas = ({
       const flashProgress = Math.min(elapsed / flashDuration, 1);
 
       Engine.update(engine, 1000 / 60);
-  
-  // During GSAP animation phase (first 3s): sync physics bodies to GSAP positions
+
+      // During GSAP animation phase (first 3s): sync physics bodies to GSAP positions
       if (elapsed < 3000) {
         animStates.forEach((state) => {
           const animPos = state.body.animatedPosition;
@@ -1346,9 +1241,9 @@ const GridCanvas = ({
             Body.setPosition(state.body, { x: animPos.x, y: animPos.y });
             Body.setAngle(state.body, animPos.angle);
             //  Apply some velocity for momentum carry-over
-            Body.setVelocity(state.body, { 
-              x: state.animVelocityX * 0.5, 
-              y: state.animVelocityY * 0.5 
+            Body.setVelocity(state.body, {
+              x: state.animVelocityX * 0.5,
+              y: state.animVelocityY * 0.5,
             });
           }
         });
@@ -1369,11 +1264,9 @@ const GridCanvas = ({
         }
       }
 
-     
       ctx.save();
       ctx.translate(offsetX, offsetY);
 
-    
       if (elapsed < 3) {
         affectedCells.forEach((cell) => {
           const block = new OreBlock(
@@ -1602,15 +1495,15 @@ const GridCanvas = ({
       // Render physics bodies (affected cells as debris) with motion trails 🔥
       animStates.forEach((state) => {
         const body = state.body;
-          // Use GSAP position during animation phase, physics position after
+        // Use GSAP position during animation phase, physics position after
         const animPos = body.animatedPosition || {
-          x: body.position.x,      // ← Fallback to actual physics position
+          x: body.position.x, // ← Fallback to actual physics position
           y: body.position.y,
           angle: body.angle,
           velocityX: body.velocity.x,
-          velocityY: body.velocity.y
+          velocityY: body.velocity.y,
         };
-        
+
         // if (!animPos) return;
 
         const opacity = Math.max(0, 1 - progress * 0.8);
@@ -1680,12 +1573,12 @@ const GridCanvas = ({
 
         // Stop physics simulation and cleanup
         timeline.kill();
-        
+
         if (physicsSyncTicker) {
           gsap.ticker.remove(physicsSyncTicker);
           physicsSyncTicker = null;
         }
-        
+
         cleanupPhysicsEngine(engine, null);
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
@@ -1754,12 +1647,11 @@ const GridCanvas = ({
         cancelAnimationFrame(animationFrame);
       }
       if (timeline) timeline.kill();
-      
-    
+
       if (physicsSyncTicker) {
         gsap.ticker.remove(physicsSyncTicker);
       }
-      
+
       cleanupPhysicsEngine(engine, null);
       isBlastRunningRef.current = false;
       staticGridCacheRef.current = null;
