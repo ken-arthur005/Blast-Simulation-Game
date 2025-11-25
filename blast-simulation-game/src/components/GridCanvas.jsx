@@ -1040,6 +1040,8 @@ const GridCanvas = ({
       return;
     }
 
+    
+
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -1229,6 +1231,8 @@ const GridCanvas = ({
       const scoreResult = scoringLogic(totalOres, recovered, diluted, 10);
       console.log('📊 Score calculated:', scoreResult.finalScore);
 
+      
+
       // Update the game score
       if (updateScore) {
         updateScore(scoreResult.finalScore);
@@ -1240,6 +1244,9 @@ const GridCanvas = ({
         recoveredCount: recovered,
         dilutedCount: diluted,
         efficiency: efficiency,
+        finalScore: scoreResult.finalScore,
+        recoveryRate: scoreResult.recoveryRate,
+        dilutionRate: scoreResult.dilutionRate,
       });
     }, 6000);
 
