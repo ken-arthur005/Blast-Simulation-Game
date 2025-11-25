@@ -1,4 +1,4 @@
-import { adjustColor } from "./rockTextureUtils";
+import { adjustColor, mulberry32 } from "./rockTextureUtils";
 
 // Draw a simple rock-like texture inside current origin (0,0) sized to (size)
 // baseColor is a hex string, seedNumber is a deterministic seed per cell
