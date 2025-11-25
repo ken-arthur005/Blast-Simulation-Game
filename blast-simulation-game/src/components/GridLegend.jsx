@@ -3,7 +3,7 @@ import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
 import ArrowButton from "./ArrowButton";
 import RockTexture from "./RockTexture";
-import { RotateCcw, Zap, Palette, Move3d, Save } from "lucide-react";
+import { RotateCcw, Zap, Palette, Move3d, Save, Upload } from "lucide-react";
 
 /**
  * Legend component showing ore types and their colors and controls
@@ -16,6 +16,8 @@ const GridLegend = ({
   selectedBlast = null,
   onSelectDirection = null,
   onSaveSimulation,
+  onLoadSimulation, // <--- ADD THIS PROP
+  loadFileInputKey
 }) => {
   const { gameState, pendingDirection, setPendingDirection } =
     useContext(GameContext);
@@ -266,6 +268,21 @@ const GridLegend = ({
           <Save className="inline-block w-4 h-4 mr-1" />
           Save
         </button>
+        <label
+          htmlFor="load-simulation-mobile"
+          className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-600 text-sm font-semibold flex-1 flex items-center justify-center cursor-pointer"
+        >
+          <Upload className="inline-block w-4 h-4 mr-1" />
+          Load
+          <input
+            id="load-simulation-mobile"
+            key={loadFileInputKey} // Key forces input reset
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={onLoadSimulation}
+          />
+        </label>
       </div>
 
       {/* Desktop: Action buttons and direction selector */}
@@ -301,6 +318,21 @@ const GridLegend = ({
           Save
         </button>
       </div>
+          <label
+          htmlFor="load-simulation-desktop"
+          className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-600 text-base font-semibold w-full mt-3 flex items-center justify-center cursor-pointer"
+        >
+          <Upload className="inline-block w-4 h-4 mr-1" />
+          Load Simulation
+          <input
+            id="load-simulation-desktop"
+            key={loadFileInputKey} // Key forces input reset
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={onLoadSimulation}
+          />
+        </label>
 
       {/* Desktop: Direction selector always visible */}
       <div className="mt-4 hidden md:block">
