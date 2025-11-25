@@ -1,7 +1,7 @@
 import React, {
   useEffect,
   useState,
-  useCallback,
+  useCallback, // <-- Import useCallback
   useContext,
   useRef,
 } from "react";
@@ -18,6 +18,7 @@ import {
 import BlastResults from "./BlastResults";
 import Toast from "./Toast";
 import { saveSimulation } from "../utils/simulationManager";
+import { loadSimulation } from "../utils/loadSimulation"; // <-- utility import assumed to be correct
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const { addRecoveryRecord, updateScore } = useContext(GameContext);
@@ -38,6 +39,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [blastTrigger, setBlastTrigger] = useState(null);
   const [selectedBlast, setSelectedBlast] = useState(null);
   const csvDataRef = useRef(null);
+  const [loadFileInputKey, setLoadFileInputKey] = useState(0) // <-- loadFileInputKey state
   // Ref for synchronous next-placement direction to avoid setState batching/race conditions
   // Shape: { dir: string|null, explicit: boolean }
   // explicit === true means the user explicitly set this as the default for next placements
@@ -52,10 +54,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [showBlastResults, setShowBlastResults] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const showToast = (message, type = "error") => {
+  const showToast = useCallback((message, type = "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 5000);
-  };
+  }, []);
   const handleCloseBlastResults = () => setShowBlastResults(false);
   const handleOpenBlastResults = () => setShowBlastResults(true);
 
@@ -339,6 +341,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       pendingDirection,
       selectedBlast,
       setPendingDirection,
+      showToast,
     ]
   );
 
@@ -448,6 +451,69 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     console.log("Canvas reset to original state");
   };
+  
+  // ----------------------------------------------------------------------
+  // Implementation of Load Simulation Handler (wrapped in useCallback)
+  // ----------------------------------------------------------------------
+  const handleLoadSimulation = useCallback(async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const startTime = performance.now();
+    setIsProcessing(true);
+    setToast(null);
+
+    try {
+      // Assuming 'loadSimulation' is imported correctly and handles parsing/validation
+      const loadedState = await loadSimulation(file);
+
+      // Restore local state
+      setGridData({
+        grid: loadedState.currentGrid,
+        dimensions: loadedState.gridDimensions,
+        metadata: loadedState.gridMetadata,
+        // ... any other properties of gridData
+      });
+      setOriginalGridData({
+        grid: loadedState.originalGrid,
+        dimensions: loadedState.gridDimensions,
+        metadata: loadedState.gridMetadata,
+        // ... any other properties of originalGridData
+      });
+
+      // Restore GameContext state
+      setGameState((prev) => ({
+        ...prev,
+        playerName: loadedState.gameState.playerName,
+        score: loadedState.gameState.score,
+        blasts: loadedState.gameState.blasts,
+        recoveryHistory: loadedState.gameState.recoveryHistory,
+        blastHistory: loadedState.gameState.blastHistory || prev.blastHistory, // Use existing if not present
+        canPlaceExplosives: loadedState.gameState.canPlaceExplosives,
+        // Ensure grid context is updated for consistency
+        grid: loadedState.currentGrid,
+        materialsRemainedAfterDestroy: loadedState.gameState.materialsRemainedAfterDestroy || 0,
+        numberOfMaterialsDestroyed: loadedState.gameState.numberOfMaterialsDestroyed || 0,
+      }));
+
+      // Restore other local states
+      setSelectedBlast(loadedState.selectedBlast || null);
+      setFileResetKey((prev) => prev + 1); // Force GridCanvas reset
+
+      const duration = (performance.now() - startTime) / 1000;
+      showToast(`Simulation loaded successfully in ${duration.toFixed(2)}s!`, "success");
+      console.log("Simulation loaded and state restored:", loadedState);
+
+    } catch (error) {
+      showToast(error.message || "An unknown error occurred during loading.", "error");
+    } finally {
+      setIsProcessing(false);
+      // Reset the file input so the user can load the same file again if needed
+      setLoadFileInputKey((prev) => prev + 1);
+    }
+  }, [setGameState, showToast, setGridData, setOriginalGridData, setFileResetKey]);
+  // ----------------------------------------------------------------------
+
 
   // Loading state
   if (!csvData) {
@@ -508,7 +574,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         score: gameState.score,
         blasts: gameState.blasts,
         recoveryHistory: gameState.recoveryHistory,
+        blastHistory: gameState.blastHistory, // Include blastHistory
         canPlaceExplosives: gameState.canPlaceExplosives,
+        materialsRemainedAfterDestroy: gameState.materialsRemainedAfterDestroy,
+        numberOfMaterialsDestroyed: gameState.numberOfMaterialsDestroyed,
       },
       // From local state
       currentGrid: gridData.grid, // The grid as it is now (possibly with destroyed cells)
@@ -577,6 +646,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             isBlasting={isBlasting}
             selectedBlast={selectedBlast}
             onSelectDirection={onSelectDirection}
+            onSaveSimulation={handleSaveSimulation} // Ensure Save is here too
+            onLoadSimulation={handleLoadSimulation} // <-- PASS PROP
+            loadFileInputKey={loadFileInputKey} // <-- PASS PROP
           />
         </div>
       </div>
@@ -594,6 +666,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           isBlasting={isBlasting}
           selectedBlast={selectedBlast}
           onSelectDirection={onSelectDirection}
+          onLoadSimulation={handleLoadSimulation} // <-- PASS PROP
+          loadFileInputKey={loadFileInputKey}  // <-- PASS PROP
         />
       </div>
 
@@ -614,6 +688,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         // ✅ NEW PROPS: Pass the recovery and dilution rates from the new blast history
         recoveryRate={lastBlastRecord.recovery}
         dilutionRate={lastBlastRecord.dilution}
+        onLoad={handleLoadSimulation}       // <-- PASS PROP to BlastResults
+        loadFileInputKey={loadFileInputKey} // <-- PASS PROP to BlastResults
       />
     </div>
   );

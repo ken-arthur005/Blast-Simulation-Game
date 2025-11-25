@@ -1,9 +1,5 @@
 class GridDataProcessor {
-  /**
-   * Processes CSV data into a 2D grid structure
-   * @param {Object} csvResults - The validated CSV results from react-papaparse
-   * @returns {Object} - Contains grid data, dimensions, and metadata
-   */
+ 
   static processCSVToGrid(csvResults) {
     if (!csvResults || !csvResults.data || csvResults.data.length < 2) {
       console.error('Invalid CSV data provided to GridDataProcessor');
