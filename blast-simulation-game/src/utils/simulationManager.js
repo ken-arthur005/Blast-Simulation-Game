@@ -32,7 +32,7 @@ export const saveSimulation = (simulationState) => {
     // Add new save to the beginning of the array
     const newSave = {
       id: `save_${Date.now()}`,
-      timestamp: new Date().toISOString(),
+      timestamp: simulationState.savedAt || new Date().toISOString(),
       ...simulationState,
     };
     const updatedSaves = [newSave, ...allSaves];
