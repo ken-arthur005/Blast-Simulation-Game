@@ -39,7 +39,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [blastTrigger, setBlastTrigger] = useState(null);
   const [selectedBlast, setSelectedBlast] = useState(null);
   const csvDataRef = useRef(null);
-  const [loadFileInputKey, setLoadFileInputKey] = useState(0) // <-- loadFileInputKey state
+  const [loadFileInputKey, setLoadFileInputKey] = useState(0); // <-- loadFileInputKey state
   // Ref for synchronous next-placement direction to avoid setState batching/race conditions
   // Shape: { dir: string|null, explicit: boolean }
   // explicit === true means the user explicitly set this as the default for next placements
@@ -51,6 +51,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   // Track the last placed blast synchronously so quick direction clicks after placement
   // can be applied to that blast even if React state hasn't updated selectedBlast yet.
   const lastPlacedRef = useRef(null);
+  const [fallenDebris, setFallenDebris] = useState([]);
   const [showBlastResults, setShowBlastResults] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -446,6 +447,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     // also clear next-placement ref
     if (nextPlacementDirRef) nextPlacementDirRef.current = null;
 
+    setFallenDebris([]);
     // this line trigger the reset effect in GridCanvas.jsx
     setFileResetKey((prevKey) => prevKey + 1);
 
@@ -514,7 +516,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   }, [setGameState, showToast, setGridData, setOriginalGridData, setFileResetKey]);
   // ----------------------------------------------------------------------
 
-
   // Loading state
   if (!csvData) {
     return (
@@ -561,30 +562,45 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   });
 
   const handleSaveSimulation = () => {
+    // Error Mitigation: Prevent saving if data isn't ready or a blast is running.
+    if (isBlasting) {
+      showToast("Cannot save while a blast is in progress.", "error");
+      return;
+    }
     if (!gridData || !originalGridData) {
       showToast("Cannot save, grid data is not available.", "error");
       return;
     }
 
-    // Define the State Schema
+    // --- Define the Comprehensive State Schema for Replay ---
     const simulationState = {
-      // From GameContext
+      // 1. Metadata for the save file
+      savedAt: new Date().toISOString(),
+
+      // 2. The complete original grid state, essential for resetting/replaying from scratch
+      initialGridState: {
+        grid: originalGridData.grid,
+        dimensions: originalGridData.dimensions,
+        metadata: originalGridData.metadata,
+      },
+
+      // 3. The state of the simulation at the moment of saving
+      simulationSnapshot: {
+        // The grid as it appears now (may have holes from previous blasts)
+        grid: gridData.grid,
+        // The final resting positions of ores from the LAST blast. Will be an empty array if saved before blasting.
+        fallenDebris: fallenDebris,
+      },
+
+      // 4. All game-related data from the context
       gameState: {
         playerName: gameState.playerName,
-        score: gameState.score,
-        blasts: gameState.blasts,
-        recoveryHistory: gameState.recoveryHistory,
-        blastHistory: gameState.blastHistory, // Include blastHistory
+        blasts: gameState.blasts, // The crucial user action: where explosives were placed
+        blastHistory: gameState.blastHistory, // Contains scores, recovery, efficiency per round
         canPlaceExplosives: gameState.canPlaceExplosives,
         materialsRemainedAfterDestroy: gameState.materialsRemainedAfterDestroy,
         numberOfMaterialsDestroyed: gameState.numberOfMaterialsDestroyed,
       },
-      // From local state
-      currentGrid: gridData.grid, // The grid as it is now (possibly with destroyed cells)
-      originalGrid: originalGridData.grid, // The initial grid from the CSV
-      gridDimensions: gridData.dimensions,
-      gridMetadata: gridData.metadata,
-      selectedBlast: selectedBlast,
     };
 
     // Use the utility to save the state
@@ -594,7 +610,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     if (success) {
       showToast("Simulation saved successfully!", "success");
     } else {
-      showToast("Failed to save simulation.", "error");
+      // The simulationManager already shows an alert, but a toast is more consistent.
+      showToast("Failed to save simulation. Storage might be full.", "error");
     }
   };
 
@@ -631,6 +648,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             onBlockClick={handleCellClick}
             blastTrigger={blastTrigger}
             onBlastComplete={handleBlastComplete}
+            onDebrisSettled={setFallenDebris}
+            fallenDebris={fallenDebris}
             fileResetKey={fileResetKey}
             addRecoveryRecordToGameContext={addRecoveryRecord}
             updateScore={updateScore}
@@ -688,7 +707,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         // ✅ NEW PROPS: Pass the recovery and dilution rates from the new blast history
         recoveryRate={lastBlastRecord.recovery}
         dilutionRate={lastBlastRecord.dilution}
-        onLoad={handleLoadSimulation}       // <-- PASS PROP to BlastResults
+        onLoad={handleLoadSimulation} // <-- PASS PROP to BlastResults
         loadFileInputKey={loadFileInputKey} // <-- PASS PROP to BlastResults
       />
     </div>
