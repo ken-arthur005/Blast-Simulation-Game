@@ -27,6 +27,8 @@ const GridCanvas = ({
   blockSize,
   blastTrigger,
   onBlastComplete,
+  onDebrisSettled,
+  fallenDebris,
   className = "",
   blasts = [],
   onBlockClick,
@@ -53,7 +55,7 @@ const GridCanvas = ({
   };
   const [tooltipData, setTooltipData] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [fallenDebris, setFallenDebris] = useState([]);
+  // const [fallenDebris, setFallenDebris] = useState([]);
   const hoverRafRef = useRef(null);
   const pendingHoverRef = useRef(null);
   // Cache for static grid during blast animation
@@ -71,7 +73,6 @@ const GridCanvas = ({
   // Store current animation timeline for cleanup
   const animationTimelineRef = useRef(null);
   const animationStatesRef = useRef(null);
-
 
   // Helper: Create a cached canvas of static (non-affected) cells for fast rendering during blast
   const createStaticGridCache = useCallback(
@@ -256,7 +257,7 @@ const GridCanvas = ({
     if (gridData && gridData.grid) {
       blocksRef.current = createBlocks();
       setDestroyedCells([]);
-      setFallenDebris([]); // Clear fallen debris on reset
+      onDebrisSettled([]); // Clear fallen debris on reset
       setBlastCompleted(false); // Reset blast state
       // Clear gray caches
       // blocksRef.current.forEach((b) => (b.grayCachedCanvas = null));
@@ -1454,7 +1455,10 @@ const GridCanvas = ({
           };
         });
 
-        setFallenDebris(debrisSnapshot);
+        // setFallenDebris(debrisSnapshot);
+        if (onDebrisSettled) {
+          onDebrisSettled(debrisSnapshot);
+        }
 
         // Invalidate grid cache to trigger rebuild with gray colors
         gridRenderCacheRef.current = null;
@@ -1505,6 +1509,7 @@ const GridCanvas = ({
     addRecoveryRecordToGameContext,
     updateScore,
     renderCanvas,
+    onDebrisSettled,
   ]);
 
   if (!gridData) {
