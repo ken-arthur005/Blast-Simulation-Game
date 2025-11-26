@@ -42,6 +42,9 @@ export const saveSimulation = (simulationState) => {
       updatedSaves.splice(MAX_SAVES); // Remove the oldest saves
     }
 
+    console.log("✅ Simulation Save Triggered. Data being saved:", newSave);
+    console.log("📦 Current state of all saves in localStorage:", updatedSaves);
+
     localStorage.setItem(SAVE_SLOT_KEY, JSON.stringify(updatedSaves));
     console.log(`Simulation saved successfully with ID: ${newSave.id}`);
     return true;
