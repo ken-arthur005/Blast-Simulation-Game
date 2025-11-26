@@ -1,65 +1,101 @@
-const SAVE_SLOT_KEY = "rockBlasterzSaves";
-const MAX_SAVES = 5; // The ticket suggests 5-10, let's start with 5.
+const MANUAL_SAVE_KEY = "rockBlasterzSaves";
+const AUTO_SAVE_KEY = "rockBlasterzAutoSaves";
+
+const MAX_MANUAL_SAVES = 5;
+const MAX_AUTO_SAVES = 3;
 
 /**
- * Retrieves all saved simulations from localStorage.
- * @returns {Array} An array of saved simulation states.
+ * Generic function to get saves from a specific localStorage key.
+ * @param {string} key - The localStorage key to read from.
+ * @returns {Array} An array of saved states.
  */
-export const getSavedSimulations = () => {
+const getSaves = (key) => {
   try {
-    const savedData = localStorage.getItem(SAVE_SLOT_KEY);
+    const savedData = localStorage.getItem(key);
     return savedData ? JSON.parse(savedData) : [];
   } catch (error) {
-    console.error("Failed to retrieve saved simulations:", error);
+    console.error(`Failed to retrieve saves from ${key}:`, error);
     return [];
   }
 };
 
 /**
- * Saves the current simulation state.
- * @param {Object} simulationState - The complete state object to save.
- * @returns {boolean} - True if save was successful, false otherwise.
+ * Generic function to write saves to a specific localStorage key.
+ * @param {string} key - The localStorage key to write to.
+ * @param {Array} data - The array of saves to store.
  */
-export const saveSimulation = (simulationState) => {
+const writeSaves = (key, data) => {
+  localStorage.setItem(key, JSON.stringify(data));
+};
+
+export const getManualSimulations = () => getSaves(MANUAL_SAVE_KEY);
+export const getAutoSimulations = () => getSaves(AUTO_SAVE_KEY);
+
+/**
+ * Saves a manual simulation state.
+ * @param {Object} simulationState - The complete state object to save.
+ * @returns {boolean} - True if save was successful.
+ */
+export const saveManualSimulation = (simulationState) => {
   if (!simulationState) {
-    console.error("Save failed: No simulation state provided.");
+    console.error("Manual save failed: No simulation state provided.");
     return false;
   }
-
   try {
-    const allSaves = getSavedSimulations();
-
-    // Add new save to the beginning of the array
+    const manualSaves = getManualSimulations();
     const newSave = {
-      id: `save_${Date.now()}`,
-      timestamp: simulationState.savedAt || new Date().toISOString(),
+      id: `save_manual_${Date.now()}`,
+      tag: "Manual Save", // Tag for UI distinction
       ...simulationState,
     };
-    const updatedSaves = [newSave, ...allSaves];
+    const updatedSaves = [newSave, ...manualSaves].slice(0, MAX_MANUAL_SAVES);
 
-    // Ensure only the 5 most recent saves are retained
-    if (updatedSaves.length > MAX_SAVES) {
-      updatedSaves.splice(MAX_SAVES); // Remove the oldest saves
-    }
+    console.groupCollapsed(
+      `[MANUAL SAVE] - ${new Date().toLocaleTimeString()}`
+    );
+    console.log("Data being saved:", newSave);
+    console.log("Full list of manual saves:", updatedSaves);
+    console.groupEnd();
 
-    console.log("✅ Simulation Save Triggered. Data being saved:", newSave);
-    console.log("📦 Current state of all saves in localStorage:", updatedSaves);
-
-    localStorage.setItem(SAVE_SLOT_KEY, JSON.stringify(updatedSaves));
-    console.log(`Simulation saved successfully with ID: ${newSave.id}`);
+    writeSaves(MANUAL_SAVE_KEY, updatedSaves);
+    console.log("✅ Manual simulation saved.");
     return true;
   } catch (error) {
-    console.error("Failed to save simulation:", error);
-    // This can happen if localStorage is full.
-    alert("Could not save simulation. Storage might be full.");
+    console.error("Failed to save manual simulation:", error);
     return false;
   }
 };
 
-// We would also add load and delete functions here later.
-/*
-export const loadSimulation = (saveId) => {
-  const allSaves = getSavedSimulations();
-  return allSaves.find(save => save.id === saveId);
+/**
+ * Saves an automatic simulation state after a blast.
+ * @param {Object} simulationState - The complete state object to save.
+ * @param {number} roundNumber - The round number of the blast.
+ * @returns {boolean} - True if save was successful.
+ */
+export const saveAutoSimulation = (simulationState, roundNumber) => {
+  if (!simulationState) {
+    console.error("Auto-save failed: No simulation state provided.");
+    return false;
+  }
+  try {
+    const autoSaves = getAutoSimulations();
+    const newSave = {
+      id: `save_auto_${Date.now()}`,
+      tag: `Auto-Save (After Round ${roundNumber})`, // Dynamic tag
+      ...simulationState,
+    };
+    const updatedSaves = [newSave, ...autoSaves].slice(0, MAX_AUTO_SAVES);
+
+    console.groupCollapsed(`[AUTO SAVE] - Round ${roundNumber}`);
+    console.log("Data being auto-saved:", newSave);
+    console.log("Full list of auto-saves:", updatedSaves);
+    console.groupEnd();
+
+    writeSaves(AUTO_SAVE_KEY, updatedSaves);
+    console.log(`🤖 Auto-save triggered after round ${roundNumber}.`);
+    return true;
+  } catch (error) {
+    console.error("Failed to auto-save simulation:", error);
+    return false;
+  }
 };
-*/
