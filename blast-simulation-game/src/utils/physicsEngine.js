@@ -183,22 +183,16 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
     ),
 
     //ceiling
-    Bodies.rectangle(
-      width / 2,
-      -wallThickness / 2,
-      width,
-      wallThickness,
-      {
-        isStatic: true,
-        friction: 0.5,
-        restitution: 0.3,
-        render: {
-          fillStyle: "#333333",
-          visible: true,
-        },
-        label: "ceiling",
-      }
-    ),
+    Bodies.rectangle(width / 2, -wallThickness / 2, width, wallThickness, {
+      isStatic: true,
+      friction: 0.5,
+      restitution: 0.3,
+      render: {
+        fillStyle: "#333333",
+        visible: true,
+      },
+      label: "ceiling",
+    }),
     // Left wall
     Bodies.rectangle(
       -wallThickness / 2,
@@ -246,24 +240,48 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
  * @param {number} blockSize
  * @param {Object} gridOffset
  * @param {Object} gridData
- * @returns {Array}
+ * @param {Object} replayData - Optional initial positions for replay
+ * @returns {Object} { bodies: Array, initialPositions: Array }
  */
 export const createBlastBodies = (
   affectedCells,
   bodySizeParam,
   gridOffset = { x: 0, y: 0 },
   gridData,
-  stride = bodySizeParam // stride is the distance between cell origins (inner size + spacing)
+  stride = bodySizeParam, // stride is the distance between cell origins (inner size + spacing)
+  replayData = null
 ) => {
-  if (!Array.isArray(affectedCells)) return [];
+  if (!Array.isArray(affectedCells))
+    return { bodies: [], initialPositions: [] };
 
   // Compute min/max for normalization once for the dataset
   const minMax = getMinMax(gridData);
 
-  const bodies = affectedCells.map((cell) => {
-    // Convert grid coordinates to pixel coordinates (center of cell using stride)
-    const pixelX = cell.x * stride + gridOffset.x + stride / 2;
-    const pixelY = cell.y * stride + gridOffset.y + stride / 2;
+  // Store initial positions for replay
+  const initialPositions = [];
+
+  const bodies = affectedCells.map((cell, index) => {
+    // Use replay positions if available, otherwise calculate from grid
+    let pixelX, pixelY;
+    if (
+      replayData &&
+      replayData.initialPositions &&
+      replayData.initialPositions[index]
+    ) {
+      pixelX = replayData.initialPositions[index].x;
+      pixelY = replayData.initialPositions[index].y;
+    } else {
+      // Convert grid coordinates to pixel coordinates (center of cell using stride)
+      pixelX = cell.x * stride + gridOffset.x + stride / 2;
+      pixelY = cell.y * stride + gridOffset.y + stride / 2;
+      initialPositions.push({
+        x: pixelX,
+        y: pixelY,
+        gridX: cell.x,
+        gridY: cell.y,
+        oreType: cell.oreType,
+      });
+    }
 
     // Get the actual cell data from the grid if available
     const cellData = gridData?.grid?.[cell.y]?.[cell.x];
@@ -318,14 +336,16 @@ export const createBlastBodies = (
           x: b.position?.x,
           y: b.position?.y,
           oreType: b.oreType,
-        }))
+        })),
+        "replay mode:",
+        !!replayData
       );
     } catch {
       /* ignore */
     }
   }
 
-  return bodies;
+  return { bodies, initialPositions };
 };
 
 /**
@@ -334,20 +354,39 @@ export const createBlastBodies = (
  * @param {Array} bodies
  * @param {Array} blastCenters
  * @param {number} blastForce
+ * @param {Object} replayData - Optional replay data with pre-recorded random values
+ * @returns {Object} physicsState - Contains all random factors for replay
  */
-export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
+export const applyBlastForce = (
+  bodies,
+  blastCenters,
+  blastForce = 0.08,
+  replayData = null
+) => {
   if (typeof window !== "undefined") {
     try {
       console.debug(
         "physicsEngine.applyBlastForce -> bodies:",
         (bodies || []).length,
         "blastCenters:",
-        blastCenters
+        blastCenters,
+        "replay mode:",
+        !!replayData
       );
     } catch {
       /* ignore */
     }
   }
+
+  // Store random factors for replay
+  const physicsState = {
+    angularVelocities: [],
+    randomFactors: [],
+    timestamp: Date.now(),
+    blastForce,
+    blastCenters: JSON.parse(JSON.stringify(blastCenters)), // Deep copy
+  };
+
   // direction map for biasing debris movement
   const dirMap = {
     right: { x: 1, y: 0 },
@@ -360,7 +399,6 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     "down-left": { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
   };
 
-  
   const biasMultiplier = 15.0; // Significantly increased from 1.2 to 15 to overcome gravity and affect more blocks
   const impulseMultiplier = 2.5; // increase from 0.8 to 2.5 for much stronger initial kick for visible directional movement
   const maxForcePerCall = 0.25; // Increased from to allow very strong directional forces
@@ -381,7 +419,7 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     return { x: vx * s, y: vy * s };
   };
 
-  bodies.forEach((body) => {
+  bodies.forEach((body, bodyIndex) => {
     // debug: log initial body position for the first body sometimes
     // (kept minimal to avoid overwhelming console)
     if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
@@ -396,6 +434,20 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
         /* ignore */
       }
     }
+
+    // Get or generate random angular velocity
+    let angularVelocity;
+    if (
+      replayData &&
+      replayData.angularVelocities &&
+      replayData.angularVelocities[bodyIndex] !== undefined
+    ) {
+      angularVelocity = replayData.angularVelocities[bodyIndex];
+    } else {
+      angularVelocity = (Math.random() - 0.5) * 0.12;
+      physicsState.angularVelocities.push(angularVelocity);
+    }
+
     blastCenters.forEach((blastCenter) => {
       // Calculate direction from blast center to body
       const dx = body.position.x - blastCenter.x;
@@ -435,21 +487,21 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
       // Force calculation: if direction is specified, use primarily directional force
       // Otherwise use radial explosion force
       let forceX, forceY;
-      
+
       if (blastCenter.dirKey) {
         // DIRECTIONAL MODE: Force pushes primarily in the chosen direction
         const bias = dirMap[blastCenter.dirKey] || { x: 0, y: 0 };
-        
+
         // Use 95% directional, 5% radial for strong directional effect
         const directionalWeight = 0.95;
         const radialWeight = 0.05;
-        
+
         const directionalForce = forceMagnitude * biasMultiplier;
         const radialForceX = ux * forceMagnitude * radialWeight;
         const radialForceY = uy * forceMagnitude * radialWeight;
-        
-        forceX = (bias.x * directionalForce * directionalWeight) + radialForceX;
-        forceY = (bias.y * directionalForce * directionalWeight) + radialForceY;
+
+        forceX = bias.x * directionalForce * directionalWeight + radialForceX;
+        forceY = bias.y * directionalForce * directionalWeight + radialForceY;
 
         // Additional impulse in the chosen direction
         const impulseScale = forceMagnitude * impulseMultiplier;
@@ -464,14 +516,14 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
             directionalForce: directionalForce * directionalWeight,
             radialComponent: { x: radialForceX, y: radialForceY },
             totalForce: { x: forceX, y: forceY },
-            magnitude: Math.hypot(forceX, forceY)
+            magnitude: Math.hypot(forceX, forceY),
           });
         }
       } else {
         // RADIAL MODE: Standard explosion in all directions
         forceX = ux * forceMagnitude;
         forceY = uy * forceMagnitude;
-        
+
         if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
           console.log(`⚪ RADIAL blast (no direction specified)`);
         }
@@ -480,19 +532,30 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
       // Clamp total force for stability
       if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
         const beforeClamp = Math.hypot(forceX, forceY);
-        console.log(`🔧 Before clamp: ${beforeClamp.toFixed(4)}, maxForcePerCall: ${maxForcePerCall}`);
+        console.log(
+          `🔧 Before clamp: ${beforeClamp.toFixed(
+            4
+          )}, maxForcePerCall: ${maxForcePerCall}`
+        );
       }
       const clamped = clampVec(forceX, forceY, maxForcePerCall);
       if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
         const afterClamp = Math.hypot(clamped.x, clamped.y);
-        console.log(`🔧 After clamp: ${afterClamp.toFixed(4)}, was clamped: ${afterClamp < Math.hypot(forceX, forceY)}`);
+        console.log(
+          `🔧 After clamp: ${afterClamp.toFixed(4)}, was clamped: ${
+            afterClamp < Math.hypot(forceX, forceY)
+          }`
+        );
       }
       Body.applyForce(body, body.position, clamped);
     });
 
-    // Mild random rotation
-    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.12);
+    // Apply recorded or generated angular velocity
+    Body.setAngularVelocity(body, angularVelocity);
   });
+
+  // Return physics state for replay
+  return physicsState;
 };
 
 /**

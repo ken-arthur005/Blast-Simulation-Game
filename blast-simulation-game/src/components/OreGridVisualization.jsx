@@ -57,13 +57,53 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [fallenDebris, setFallenDebris] = useState([]);
   const [showBlastResults, setShowBlastResults] = useState(false);
   const [toast, setToast] = useState(null);
+  const [isPreparingReplay, setIsPreparingReplay] = useState(false);
 
   const showToast = useCallback((message, type = "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 5000);
   }, []);
-  const handleCloseBlastResults = () => setShowBlastResults(false);
+
+  const handleCloseBlastResults = () => {
+    setShowBlastResults(false);
+  };
+
   const handleOpenBlastResults = () => setShowBlastResults(true);
+
+  // Define handleReplayBlast before any early returns
+  const handleReplayBlast = useCallback(() => {
+    if (typeof window === "undefined" || !window.lastBlastPhysicsState) {
+      showToast("No replay data available.", "error");
+      return;
+    }
+
+    console.log("🎬 Starting blast replay...");
+
+    // Close the blast results modal
+    setShowBlastResults(false);
+
+    // Enter preparation phase to clear visual state
+    setIsPreparingReplay(true);
+    setFallenDebris([]);
+
+    // Add delay to allow visual state to reset before starting blast
+    setTimeout(() => {
+      setIsPreparingReplay(false);
+      
+      // Trigger a replay by setting a special blast trigger
+      setBlastTrigger({
+        affectedCells: window.lastBlastPhysicsState.affectedCells,
+        timestamp: Date.now(),
+        isReplay: true,
+        replayData: window.lastBlastPhysicsState,
+      });
+
+      showToast("Replaying blast animation...", "success");
+    }, 800); // 800ms delay to let canvas re-render with all original colors visible
+
+    // Don't auto-clear the trigger - let GridCanvas handle the cleanup
+    // after animation completes to prevent duplicate triggers
+  }, [showToast]);
 
   const handleTriggerBlast = () => {
     console.log(
@@ -180,86 +220,128 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
   // FIX: Wrap handleBlastComplete in useCallback.
   // This is crucial because it's passed as a prop to GridCanvas and used in a useEffect.
-  const handleBlastComplete = useCallback(() => {
-    if (!gridData || !gridData.grid) {
-      console.error("Grid data not ready yet.");
-      return;
-    }
+  const handleBlastComplete = useCallback(
+    (isReplayCompletion = false) => {
+      // If this is a replay completion, clear trigger and reopen modal
+      if (isReplayCompletion) {
+        console.log(
+          "🎬 Replay completion: Clearing trigger and reopening modal"
+        );
+        // Clear trigger to prevent re-triggering
+        setBlastTrigger(null);
+        setIsBlasting(false);
+        // Open modal in next tick to ensure trigger is cleared first
+        setTimeout(() => {
+          handleOpenBlastResults();
+        }, 0);
+        return;
+      }
 
-    const affectedCells = calculateAllAffectedCells(
-      gridData.grid,
-      gameState.blasts
-    );
+      // Clear the trigger and blasting state (only for normal blast completion)
+      console.log(
+        "🛑 handleBlastComplete: Clearing blast trigger and resetting state"
+      );
+      setBlastTrigger(null);
+      setIsBlasting(false);
 
-    const updatedGrid = applyBlastToGrid(gridData.grid, affectedCells);
+      if (!gridData || !gridData.grid) {
+        console.error("Grid data not ready yet.");
+        return;
+      }
 
-    const totalBlocks = gridData.grid.flat().length;
-    const remainingBlocks = totalBlocks - affectedCells.length;
-    console.log("Remaining blocks:", remainingBlocks);
+      const affectedCells = calculateAllAffectedCells(
+        gridData.grid,
+        gameState.blasts
+      );
 
-    setGameState((prev) => ({
-      ...prev,
-      materialsRemainedAfterDestroy: remainingBlocks,
-      numberOfMaterialsDestroyed: affectedCells.length,
-      canPlaceExplosives: false,
-    }));
+      const updatedGrid = applyBlastToGrid(gridData.grid, affectedCells);
 
-    // Don't store destroyed grid in GameContext - only update local state
-    setGridData((prevState) => ({
-      ...prevState,
-      grid: updatedGrid,
-      remainingBlocks,
-    }));
+      const totalBlocks = gridData.grid.flat().length;
+      const remainingBlocks = totalBlocks - affectedCells.length;
+      console.log("Remaining blocks:", remainingBlocks);
 
-    console.log("🛑 handleBlastComplete: Clearing blast trigger and resetting state");
-    setBlastTrigger(null);
-    setIsBlasting(false);
-    clearBlasts();
-    setSelectedBlast(null);
-    // reset pending direction for the next placement to no-selection (null)
-    if (setPendingDirection) setPendingDirection(null);
-    // clear next-placement ref
-    if (nextPlacementDirRef) nextPlacementDirRef.current = null;
+      setGameState((prev) => ({
+        ...prev,
+        materialsRemainedAfterDestroy: remainingBlocks,
+        numberOfMaterialsDestroyed: affectedCells.length,
+        canPlaceExplosives: false,
+      }));
 
-    console.log("✅ handleBlastComplete: Opening blast results modal");
-    handleOpenBlastResults();
-
-    console.log(
-      "Blast complete! Destroyed:",
-      affectedCells.length,
-      "Remaining:",
-      remainingBlocks
-    );
-
-    // --- TRIGGER AUTO-SAVE ---
-    const roundNumber = (gameState.blastHistory?.length || 0) + 1;
-    const autoSaveState = {
-      savedAt: new Date().toISOString(),
-      initialGridState: {
-        grid: originalGridData.grid,
-        dimensions: originalGridData.dimensions,
-        metadata: originalGridData.metadata,
-      },
-      simulationSnapshot: {
-        grid: updatedGrid, // Use the grid state *after* the blast
-        fallenDebris: fallenDebris, // Use the debris state we lifted earlier
-      },
-      gameState: {
-        ...gameState,
-        blasts: [], // Blasts are cleared after completion
+      // Don't store destroyed grid in GameContext - only update local state
+      setGridData((prevState) => ({
+        ...prevState,
         grid: updatedGrid,
-      },
-    };
-    saveAutoSimulation(autoSaveState, roundNumber);
-  }, [
-    gridData,
-    gameState,
-    setGameState,
-    clearBlasts,
-    setPendingDirection,
-    originalGridData,
-    fallenDebris,
-  ]);
+        remainingBlocks,
+      }));
+
+      // Clear blast state and selection
+      clearBlasts();
+      setSelectedBlast(null);
+      // reset pending direction for the next placement to no-selection (null)
+      if (setPendingDirection) setPendingDirection(null);
+      // clear next-placement ref
+      if (nextPlacementDirRef) nextPlacementDirRef.current = null;
+
+      console.log("✅ handleBlastComplete: Opening blast results modal");
+      handleOpenBlastResults();
+
+      console.log(
+        "Blast complete! Destroyed:",
+        affectedCells.length,
+        "Remaining:",
+        remainingBlocks
+      );
+
+      // --- TRIGGER AUTO-SAVE ---
+      const roundNumber = (gameState.blastHistory?.length || 0) + 1;
+
+      // Capture physics state from the last blast
+      const physicsReplayData =
+        typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
+
+      const autoSaveState = {
+        savedAt: new Date().toISOString(),
+        initialGridState: {
+          grid: originalGridData.grid,
+          dimensions: originalGridData.dimensions,
+          metadata: originalGridData.metadata,
+        },
+        simulationSnapshot: {
+          grid: updatedGrid, // Use the grid state *after* the blast
+          fallenDebris: fallenDebris, // Use the debris state we lifted earlier
+        },
+        gameState: {
+          ...gameState,
+          blasts: [], // Blasts are cleared after completion
+          grid: updatedGrid,
+        },
+        // Add physics replay data for deterministic replay
+        physicsReplayData: physicsReplayData
+          ? {
+              initialPositions: physicsReplayData.initialPositions,
+              physicsState: physicsReplayData.physicsState,
+              trajectories: physicsReplayData.trajectories,
+              affectedCells: physicsReplayData.affectedCells,
+              blastCenters: physicsReplayData.blastCenters,
+              timestamp: physicsReplayData.timestamp,
+              expectedScore: physicsReplayData.expectedScore,
+              expectedRecoveryRate: physicsReplayData.expectedRecoveryRate,
+              expectedDilutionRate: physicsReplayData.expectedDilutionRate,
+            }
+          : null,
+      };
+      saveAutoSimulation(autoSaveState, roundNumber);
+    },
+    [
+      gridData,
+      gameState,
+      setGameState,
+      clearBlasts,
+      setPendingDirection,
+      originalGridData,
+      fallenDebris,
+    ]
+  );
 
   const calculateOptimalSizing = useCallback((processedGrid) => {
     const { dimensions } = processedGrid;
@@ -508,6 +590,13 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     if (nextPlacementDirRef) nextPlacementDirRef.current = null;
 
     setFallenDebris([]);
+
+    // Clear blast trigger to prevent "please import CSV" error
+    setBlastTrigger(null);
+
+    // Close blast results modal if open
+    setShowBlastResults(false);
+
     // this line trigger the reset effect in GridCanvas.jsx
     setFileResetKey((prevKey) => prevKey + 1);
 
@@ -641,6 +730,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       return;
     }
 
+    // Capture physics state from the last blast
+    const physicsReplayData =
+      typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
+
     // --- Define the Comprehensive State Schema for Replay ---
     const simulationState = {
       // 1. Metadata for the save file
@@ -670,6 +763,21 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         materialsRemainedAfterDestroy: gameState.materialsRemainedAfterDestroy,
         numberOfMaterialsDestroyed: gameState.numberOfMaterialsDestroyed,
       },
+
+      // 5. Physics replay data for deterministic replay
+      physicsReplayData: physicsReplayData
+        ? {
+            initialPositions: physicsReplayData.initialPositions,
+            physicsState: physicsReplayData.physicsState,
+            trajectories: physicsReplayData.trajectories,
+            affectedCells: physicsReplayData.affectedCells,
+            blastCenters: physicsReplayData.blastCenters,
+            timestamp: physicsReplayData.timestamp,
+            expectedScore: physicsReplayData.expectedScore,
+            expectedRecoveryRate: physicsReplayData.expectedRecoveryRate,
+            expectedDilutionRate: physicsReplayData.expectedDilutionRate,
+          }
+        : null,
     };
 
     // Use the utility to save the state
@@ -722,6 +830,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             fileResetKey={fileResetKey}
             addRecoveryRecordToGameContext={addRecoveryRecord}
             updateScore={updateScore}
+            isPreparingReplay={isPreparingReplay}
           />
         </div>
 
@@ -764,6 +873,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         show={showBlastResults}
         onClose={handleCloseBlastResults}
         onSave={handleSaveSimulation}
+        onReplay={handleReplayBlast}
         blastRadiusUsed={gameState.blastRadius}
         materialsDestroyed={gameState.numberOfMaterialsDestroyed}
         // ✅ UPDATED: Pass the score from the new blast history
