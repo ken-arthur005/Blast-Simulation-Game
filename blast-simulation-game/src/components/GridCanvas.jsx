@@ -845,6 +845,7 @@ const GridCanvas = ({
       const [x, y] = coord.split(",").map(Number);
       // find matching blast object (if available) to read dirKey
       const matchingBlast = blasts?.find((b) => b.x === x && b.y === y) || {};
+      console.log(`🎯 Creating blast center at grid(${x}, ${y}) with direction: "${matchingBlast.dirKey || 'radial'}"`);
       return {
         x: x * stride + offsetX + innerBlockSize / 2,
         y: y * stride + offsetY + innerBlockSize / 2,

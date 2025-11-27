@@ -66,7 +66,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const handleOpenBlastResults = () => setShowBlastResults(true);
 
   const handleTriggerBlast = () => {
-    console.log("Blasts before calculating:", gameState.blasts);
+    console.log("🚀 TRIGGER BLAST - Blasts before calculating:", gameState.blasts);
+    console.log("🚀 Each blast detail:", gameState.blasts.map((b, i) => 
+      `Blast ${i}: (${b.x},${b.y}) dirKey="${b.dirKey || 'null'}"`
+    ).join(', '));
 
     if (isBlasting) return;
 
@@ -88,7 +91,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
     console.log("Affected cells count:", affectedCells.length);
     console.log("Affected cells:", affectedCells);
-    console.log("Blast centers:", gameState.blasts);
+    console.log("Blast centers with dirKeys:", gameState.blasts);
 
     setBlastTrigger({ affectedCells, timestamp: Date.now() });
   };
@@ -97,14 +100,23 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   // Wrap setBlastDirection in useCallback
   const setBlastDirection = useCallback(
     (x, y, dirKey) => {
-      console.debug("setBlastDirection called ->", { x, y, dirKey });
-      setGameState((prev) => ({
-        ...prev,
-        blasts: prev.blasts.map((b) => {
-          if (b.x === x && b.y === y) return { ...b, dirKey };
+      console.log("🔧 setBlastDirection called ->", { x, y, dirKey });
+      setGameState((prev) => {
+        const updatedBlasts = prev.blasts.map((b) => {
+          if (b.x === x && b.y === y) {
+            console.log(
+              `✅ Updating blast at (${x}, ${y}) with dirKey: ${dirKey}`
+            );
+            return { ...b, dirKey };
+          }
           return b;
-        }),
-      }));
+        });
+        console.log("📦 Updated blasts array:", updatedBlasts);
+        return {
+          ...prev,
+          blasts: updatedBlasts,
+        };
+      });
     },
     [setGameState]
   );
@@ -115,22 +127,27 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   // Wrap onSelectDirection in useCallback
   const onSelectDirection = useCallback(
     (dir, opts = {}) => {
-      console.debug("onSelectDirection called ->", {
+      console.log("🎯 onSelectDirection called ->", {
         dir,
         opts,
         selectedBlast,
       });
       const applyToNext = opts.applyToNext === true;
       if (selectedBlast) {
+        console.log(
+          `📍 Selected blast exists at (${selectedBlast.x}, ${selectedBlast.y}), setting direction to: ${dir}`
+        );
         setBlastDirection(selectedBlast.x, selectedBlast.y, dir);
         if (applyToNext) {
           if (setPendingDirection) setPendingDirection(dir);
           nextPlacementDirRef.current = { dir, explicit: true };
         }
       } else {
+        console.log("❌ No selected blast, checking last placed...");
         const last = lastPlacedRef.current;
         const now = Date.now();
         if (last && now - last.t < 2000) {
+          console.log(`⏱️ Using last placed blast at (${last.x}, ${last.y})`);
           setBlastDirection(last.x, last.y, dir);
           if (applyToNext) {
             if (setPendingDirection) setPendingDirection(dir);
@@ -139,6 +156,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           lastPlacedRef.current = null;
           return;
         }
+        console.log("💡 Setting as pending direction for next placement");
         if (setPendingDirection) setPendingDirection(dir);
         nextPlacementDirRef.current = { dir, explicit: true };
       }

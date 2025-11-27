@@ -360,10 +360,10 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     "down-left": { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
   };
 
-  // Calmer biasing
-  const biasMultiplier = 1.2;
-  const impulseMultiplier = 0.25;
-  const maxForcePerCall = 0.012;
+  
+  const biasMultiplier = 15.0; // Significantly increased from 1.2 to 15 to overcome gravity and affect more blocks
+  const impulseMultiplier = 2.5; // increase from 0.8 to 2.5 for much stronger initial kick for visible directional movement
+  const maxForcePerCall = 0.25; // Increased from to allow very strong directional forces
 
   // Adaptive normalization: smaller datasets can have stronger forces
   // Large datasets (many affected bodies) need gentler forces to prevent explosion
@@ -432,27 +432,61 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
         radialFalloff *
         scales.displacementScale;
 
-      // Radial force component
-      let forceX = ux * forceMagnitude;
-      let forceY = uy * forceMagnitude;
-
-      // Optional directional bias
+      // Force calculation: if direction is specified, use primarily directional force
+      // Otherwise use radial explosion force
+      let forceX, forceY;
+      
       if (blastCenter.dirKey) {
+        // DIRECTIONAL MODE: Force pushes primarily in the chosen direction
         const bias = dirMap[blastCenter.dirKey] || { x: 0, y: 0 };
-        const biasScale = forceMagnitude * biasMultiplier; // no double material scaling
-        forceX += bias.x * biasScale;
-        forceY += bias.y * biasScale;
+        
+        // Use 95% directional, 5% radial for strong directional effect
+        const directionalWeight = 0.95;
+        const radialWeight = 0.05;
+        
+        const directionalForce = forceMagnitude * biasMultiplier;
+        const radialForceX = ux * forceMagnitude * radialWeight;
+        const radialForceY = uy * forceMagnitude * radialWeight;
+        
+        forceX = (bias.x * directionalForce * directionalWeight) + radialForceX;
+        forceY = (bias.y * directionalForce * directionalWeight) + radialForceY;
 
-        // Small extra "kick" as force (not velocity) so mass matters
+        // Additional impulse in the chosen direction
         const impulseScale = forceMagnitude * impulseMultiplier;
         Body.applyForce(body, body.position, {
           x: bias.x * impulseScale,
           y: bias.y * impulseScale,
         });
+
+        if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
+          console.log(`🎯 DIRECTIONAL blast: "${blastCenter.dirKey}"`, {
+            bias,
+            directionalForce: directionalForce * directionalWeight,
+            radialComponent: { x: radialForceX, y: radialForceY },
+            totalForce: { x: forceX, y: forceY },
+            magnitude: Math.hypot(forceX, forceY)
+          });
+        }
+      } else {
+        // RADIAL MODE: Standard explosion in all directions
+        forceX = ux * forceMagnitude;
+        forceY = uy * forceMagnitude;
+        
+        if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
+          console.log(`⚪ RADIAL blast (no direction specified)`);
+        }
       }
 
       // Clamp total force for stability
+      if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
+        const beforeClamp = Math.hypot(forceX, forceY);
+        console.log(`🔧 Before clamp: ${beforeClamp.toFixed(4)}, maxForcePerCall: ${maxForcePerCall}`);
+      }
       const clamped = clampVec(forceX, forceY, maxForcePerCall);
+      if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
+        const afterClamp = Math.hypot(clamped.x, clamped.y);
+        console.log(`🔧 After clamp: ${afterClamp.toFixed(4)}, was clamped: ${afterClamp < Math.hypot(forceX, forceY)}`);
+      }
       Body.applyForce(body, body.position, clamped);
     });
 
