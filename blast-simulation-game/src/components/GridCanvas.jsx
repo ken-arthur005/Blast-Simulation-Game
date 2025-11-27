@@ -19,8 +19,6 @@ import {
 
 import { drawRockTexture, drawRoundedRect } from "../utils/canvasUtils";
 
-
-
 const GridCanvas = ({
   gridData,
   canvasSize,
@@ -37,6 +35,7 @@ const GridCanvas = ({
   fileResetKey = 0, // Trigger to force cleanup when new file is uploaded
   addRecoveryRecordToGameContext,
   updateScore,
+  isPreparingReplay = false,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -495,6 +494,28 @@ const GridCanvas = ({
     renderCanvas();
   }, [renderCanvas]);
 
+  // Clear visual state when preparing for replay
+  useEffect(() => {
+    if (!isPreparingReplay) return;
+
+    console.log("🔄 Preparing for replay - clearing all visual state...");
+    
+    // Clear destroyed cells to show all blocks
+    setDestroyedCells([]);
+    setBlastCompleted(false);
+    
+    // Clear all gray caches so original colors show
+    blocksRef.current.forEach((block) => {
+      block.grayCachedCanvas = null;
+    });
+    
+    // Force render cache rebuild
+    gridRenderCacheRef.current = null;
+    
+    // Trigger a re-render
+    renderCanvas();
+  }, [isPreparingReplay, renderCanvas]);
+
   // Build or rebuild the merged offscreen cache used by the fast-path draw.
   // This is purely visual optimization and does not change any UI or behavior.
   useEffect(() => {
@@ -755,26 +776,84 @@ const GridCanvas = ({
   // Add a ref to track if blast is already running
   // const isBlastRunningRef = useRef(false);
   const bodiesRef = useRef([]);
+  const isInReplayModeRef = useRef(false);
 
   useEffect(() => {
+    // Clear ALL flags if trigger is cleared after replay
+    if (
+      !blastTrigger &&
+      (isInReplayModeRef.current || isBlastRunningRef.current)
+    ) {
+      console.log("🎬 Trigger cleared - resetting all blast flags");
+      isInReplayModeRef.current = false;
+      isBlastRunningRef.current = false;
+      return;
+    }
+
     if (!blastTrigger || !gridData || !gridData.grid || !gridData.grid.length)
       return;
 
-    // PREVENT DOUBLE EXECUTION
+    const isReplayMode = blastTrigger.isReplay === true;
+
+    // PREVENT DOUBLE EXECUTION - check both running flag and replay mode
     if (isBlastRunningRef.current) {
-      console.log("Blast already running, skipping duplicate trigger");
+      // Silently skip duplicate trigger (common in React StrictMode during development)
       return;
     }
+
+    // Check if we're already in replay mode (prevents duplicate replay processing)
+    if (isReplayMode && isInReplayModeRef.current) {
+      console.warn(
+        "⚠️ Already in replay mode, skipping duplicate replay trigger",
+        {
+          currentTimestamp: blastTrigger.timestamp,
+          isBlastRunning: isBlastRunningRef.current,
+        }
+      );
+      return;
+    }
+
+    // Mark blast as running IMMEDIATELY before any state changes
+    // This prevents duplicate triggers during state update renders
+    isBlastRunningRef.current = true;
+
+    // Track replay mode BEFORE any state changes
+    if (isReplayMode) {
+      isInReplayModeRef.current = true;
+      console.log("🔒 Replay mode locked");
+    }
+    console.log(
+      isReplayMode
+        ? "🎬 Starting REPLAY animation"
+        : "✅ Starting NEW blast animation"
+    );
+    console.log("🔍 Flag states at animation start:", {
+      isBlastRunning: isBlastRunningRef.current,
+      isInReplayMode: isInReplayModeRef.current,
+      triggerTimestamp: blastTrigger.timestamp,
+    });
 
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
     const ctx = canvas.getContext("2d");
 
-    const { affectedCells } = blastTrigger;
+    const { affectedCells, replayData } = blastTrigger;
 
-    // Mark blast as running
-    isBlastRunningRef.current = true;
+    // If replay mode, reset the visual state to show original colors
+    if (isReplayMode) {
+      console.log("🔄 Resetting visual state for replay...");
+      // Clear destroyed cells to show all original ore colors
+      setDestroyedCells([]);
+      setBlastCompleted(false); // Reset blast completed flag
+      
+      // Clear gray caches so original colors show
+      blocksRef.current.forEach((block) => {
+        block.grayCachedCanvas = null;
+      });
+      
+      gridRenderCacheRef.current = null; // Force cache rebuild with original colors
+    }
     console.debug("GridCanvas: blastTrigger received", {
       affectedCellsCount: affectedCells?.length,
       affectedSample: affectedCells?.slice?.(0, 6),
@@ -821,15 +900,30 @@ const GridCanvas = ({
     // Create physics bodies sized to the inner block size so visual debris matches spacing
     // Pass stride = innerBlockSize + cellSpacing so bodies are positioned in the same grid layout
     const stride = innerBlockSize + cellSpacing;
-    const bodies = createBlastBodies(
+
+    // Use replay data if available
+    const replayPhysicsData =
+      isReplayMode && replayData
+        ? {
+            initialPositions: replayData.initialPositions,
+            physicsState: replayData.physicsState,
+          }
+        : null;
+
+    const { bodies, initialPositions } = createBlastBodies(
       affectedCells,
       innerBlockSize,
       { x: offsetX, y: offsetY },
       gridData,
-      stride
+      stride,
+      replayPhysicsData
     );
 
-    console.debug("GridCanvas: created bodies", { count: bodies.length });
+    console.debug("GridCanvas: created bodies", {
+      count: bodies.length,
+      initialPositions: initialPositions.length,
+      replayMode: isReplayMode,
+    });
 
     // Add bodies to the world
     World.add(engine.world, bodies);
@@ -837,20 +931,32 @@ const GridCanvas = ({
     // Store bodies in ref so we can access them later with updated colors
     bodiesRef.current = bodies;
 
-    // Calculate blast centers in pixel coordinates and include dirKey for directional bias
-    const uniqueCoords = [
-      ...new Set(affectedCells.map((c) => `${c.blastX},${c.blastY}`)),
-    ];
-    const blastCenters = uniqueCoords.map((coord) => {
-      const [x, y] = coord.split(",").map(Number);
-      // find matching blast object (if available) to read dirKey
-      const matchingBlast = blasts?.find((b) => b.x === x && b.y === y) || {};
-      return {
-        x: x * stride + offsetX + innerBlockSize / 2,
-        y: y * stride + offsetY + innerBlockSize / 2,
-        dirKey: matchingBlast.dirKey || null,
-      };
-    });
+    // Calculate blast centers - use replay data if available
+    let blastCenters;
+    if (isReplayMode && replayData?.blastCenters) {
+      blastCenters = replayData.blastCenters;
+      console.log("🎬 Using stored blast centers for replay");
+    } else {
+      // Calculate blast centers in pixel coordinates and include dirKey for directional bias
+      const uniqueCoords = [
+        ...new Set(affectedCells.map((c) => `${c.blastX},${c.blastY}`)),
+      ];
+      blastCenters = uniqueCoords.map((coord) => {
+        const [x, y] = coord.split(",").map(Number);
+        // find matching blast object (if available) to read dirKey
+        const matchingBlast = blasts?.find((b) => b.x === x && b.y === y) || {};
+        console.log(
+          `🎯 Creating blast center at grid(${x}, ${y}) with direction: "${
+            matchingBlast.dirKey || "radial"
+          }"`
+        );
+        return {
+          x: x * stride + offsetX + innerBlockSize / 2,
+          y: y * stride + offsetY + innerBlockSize / 2,
+          dirKey: matchingBlast.dirKey || null,
+        };
+      });
+    }
 
     // Apply blast forces (tunable factor)
     // Diagnostic overlay: draw small markers at computed blast centers so we can see where
@@ -871,11 +977,69 @@ const GridCanvas = ({
       /* ignore diagnostics errors */
     }
 
-    applyBlastForce(bodies, blastCenters, 0.02); // Reduce from 0.08 to 0.02 for more dramatic effect
+    // Apply blast force - use replay data if available
+    const physicsState = applyBlastForce(
+      bodies,
+      blastCenters,
+      0.02,
+      isReplayMode && replayData ? replayData.physicsState : null
+    );
 
     console.log("📊 Capturing physics trajectories...");
-    const trajectories = capturePhysicsTrajectories(bodies, engine, 120);
-    console.log(`✅ Captured ${trajectories.length} trajectories`);
+
+    // Use stored trajectories in replay mode, otherwise capture new ones
+    let trajectories;
+    if (isReplayMode && replayData?.trajectories) {
+      // Reconstruct trajectories by linking keyframes back to bodies
+      trajectories = replayData.trajectories.map((t) => {
+        const body = bodies.find(
+          (b) =>
+            b.gridX === t.body.gridX &&
+            b.gridY === t.body.gridY &&
+            b.oreType === t.body.oreType
+        );
+        return {
+          body: body || t.body, // Use actual body or fallback to stored data
+          keyframes: t.keyframes,
+        };
+      });
+      console.log(
+        `🎬 Using ${trajectories.length} stored trajectories for replay`
+      );
+    } else {
+      trajectories = capturePhysicsTrajectories(bodies, engine, 120);
+      console.log(`✅ Captured ${trajectories.length} new trajectories`);
+
+      // Store physics state for future replay (only for new blasts)
+      // Note: score will be added later after it's calculated
+      // Strip out circular references from trajectories for storage
+      if (typeof window !== "undefined") {
+        const cleanTrajectories = trajectories.map((t) => ({
+          body: {
+            id: t.body.id,
+            gridX: t.body.gridX,
+            gridY: t.body.gridY,
+            oreType: t.body.oreType,
+          },
+          keyframes: t.keyframes.map((kf) => ({
+            x: kf.x,
+            y: kf.y,
+            angle: kf.angle,
+            frame: kf.frame,
+          })),
+        }));
+
+        window.lastBlastPhysicsState = {
+          initialPositions,
+          physicsState,
+          trajectories: cleanTrajectories,
+          affectedCells,
+          blastCenters,
+          timestamp: Date.now(),
+          expectedScore: null, // Will be set after score calculation
+        };
+      }
+    }
 
     // Step 6: Reset bodies to original positions for animation
     bodies.forEach((body) => {
@@ -889,11 +1053,12 @@ const GridCanvas = ({
       }
     });
     // Set timeout to check blast results after simulation settles (5 seconds)
-    setTimeout(() => {
+    const scoringTimeout = setTimeout(() => {
       const recoveryY = canvas.height * 0.8;
       const neighborRadius = 50; // Pixels to check for mixing
       const highValueThreshold = 50; // From oreValueMapper
 
+      // Apply colors to bodies (needed for both normal blast and replay)
       bodies.forEach((body) => {
         const value = OreValueMapper.getValue(body.oreType);
         let isDiluted = false;
@@ -927,6 +1092,12 @@ const GridCanvas = ({
       // Update the ref with the colored bodies so snapshot can use them
       bodiesRef.current = bodies;
 
+      // Skip score calculation and updates during replay
+      if (isReplayMode) {
+        console.log("🎬 Skipping score calculation for replay (colors applied)");
+        return;
+      }
+
       // Calculate feedback
       const totalOres = bodies.length;
       const recovered = bodies.filter(
@@ -955,12 +1126,21 @@ const GridCanvas = ({
       const scoreResult = scoringLogic(totalOres, recovered, diluted, 10);
       console.log("📊 Score calculated:", scoreResult.finalScore);
 
+      // Store the score with physics state for future replay validation
+      if (typeof window !== "undefined" && window.lastBlastPhysicsState) {
+        window.lastBlastPhysicsState.expectedScore = scoreResult.finalScore;
+        window.lastBlastPhysicsState.expectedRecoveryRate =
+          scoreResult.recoveryRate;
+        window.lastBlastPhysicsState.expectedDilutionRate =
+          scoreResult.dilutionRate;
+      }
+
       // Update the game score
       if (updateScore) {
         updateScore(scoreResult.finalScore);
       }
 
-      // This is the where I called addRecoveryRecord() in GameContext.jsx at.
+      // Add recovery record to game context
       addRecoveryRecordToGameContext({
         totalOres: totalOres,
         recoveredCount: recovered,
@@ -994,9 +1174,16 @@ const GridCanvas = ({
       cacheCreated: !!staticGridCache,
     });
 
-    // Mark affected cells as destroyed immediately when blast starts
-    // so they disappear from the grid right away
-    setDestroyedCells((prev) => [...prev, ...affectedCells]);
+    // Mark affected cells as destroyed immediately ONLY for new blasts
+    // For replay, add a delay to show original colors first
+    if (!isReplayMode) {
+      setDestroyedCells((prev) => [...prev, ...affectedCells]);
+    } else {
+      // For replay, mark them destroyed after a delay to show original colors
+      setTimeout(() => {
+        setDestroyedCells((prev) => [...prev, ...affectedCells]);
+      }, 500); // 500ms delay to show all original colors before blast starts
+    }
 
     console.log(" Starting GSAP animation...");
     const animationDuration = 2.5; // seconds
@@ -1417,8 +1604,49 @@ const GridCanvas = ({
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
 
-        isBlastRunningRef.current = false;
+        // For replays, keep isBlastRunningRef true until after onBlastComplete is called
+        // This prevents duplicate replay triggers during state updates
+        if (!isReplayMode) {
+          isBlastRunningRef.current = false;
+        }
         setBlastCompleted(true);
+
+        // Apply recovery colors immediately before creating snapshot
+        // This ensures debris colors are captured correctly
+        const recoveryY = canvas.height * 0.8;
+        const neighborRadius = 50;
+        const highValueThreshold = 50;
+
+        bodies.forEach((body) => {
+          const value = OreValueMapper.getValue(body.oreType);
+          let isDiluted = false;
+
+          if (body.position.y > recoveryY) {
+            const neighbors = bodies.filter((other) => {
+              if (other === body) return false;
+              const dist = Math.hypot(
+                body.position.x - other.position.x,
+                body.position.y - other.position.y
+              );
+              return dist <= neighborRadius;
+            });
+            const lowValueNeighbors = neighbors.filter(
+              (n) => OreValueMapper.getValue(n.oreType) < highValueThreshold
+            ).length;
+
+            if (value >= highValueThreshold && lowValueNeighbors >= 1) {
+              isDiluted = true;
+            } else if (value < highValueThreshold) {
+              isDiluted = true;
+            }
+          } else {
+            isDiluted = true;
+          }
+
+          body.render.fillStyle = isDiluted ? "#FF0000" : "#00FF00";
+        });
+
+        bodiesRef.current = bodies;
 
         // Save fallen debris positions WITH their final colors (green/red)
         // Use bodiesRef which has been updated with colors from the recovery timeout
@@ -1466,35 +1694,65 @@ const GridCanvas = ({
         console.log("Blast animation completed", {
           debrisCount: debrisSnapshot.length,
           blastCompletedSet: true,
+          isReplay: isReplayMode,
         });
-        if (onBlastComplete) onBlastComplete();
+
+        // Trigger onBlastComplete for both new blasts and replays
+        if (!isReplayMode && onBlastComplete) {
+          onBlastComplete();
+        } else if (isReplayMode) {
+          console.log(
+            "🎬 Replay completed - showing results and clearing trigger"
+          );
+
+          // Show results modal after a delay to ensure animation is fully complete
+          // Keep both isInReplayModeRef and isBlastRunningRef set to true
+          // They will be cleared automatically when the effect detects trigger is null
+          setTimeout(() => {
+            console.log("🎬 Showing results after replay");
+
+            // Show results modal (true = replay completion, clears trigger and opens modal)
+            // This will set blastTrigger to null, which triggers the early check above
+            // that clears both isInReplayModeRef and isBlastRunningRef
+            if (onBlastComplete) {
+              onBlastComplete(true);
+            }
+          }, 200); // Wait 200ms after debris settles for gray caches to render
+        }
       }
     };
 
     animationFrame = requestAnimationFrame(animatePhysics);
 
     return () => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-      }
-      if (timeline) timeline.kill();
+      // Only cleanup if we're not in the middle of a blast
+      // This prevents killing the animation when duplicate triggers are blocked
+      if (!isBlastRunningRef.current && !isInReplayModeRef.current) {
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame);
+        }
+        if (timeline) timeline.kill();
 
-      if (physicsSyncTicker) {
-        gsap.ticker.remove(physicsSyncTicker);
+        if (physicsSyncTicker) {
+          gsap.ticker.remove(physicsSyncTicker);
+        }
+      }
+
+      // Clear the scoring timeout
+      if (scoringTimeout) {
+        clearTimeout(scoringTimeout);
       }
 
       cleanupPhysicsEngine(engine, null);
-      isBlastRunningRef.current = false;
+      // Don't reset blast flags here - they're managed explicitly in the effect logic
+      // Resetting them in cleanup causes duplicate triggers during state updates
+      // isBlastRunningRef.current = false;
+      // isInReplayModeRef.current = false;
+      bodiesRef.current = [];
       staticGridCacheRef.current = null;
       staticGridCacheParamsRef.current = null;
       animationTimelineRef.current = null;
       animationStatesRef.current = null;
-
-      isBlastRunningRef.current = false;
-      bodiesRef.current = [];
-
-      staticGridCacheRef.current = null;
-      staticGridCacheParamsRef.current = null;
     };
   }, [
     blastTrigger,
@@ -1503,13 +1761,12 @@ const GridCanvas = ({
     canvasSize,
     innerBlockSize,
     cellSpacing,
-    onBlastComplete,
     blasts,
     createStaticGridCache,
-    addRecoveryRecordToGameContext,
-    updateScore,
     renderCanvas,
-    onDebrisSettled,
+    // NOTE: Deliberately excluding onBlastComplete, addRecoveryRecordToGameContext, updateScore, onDebrisSettled
+    // from dependencies because they're used inside setTimeout/animation callbacks and we don't want
+    // the effect to retrigger when they change. They're captured at the time the effect runs.
   ]);
 
   if (!gridData) {
