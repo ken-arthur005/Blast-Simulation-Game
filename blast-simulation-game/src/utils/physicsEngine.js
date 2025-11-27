@@ -155,7 +155,8 @@ export const createPhysicsEngine = (canvas, canvasSize) => {
 };
 
 /**
- * Create boundary walls (floor and sides) to contain debris
+ * Create boundary walls (floor, ceiling and sides) to contain debris
+ * Ensures no blocks can escape the canvas bounds
  * @param {Object} canvasSize
  * @param {number} wallThickness
  * @returns {Array}
@@ -168,7 +169,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 70) => {
     Bodies.rectangle(
       width / 2,
       height + wallThickness / 2,
-      width,
+      width + wallThickness * 2, // Extend width to overlap with side walls
       wallThickness,
       {
         isStatic: true,
@@ -182,47 +183,53 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 70) => {
       }
     ),
 
-    //ceiling
-    Bodies.rectangle(width / 2, -wallThickness / 2, width, wallThickness, {
-      isStatic: true,
-      friction: 0.5,
-      restitution: 0.3,
-      render: {
-        fillStyle: "#333333",
-        visible: true,
-      },
-      label: "ceiling",
-    }),
-    // Left wall
+    // Ceiling - at top of canvas to prevent blocks from escaping upward
+    Bodies.rectangle(
+      width / 2,
+      -wallThickness / 2,
+      width + wallThickness * 2, // Extend width to overlap with side walls
+      wallThickness,
+      {
+        isStatic: true,
+        friction: 0.3,
+        restitution: 0.7, // High bounce to send blocks back down decisively
+        render: {
+          fillStyle: "#333333",
+          visible: true,
+        },
+        label: "ceiling",
+      }
+    ),
+    // Left wall - full height coverage from ceiling to floor
     Bodies.rectangle(
       -wallThickness / 2,
       height / 2,
       wallThickness,
-      height * 2,
+      height + wallThickness * 2, // Extra tall to ensure no gaps
       {
         isStatic: true,
         friction: 0.5,
         restitution: 0.5,
         render: {
           fillStyle: "#333333",
-          visible: false,
+          visible: true,
         },
         label: "leftWall",
       }
     ),
-    // Right wall
+    // Right wall - full height coverage from ceiling to floor
     Bodies.rectangle(
       width + wallThickness / 2,
       height / 2,
       wallThickness,
-      height * 2,
+      height + wallThickness * 2, // Extra tall to ensure no gaps
       {
         isStatic: true,
         friction: 0.5,
         restitution: 0.5,
         render: {
           fillStyle: "#333333",
-          visible: false,
+          visible: true,
         },
         label: "rightWall",
       }
