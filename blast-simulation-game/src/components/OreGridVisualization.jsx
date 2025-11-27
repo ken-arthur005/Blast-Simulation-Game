@@ -66,16 +66,30 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const handleOpenBlastResults = () => setShowBlastResults(true);
 
   const handleTriggerBlast = () => {
-    console.log("🚀 TRIGGER BLAST - Blasts before calculating:", gameState.blasts);
-    console.log("🚀 Each blast detail:", gameState.blasts.map((b, i) => 
-      `Blast ${i}: (${b.x},${b.y}) dirKey="${b.dirKey || 'null'}"`
-    ).join(', '));
+    console.log(
+      "🚀 TRIGGER BLAST - Blasts before calculating:",
+      gameState.blasts
+    );
+    console.log(
+      "🚀 Each blast detail:",
+      gameState.blasts
+        .map(
+          (b, i) => `Blast ${i}: (${b.x},${b.y}) dirKey="${b.dirKey || "null"}"`
+        )
+        .join(", ")
+    );
 
     if (isBlasting) return;
 
     // Check if there are any blasts to trigger
     if (!gameState.blasts || gameState.blasts.length === 0) {
       console.log("No blasts to trigger");
+      return;
+    }
+
+    // Check if grid data is available
+    if (!gridData || !gridData.grid) {
+      console.error("Grid data not available for blast calculation");
       return;
     }
 
@@ -197,6 +211,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       remainingBlocks,
     }));
 
+    console.log("🛑 handleBlastComplete: Clearing blast trigger and resetting state");
     setBlastTrigger(null);
     setIsBlasting(false);
     clearBlasts();
@@ -206,6 +221,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     // clear next-placement ref
     if (nextPlacementDirRef) nextPlacementDirRef.current = null;
 
+    console.log("✅ handleBlastComplete: Opening blast results modal");
     handleOpenBlastResults();
 
     console.log(
@@ -237,12 +253,12 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     saveAutoSimulation(autoSaveState, roundNumber);
   }, [
     gridData,
-    gameState.blasts,
-    originalGridData,
+    gameState,
     setGameState,
-    fallenDebris,
     clearBlasts,
     setPendingDirection,
+    originalGridData,
+    fallenDebris,
   ]);
 
   const calculateOptimalSizing = useCallback((processedGrid) => {

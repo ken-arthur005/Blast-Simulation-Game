@@ -762,9 +762,12 @@ const GridCanvas = ({
 
     // PREVENT DOUBLE EXECUTION
     if (isBlastRunningRef.current) {
-      console.log("Blast already running, skipping duplicate trigger");
+      console.warn("⚠️ Blast already running, skipping duplicate trigger. This should not happen!");
+      console.trace("Stack trace for duplicate trigger");
       return;
     }
+    
+    console.log("✅ Starting NEW blast animation - isBlastRunningRef set to true");
 
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -1504,13 +1507,12 @@ const GridCanvas = ({
     canvasSize,
     innerBlockSize,
     cellSpacing,
-    onBlastComplete,
     blasts,
     createStaticGridCache,
-    addRecoveryRecordToGameContext,
-    updateScore,
     renderCanvas,
-    onDebrisSettled,
+    // NOTE: Deliberately excluding onBlastComplete, addRecoveryRecordToGameContext, updateScore, onDebrisSettled
+    // from dependencies because they're used inside setTimeout/animation callbacks and we don't want
+    // the effect to retrigger when they change. They're captured at the time the effect runs.
   ]);
 
   if (!gridData) {
