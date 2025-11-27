@@ -160,7 +160,7 @@ export const createPhysicsEngine = (canvas, canvasSize) => {
  * @param {number} wallThickness
  * @returns {Array}
  */
-export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
+export const createBoundaryWalls = (canvasSize, wallThickness = 70) => {
   const { width, height } = canvasSize;
 
   const walls = [
@@ -173,7 +173,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
       {
         isStatic: true,
         friction: 0.5,
-        restitution: 0.3,
+        restitution: 0.5,
         render: {
           fillStyle: "#333333",
           visible: true,
@@ -202,7 +202,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
       {
         isStatic: true,
         friction: 0.5,
-        restitution: 0.3,
+        restitution: 0.5,
         render: {
           fillStyle: "#333333",
           visible: false,
@@ -219,7 +219,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
       {
         isStatic: true,
         friction: 0.5,
-        restitution: 0.3,
+        restitution: 0.5,
         render: {
           fillStyle: "#333333",
           visible: false,
@@ -492,9 +492,9 @@ export const applyBlastForce = (
         // DIRECTIONAL MODE: Force pushes primarily in the chosen direction
         const bias = dirMap[blastCenter.dirKey] || { x: 0, y: 0 };
 
-        // Use 95% directional, 5% radial for strong directional effect
-        const directionalWeight = 0.95;
-        const radialWeight = 0.05;
+        // Use 98% directional, 2% radial for very strong directional effect
+        const directionalWeight = 0.98;
+        const radialWeight = 0.02;
 
         const directionalForce = forceMagnitude * biasMultiplier;
         const radialForceX = ux * forceMagnitude * radialWeight;
@@ -503,11 +503,18 @@ export const applyBlastForce = (
         forceX = bias.x * directionalForce * directionalWeight + radialForceX;
         forceY = bias.y * directionalForce * directionalWeight + radialForceY;
 
-        // Additional impulse in the chosen direction
+        // Additional strong impulse in the chosen direction to overcome gravity
         const impulseScale = forceMagnitude * impulseMultiplier;
         Body.applyForce(body, body.position, {
           x: bias.x * impulseScale,
           y: bias.y * impulseScale,
+        });
+
+        // Apply initial velocity directly in the direction to ensure immediate visible movement
+        const velocityBoost = 3.5; // Boost factor to make direction visible before gravity takes over
+        Body.setVelocity(body, {
+          x: body.velocity.x + bias.x * velocityBoost,
+          y: body.velocity.y + bias.y * velocityBoost,
         });
 
         if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
@@ -517,6 +524,10 @@ export const applyBlastForce = (
             radialComponent: { x: radialForceX, y: radialForceY },
             totalForce: { x: forceX, y: forceY },
             magnitude: Math.hypot(forceX, forceY),
+            velocityBoost: {
+              x: bias.x * velocityBoost,
+              y: bias.y * velocityBoost,
+            },
           });
         }
       } else {
