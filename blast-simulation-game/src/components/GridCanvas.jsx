@@ -1662,26 +1662,20 @@ const GridCanvas = ({
         //   oreType: body.oreType,
         // }));
 
-        const debrisSnapshot = trajectories.map((trajectory) => {
-          const finalState =
-            trajectory.keyframes[trajectory.keyframes.length - 1];
-          // Find the corresponding body in bodiesRef to get its final calculated color
-          const bodyWithColor = bodiesRef.current.find(
-            (b) => b.id === trajectory.body.id
-          );
-
-          return {
-            x: finalState.x, // Use the final X from the trajectory
-            y: finalState.y, // Use the final Y from the trajectory
-            angle: finalState.angle, // Use the final angle
-            width: innerBlockSize * 0.8,
-            height: innerBlockSize * 0.8,
-            color: bodyWithColor?.render?.fillStyle || "#999999", // Get color from the body
-            gridX: trajectory.body.gridX,
-            gridY: trajectory.body.gridY,
-            oreType: trajectory.body.oreType,
-          };
-        });
+        // --- CORRECTED DEBRIS SNAPSHOT LOGIC ---
+        // We now map over `bodiesRef.current`, which holds the live Matter.js bodies
+        // with their final, settled positions and the correct recovery colors.
+        const debrisSnapshot = bodiesRef.current.map((body) => ({
+          x: body.position.x,
+          y: body.position.y,
+          angle: body.angle,
+          width: innerBlockSize * 0.8,
+          height: innerBlockSize * 0.8,
+          color: body.render?.fillStyle || "#999999", // This color was set by the scoring timeout
+          gridX: body.gridX,
+          gridY: body.gridY,
+          oreType: body.oreType,
+        }));
 
         // setFallenDebris(debrisSnapshot);
         if (onDebrisSettled) {
