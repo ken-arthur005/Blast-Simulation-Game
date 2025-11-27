@@ -160,7 +160,7 @@ export const createPhysicsEngine = (canvas, canvasSize) => {
  * @param {number} wallThickness
  * @returns {Array}
  */
-export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
+export const createBoundaryWalls = (canvasSize, wallThickness = 70) => {
   const { width, height } = canvasSize;
 
   const walls = [
@@ -173,7 +173,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
       {
         isStatic: true,
         friction: 0.5,
-        restitution: 0.3,
+        restitution: 0.5,
         render: {
           fillStyle: "#333333",
           visible: true,
@@ -182,7 +182,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
       }
     ),
 
-    //ceiling
+    //ceiling 
     Bodies.rectangle(
       width / 2,
       -wallThickness / 2,
@@ -193,7 +193,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
         friction: 0.5,
         restitution: 0.3,
         render: {
-          fillStyle: "#333333",
+          fillStyle: "#bb1010ff",
           visible: true,
         },
         label: "ceiling",
@@ -208,7 +208,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
       {
         isStatic: true,
         friction: 0.5,
-        restitution: 0.3,
+        restitution: 0.5,
         render: {
           fillStyle: "#333333",
           visible: false,
@@ -225,7 +225,7 @@ export const createBoundaryWalls = (canvasSize, wallThickness = 50) => {
       {
         isStatic: true,
         friction: 0.5,
-        restitution: 0.3,
+        restitution: 0.5,
         render: {
           fillStyle: "#333333",
           visible: false,
@@ -360,8 +360,8 @@ export const applyBlastForce = (bodies, blastCenters, blastForce = 0.08) => {
     "down-left": { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
   };
 
-  // Calmer biasing
-  const biasMultiplier = 1.2;
+  // Enhanced directional biasing - when direction is specified, it should dominate
+  const biasMultiplier = 3.5; // Increased from 1.2 to make directional blasts more effective
   const impulseMultiplier = 0.25;
   const maxForcePerCall = 0.012;
 

@@ -16,6 +16,7 @@ const BlastResult = ({
   // resetCanvas,
   recoveredCount,
   efficiency,
+  onExportSimulation,
 }) => {
   const { gameState } = useContext(GameContext);
 
@@ -97,7 +98,7 @@ const BlastResult = ({
               </button>
             </div>
             <div className="relative group w-full md:w-auto">
-              <button className="cursor-pointer flex gap-2 justify-center md:justify-between items-center px-3 md:px-5 py-2 md:py-1 border-black-500 border-b-2 rounded bg-amber-700 hover:bg-amber-900 hover:text-white md:ml-3 w-full md:w-auto text-sm md:text-base">
+              <button className="cursor-pointer flex gap-2 justify-center md:justify-between items-center px-3 md:px-5 py-2 md:py-1 border-black-500 border-b-2 rounded bg-amber-700 hover:bg-amber-900 hover:text-white md:ml-3 w-full md:w-auto text-sm md:text-base" onClick={onExportSimulation}>
                 {/* <Trophy /> */}
                 <Download size={16} className="md:w-5 md:h-5" />
                 Export

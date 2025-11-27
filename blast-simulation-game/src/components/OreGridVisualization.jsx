@@ -650,6 +650,37 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }
   };
 
+  //Export Simulation Logic
+  const handleExportSimulation = () => {
+    if (!gridData) {
+      showToast("Cannot export, grid data is not available.", "error");
+      return;
+    }
+
+    const timestamp = new Date().toLocaleTimeString('en-GB').replace(/:/g, '-');
+    const datestamp = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+   
+
+    const sessionData = {
+      gridDimensions: gridData.dimensions,
+      blastHistory: gameState.blastHistory,
+      recoveryHistory: gameState.recoveryHistory,
+      finalScore: gameState.score,
+      remainingMaterials: gameState.materialsRemainedAfterDestroy,
+      numberOfMaterialsDestroyed: gameState.numberOfMaterialsDestroyed,
+    }
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(sessionData, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href",     dataStr);
+    downloadAnchorNode.setAttribute("download", "simulation_" + datestamp + "_" + timestamp + ".json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+
+    showToast("Simulation exported successfully!", "success");
+  };
+
   return (
     <div className="w-full min-h-screen relative">
       {toast && (
@@ -744,6 +775,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         dilutionRate={lastBlastRecord.dilution}
         onLoad={handleLoadSimulation} // <-- PASS PROP to BlastResults
         loadFileInputKey={loadFileInputKey} // <-- PASS PROP to BlastResults
+        onExportSimulation={handleExportSimulation}
       />
     </div>
   );
