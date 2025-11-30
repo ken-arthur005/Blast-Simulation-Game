@@ -1,8 +1,11 @@
 const MANUAL_SAVE_KEY = "rockBlasterzSaves";
 const AUTO_SAVE_KEY = "rockBlasterzAutoSaves";
+// NEW: Key for lightweight leaderboard data
+const LEADERBOARD_KEY = "rockBlasterzLeaderboard";
 
 const MAX_MANUAL_SAVES = 5;
 const MAX_AUTO_SAVES = 3;
+const MAX_LEADERBOARD_ENTRIES = 50; // Keep top 50
 
 /**
  * Generic function to get saves from a specific localStorage key.
@@ -30,6 +33,8 @@ const writeSaves = (key, data) => {
 
 export const getManualSimulations = () => getSaves(MANUAL_SAVE_KEY);
 export const getAutoSimulations = () => getSaves(AUTO_SAVE_KEY);
+// NEW: Export leaderboard getter
+export const getLeaderboardScores = () => getSaves(LEADERBOARD_KEY);
 
 /**
  * Saves a manual simulation state.
@@ -49,13 +54,6 @@ export const saveManualSimulation = (simulationState) => {
       ...simulationState,
     };
     const updatedSaves = [newSave, ...manualSaves].slice(0, MAX_MANUAL_SAVES);
-
-    console.groupCollapsed(
-      `[MANUAL SAVE] - ${new Date().toLocaleTimeString()}`
-    );
-    console.log("Data being saved:", newSave);
-    console.log("Full list of manual saves:", updatedSaves);
-    console.groupEnd();
 
     writeSaves(MANUAL_SAVE_KEY, updatedSaves);
     console.log("✅ Manual simulation saved.");
@@ -86,16 +84,50 @@ export const saveAutoSimulation = (simulationState, roundNumber) => {
     };
     const updatedSaves = [newSave, ...autoSaves].slice(0, MAX_AUTO_SAVES);
 
-    console.groupCollapsed(`[AUTO SAVE] - Round ${roundNumber}`);
-    console.log("Data being auto-saved:", newSave);
-    console.log("Full list of auto-saves:", updatedSaves);
-    console.groupEnd();
-
     writeSaves(AUTO_SAVE_KEY, updatedSaves);
     console.log(`🤖 Auto-save triggered after round ${roundNumber}.`);
     return true;
   } catch (error) {
     console.error("Failed to auto-save simulation:", error);
+    return false;
+  }
+};
+
+/**
+ * Saves a high score entry to the leaderboard.
+ * @param {Object} scoreEntry - { playerName, score, efficiency, date, recoveryRate }
+ */
+export const saveHighscore = (scoreEntry) => {
+  try {
+    const currentScores = getLeaderboardScores();
+    const newEntry = {
+      id: `score_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      ...scoreEntry,
+    };
+    
+    // Add new score, sort by score descending, then limit list size
+    const updatedScores = [...currentScores, newEntry]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_LEADERBOARD_ENTRIES);
+
+    writeSaves(LEADERBOARD_KEY, updatedScores);
+    console.log("🏆 High score saved:", newEntry);
+    return true;
+  } catch (error) {
+    console.error("Failed to save high score:", error);
+    return false;
+  }
+};
+
+/**
+ * Clears the leaderboard.
+ */
+export const clearLeaderboard = () => {
+  try {
+    localStorage.removeItem(LEADERBOARD_KEY);
+    return true;
+  } catch (error) {
     return false;
   }
 };
