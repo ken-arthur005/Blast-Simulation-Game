@@ -52,19 +52,8 @@ const GridTooltip = ({ cell, gridX, gridY, mouseX, mouseY, visible }) => {
         {/* Value */}
         <div className="text-xs text-gray-600">
           <span className="font-medium">Value:</span>{" "}
-          <span className="text-gray-800">${value.toFixed(2)}</span>
+          <span className="text-gray-800">{value.toFixed(2)}℥</span>
         </div>
-
-        {/* Coordinates */}
-        {/* <div className="text-xs text-gray-600">
-          <span className="font-medium">Position:</span>{" "}
-          <span className="text-gray-800">
-            ({gridX}, {gridY})
-          </span>
-        </div> */}
-
-        {/* Color hex code */}
-        {/* <div className="text-xs text-gray-500 font-mono">{color}</div> */}
       </div>
     </div>
   );
