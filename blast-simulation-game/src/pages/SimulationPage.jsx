@@ -45,7 +45,7 @@ const SimulationPage = () => {
         // Load mobile CSV for mobile devices, otherwise load large CSV
         const csvFile = isMobileView
           ? "/sample-ore-mobile.csv"
-          : "/sample-ore-large.csv";
+          : "/sample-ore-20x20-balanced.csv";
         const res = await fetch(csvFile);
         if (!res.ok) throw new Error("Failed to fetch default CSV file");
         const csvText = await res.text();
