@@ -119,32 +119,9 @@ const BlastResult = ({
           <div className="flex flex-col md:flex-row gap-2 md:gap-0 md:pr-10">
             <div className="relative group w-full md:w-auto">
               <button
-                onClick={onSave}
-                className="cursor-pointer flex gap-2 justify-center md:justify-between items-center px-3 md:px-5 py-2 md:py-1 border-black-500 border-b-2 rounded bg-blue-600 hover:bg-blue-800 w-full md:w-auto text-sm md:text-base"
+                className="cursor-pointer flex gap-2 justify-center md:justify-between items-center px-3 md:px-5 py-2 md:py-1 border-black-500 border-b-2 rounded bg-amber-700 hover:bg-amber-900 hover:text-white md:ml-3 w-full md:w-auto text-sm md:text-base"
+                onClick={onExportSimulation}
               >
-                {/* <Trophy /> */}
-                <Save size={16} className="md:w-5 md:h-5" />
-                Save
-                <span className="hidden md:block absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Save your state
-                </span>
-              </button>
-            </div>
-            <div className="relative group w-full md:w-auto">
-              <button
-                // onClick={onClose}
-                className="cursor-pointer flex gap-2 justify-center md:justify-between items-center px-3 md:px-5 py-2 md:py-1 border-black-500 border rounded hover:bg-white/20 hover:text-white md:ml-3 w-full md:w-auto text-sm md:text-base"
-              >
-                {/* <Trophy /> */}
-                <Upload size={16} className="md:w-5 md:h-5" />
-                Load
-                <span className="hidden md:block absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Load your saved state
-                </span>
-              </button>
-            </div>
-            <div className="relative group w-full md:w-auto">
-              <button className="cursor-pointer flex gap-2 justify-center md:justify-between items-center px-3 md:px-5 py-2 md:py-1 border-black-500 border-b-2 rounded bg-amber-700 hover:bg-amber-900 hover:text-white md:ml-3 w-full md:w-auto text-sm md:text-base" onClick={onExportSimulation}>
                 {/* <Trophy /> */}
                 <Download size={16} className="md:w-5 md:h-5" />
                 Export
