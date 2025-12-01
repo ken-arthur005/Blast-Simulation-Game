@@ -253,7 +253,7 @@ const GridLegend = ({
 
         {/* Mobile Leaderboard Button */}
         <button
-          className="col-span-2 bg-yellow-600 text-white px-3 py-2 rounded hover:bg-yellow-500 text-sm font-semibold flex items-center justify-center"
+          className="bg-yellow-600 text-white px-3 py-2 rounded hover:bg-yellow-500 text-sm font-semibold flex items-center justify-center"
           onClick={onOpenLeaderboard}
           disabled={isBlasting}
         >
