@@ -1,15 +1,15 @@
 import { adjustColor, mulberry32 } from "./rockTextureUtils";
 
-// Draw a simple rock-like texture inside current origin (0,0) sized to (size)
-// baseColor is a hex string, seedNumber is a deterministic seed per cell
+
 export const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => {
   const rand = mulberry32(seedNumber);
   const prevGlobalAlpha = ctx.globalAlpha ?? 1;
 
   // Create a jagged blob silhouette (centered) to emulate a rock outline
+  // OPTIMIZED: Reduced point count from 8-14 to 6-10 for faster path creation
   const cx = size / 2;
   const cy = size / 2;
-  const points = 8 + Math.floor(rand() * 6);
+  const points = 6 + Math.floor(rand() * 5);
   const outerR = size * 0.48;
   const jagged = [];
   for (let i = 0; i < points; i++) {
@@ -42,8 +42,9 @@ export const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => 
   ctx.closePath();
   ctx.clip();
 
-  // blotches: a few soft, slightly lighter/darker blobs
-  const blotches = 6 + Math.floor(rand() * 6);
+  // OPTIMIZED: Reduced detail for better performance with 10k+ blocks
+  // blotches: fewer soft blobs (reduced from 6-12 to 4-8)
+  const blotches = 4 + Math.floor(rand() * 4);
   for (let i = 0; i < blotches; i++) {
     const bx = cx + (rand() * 2 - 1) * outerR * 0.6;
     const by = cy + (rand() * 2 - 1) * outerR * 0.5;
@@ -56,8 +57,8 @@ export const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => 
     ctx.fill();
   }
 
-  // speckles: small mineral flecks
-  const speckles = 18 + Math.floor(rand() * 36);
+  // speckles: fewer mineral flecks (reduced from 18-54 to 12-24)
+  const speckles = 12 + Math.floor(rand() * 12);
   for (let i = 0; i < speckles; i++) {
     const sx = cx + (rand() * 2 - 1) * outerR * 0.85;
     const sy = cy + (rand() * 2 - 1) * outerR * 0.85;
@@ -70,15 +71,15 @@ export const drawRockTexture = (ctx, size, baseColor, seedNumber, alpha = 1) => 
     ctx.fill();
   }
 
-  // subtle veins: short lines
-  const veins = 1 + Math.floor(rand() * 3);
+  // subtle veins: fewer short lines (reduced max from 4 to 2)
+  const veins = 1 + Math.floor(rand() * 2);
   ctx.lineWidth = Math.max(0.5, size * 0.01);
   for (let v = 0; v < veins; v++) {
     ctx.beginPath();
     const sx = cx + (rand() * 2 - 1) * outerR * 0.5;
     const sy = cy + (rand() * 2 - 1) * outerR * 0.5;
     ctx.moveTo(sx, sy);
-    const segs = 2 + Math.floor(rand() * 3);
+    const segs = 2 + Math.floor(rand() * 2); // Reduced max segments
     for (let s = 0; s < segs; s++) {
       const nx = sx + (rand() - 0.5) * size * 0.25;
       const ny = sy + (rand() - 0.5) * size * 0.25;

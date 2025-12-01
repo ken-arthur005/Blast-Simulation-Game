@@ -48,7 +48,7 @@ const getMinMax = (gridData) => {
   };
 };
 
-// Centralize material-to-physics mapping
+
 // Assumptions: min/max are now computed dynamically from the dataset for proper normalization
 const computeMaterialScales = (cellData, minMax) => {
   const rawDensity = Number.isFinite(cellData?.density)
@@ -62,7 +62,6 @@ const computeMaterialScales = (cellData, minMax) => {
     : 0.5;
 
   // Displacement scale: light and soft → move more; heavy and hard → move less
-  // Increased ranges to make material differences more visually apparent
   const densityForceScale = mapRange(
     rawDensity,
     minMax.density.min,
@@ -267,20 +266,22 @@ export const createBlastBodies = (
   // Store initial positions for replay
   const initialPositions = [];
 
+  // OPTIMIZED: Pre-calculate shared values outside loop
+  const halfStride = stride / 2;
+  const offsetXPlusHalf = gridOffset.x + halfStride;
+  const offsetYPlusHalf = gridOffset.y + halfStride;
+  const isReplay = !!(replayData && replayData.initialPositions);
+  
   const bodies = affectedCells.map((cell, index) => {
     // Use replay positions if available, otherwise calculate from grid
     let pixelX, pixelY;
-    if (
-      replayData &&
-      replayData.initialPositions &&
-      replayData.initialPositions[index]
-    ) {
+    if (isReplay && replayData.initialPositions[index]) {
       pixelX = replayData.initialPositions[index].x;
       pixelY = replayData.initialPositions[index].y;
     } else {
-      // Convert grid coordinates to pixel coordinates (center of cell using stride)
-      pixelX = cell.x * stride + gridOffset.x + stride / 2;
-      pixelY = cell.y * stride + gridOffset.y + stride / 2;
+      // OPTIMIZED: Use pre-calculated offsets to reduce arithmetic operations
+      pixelX = cell.x * stride + offsetXPlusHalf;
+      pixelY = cell.y * stride + offsetYPlusHalf;
       initialPositions.push({
         x: pixelX,
         y: pixelY,
@@ -330,27 +331,8 @@ export const createBlastBodies = (
     return body;
   });
 
-  // Debug: log a small sample of created bodies when running in the browser
-  if (typeof window !== "undefined") {
-    try {
-      console.debug(
-        "physicsEngine.createBlastBodies -> created",
-        bodies.length,
-        "bodies. Sample:",
-        bodies.slice(0, 6).map((b) => ({
-          gridX: b.gridX,
-          gridY: b.gridY,
-          x: b.position?.x,
-          y: b.position?.y,
-          oreType: b.oreType,
-        })),
-        "replay mode:",
-        !!replayData
-      );
-    } catch {
-      /* ignore */
-    }
-  }
+  // OPTIMIZED: Debug logging disabled for performance - causes significant overhead with 10k+ bodies
+  // console.debug calls removed from hot path
 
   return { bodies, initialPositions };
 };
@@ -370,20 +352,7 @@ export const applyBlastForce = (
   blastForce = 0.08,
   replayData = null
 ) => {
-  if (typeof window !== "undefined") {
-    try {
-      console.debug(
-        "physicsEngine.applyBlastForce -> bodies:",
-        (bodies || []).length,
-        "blastCenters:",
-        blastCenters,
-        "replay mode:",
-        !!replayData
-      );
-    } catch {
-      /* ignore */
-    }
-  }
+  // OPTIMIZED: Debug logging disabled for performance with 10k+ bodies
 
   // Store random factors for replay
   const physicsState = {
@@ -406,11 +375,10 @@ export const applyBlastForce = (
     "down-left": { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
   };
 
-  const biasMultiplier = 15.0; // Significantly increased from 1.2 to 15 to overcome gravity and affect more blocks
-  const impulseMultiplier = 2.5; // increase from 0.8 to 2.5 for much stronger initial kick for visible directional movement
-  const maxForcePerCall = 0.25; // Increased from to allow very strong directional forces
+  const biasMultiplier = 15.0; 
+  const impulseMultiplier = 2.5; 
+  const maxForcePerCall = 0.25; 
 
-  // Adaptive normalization: smaller datasets can have stronger forces
   // Large datasets (many affected bodies) need gentler forces to prevent explosion
   const bodyCount = bodies ? bodies.length : 1;
   const adaptiveScale = Math.max(
@@ -427,20 +395,7 @@ export const applyBlastForce = (
   };
 
   bodies.forEach((body, bodyIndex) => {
-    // debug: log initial body position for the first body sometimes
-    // (kept minimal to avoid overwhelming console)
-    if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
-      try {
-        console.debug("applyBlastForce: sample body", {
-          gridX: body.gridX,
-          gridY: body.gridY,
-          x: body.position?.x,
-          y: body.position?.y,
-        });
-      } catch {
-        /* ignore */
-      }
-    }
+    // OPTIMIZED: Debug logging removed from per-body loop for 10k+ block performance
 
     // Get or generate random angular velocity
     let angularVelocity;
@@ -468,9 +423,6 @@ export const applyBlastForce = (
       // Material scaling
       const scales = computeMaterialScales(body.cellData, body.minMax);
 
-      // Enhanced distance falloff: creates much stronger effect closer to blast
-      // Grid distance uses stronger falloff to prioritize blast epicenter blocks
-      // Adaptive: limit grid distance impact on large datasets to prevent peripheral chaos
       const gridDistanceFalloff = Math.max(
         0.1,
         Math.min(0.3, adaptiveScale * 0.15)
@@ -524,47 +476,18 @@ export const applyBlastForce = (
           y: body.velocity.y + bias.y * velocityBoost,
         });
 
-        if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
-          console.log(`🎯 DIRECTIONAL blast: "${blastCenter.dirKey}"`, {
-            bias,
-            directionalForce: directionalForce * directionalWeight,
-            radialComponent: { x: radialForceX, y: radialForceY },
-            totalForce: { x: forceX, y: forceY },
-            magnitude: Math.hypot(forceX, forceY),
-            velocityBoost: {
-              x: bias.x * velocityBoost,
-              y: bias.y * velocityBoost,
-            },
-          });
-        }
+        // OPTIMIZED: Logging removed from per-body loop for 10k+ block performance
       } else {
         // RADIAL MODE: Standard explosion in all directions
         forceX = ux * forceMagnitude;
         forceY = uy * forceMagnitude;
 
-        if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
-          console.log(`⚪ RADIAL blast (no direction specified)`);
-        }
+        // OPTIMIZED: Logging removed from per-body loop
       }
 
       // Clamp total force for stability
-      if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
-        const beforeClamp = Math.hypot(forceX, forceY);
-        console.log(
-          `🔧 Before clamp: ${beforeClamp.toFixed(
-            4
-          )}, maxForcePerCall: ${maxForcePerCall}`
-        );
-      }
+
       const clamped = clampVec(forceX, forceY, maxForcePerCall);
-      if (typeof window !== "undefined" && bodies.indexOf(body) === 0) {
-        const afterClamp = Math.hypot(clamped.x, clamped.y);
-        console.log(
-          `🔧 After clamp: ${afterClamp.toFixed(4)}, was clamped: ${
-            afterClamp < Math.hypot(forceX, forceY)
-          }`
-        );
-      }
       Body.applyForce(body, body.position, clamped);
     });
 
