@@ -19,7 +19,14 @@ export default function scoringLogic(totalOres, recoveredOres, dilutedOres, reco
   const dilutionRate = totalOres > 0 
     ? (dilutedOres / totalOres) * 100 
     : 0;
-  const finalScore = recoveryWeight * (recoveryRate - dilutionRate);
+  
+  // Base score from recovery
+  const baseScore = recoveryRate * recoveryWeight;
+  
+  // Penalty multiplier: 1.0 at 0% dilution, 0.0 at 100% dilution
+  const penaltyMultiplier = Math.max(0, 1 - (dilutionRate / 100));
+  
+  const finalScore = Math.round(baseScore * penaltyMultiplier);
 
   // Round values for cleaner output
   const result = {
@@ -28,7 +35,8 @@ export default function scoringLogic(totalOres, recoveredOres, dilutedOres, reco
     dilutedOres,
     recoveryRate: Math.round(recoveryRate * 100) / 100,  
     dilutionRate: Math.round(dilutionRate * 100) / 100,
-    finalScore: Math.round(finalScore)
+    penaltyMultiplier: Math.round(penaltyMultiplier * 100) / 100,
+    finalScore
   };
   
   return result;
