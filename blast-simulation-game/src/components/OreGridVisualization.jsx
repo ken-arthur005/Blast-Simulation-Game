@@ -24,6 +24,7 @@ import {
   saveHighscore, 
 } from "../utils/simulationManager";
 import { loadSimulation } from "../utils/loadSimulation";
+import LoadGameModal from "./LoadGameModal";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const { addRecoveryRecord, updateScore } = useContext(GameContext);
@@ -58,6 +59,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [showLeaderboard, setShowLeaderboard] = useState(false); // <--- NEW STATE
   const [toast, setToast] = useState(null);
   const [isPreparingReplay, setIsPreparingReplay] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false)
 
   // ... (keep showToast, handleCloseBlastResults, handleOpenBlastResults) ...
   const showToast = useCallback((message, type = "error") => {
@@ -377,75 +379,76 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     setFileResetKey((prevKey) => prevKey + 1);
   };
 
+  const restoreGameState = useCallback((loadedState) => {
+    // 1. Grid restoration
+    setGridData({
+        grid: loadedState.currentGrid || loadedState.simulationSnapshot?.grid,
+        dimensions: loadedState.gridDimensions || loadedState.initialGridState?.dimensions,
+        metadata: loadedState.gridMetadata || loadedState.initialGridState?.metadata,
+    });
+    setOriginalGridData({
+        grid: loadedState.originalGrid || loadedState.initialGridState?.grid,
+        dimensions: loadedState.gridDimensions || loadedState.initialGridState?.dimensions,
+        metadata: loadedState.gridMetadata || loadedState.initialGridState?.metadata,
+    });
+
+    // 2. Context restoration
+    setGameState((prev) => ({
+        ...prev,
+        playerName: loadedState.gameState.playerName,
+        score: loadedState.gameState.score,
+        blasts: loadedState.gameState.blasts,
+        recoveryHistory: loadedState.gameState.recoveryHistory,
+        blastHistory: loadedState.gameState.blastHistory || prev.blastHistory,
+        canPlaceExplosives: loadedState.gameState.canPlaceExplosives,
+        grid: loadedState.currentGrid || loadedState.simulationSnapshot?.grid,
+        materialsRemainedAfterDestroy: loadedState.gameState.materialsRemainedAfterDestroy || 0,
+        numberOfMaterialsDestroyed: loadedState.gameState.numberOfMaterialsDestroyed || 0,
+    }));
+
+    // 3. Physics Replay Restoration
+    if (loadedState.physicsReplayData && typeof window !== 'undefined') {
+        console.log("Restoring physics replay data...");
+        window.lastBlastPhysicsState = loadedState.physicsReplayData;
+    } else {
+        window.lastBlastPhysicsState = null;
+    }
+
+    // 4. Visuals
+    setSelectedBlast(loadedState.selectedBlast || null);
+    setFileResetKey((prev) => prev + 1); 
+    if (loadedState.simulationSnapshot && loadedState.simulationSnapshot.fallenDebris) {
+            setFallenDebris(loadedState.simulationSnapshot.fallenDebris);
+    }
+  }, [setGameState, setGridData, setOriginalGridData, setFileResetKey]);
+
+  const handleLoadFromStorage = (saveData) => {
+    try {
+        restoreGameState(saveData);
+        showToast("Game loaded from storage!", "success");
+    } catch (e) {
+        showToast("Failed to load save data.", "error");
+    }
+  };
+
   // ----------------------------------------------------------------------
   // MODIFIED LOAD SIMULATION HANDLER
   // ----------------------------------------------------------------------
-  const handleLoadSimulation = useCallback(
-    async (e) => {
+  const handleLoadSimulationFile = useCallback(async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-
-      const startTime = performance.now();
       setIsProcessing(true);
-      setToast(null);
-
       try {
         const loadedState = await loadSimulation(file);
-
-        setGridData({
-          grid: loadedState.currentGrid,
-          dimensions: loadedState.gridDimensions,
-          metadata: loadedState.gridMetadata,
-        });
-        setOriginalGridData({
-          grid: loadedState.originalGrid,
-          dimensions: loadedState.gridDimensions,
-          metadata: loadedState.gridMetadata,
-        });
-
-        setGameState((prev) => ({
-          ...prev,
-          playerName: loadedState.gameState.playerName,
-          score: loadedState.gameState.score,
-          blasts: loadedState.gameState.blasts,
-          recoveryHistory: loadedState.gameState.recoveryHistory,
-          blastHistory: loadedState.gameState.blastHistory || prev.blastHistory,
-          canPlaceExplosives: loadedState.gameState.canPlaceExplosives,
-          grid: loadedState.currentGrid,
-          materialsRemainedAfterDestroy: loadedState.gameState.materialsRemainedAfterDestroy || 0,
-          numberOfMaterialsDestroyed: loadedState.gameState.numberOfMaterialsDestroyed || 0,
-        }));
-        
-        // --- CRITICAL REPLAY FIX ---
-        // Restore the physics state to the window object so the "Replay" button works
-        if (loadedState.physicsReplayData && typeof window !== 'undefined') {
-            console.log("Restoring physics replay data from file...");
-            window.lastBlastPhysicsState = loadedState.physicsReplayData;
-        } else {
-            console.warn("No physics replay data found in save file.");
-            window.lastBlastPhysicsState = null;
-        }
-        // ---------------------------
-
-        setSelectedBlast(loadedState.selectedBlast || null);
-        setFileResetKey((prev) => prev + 1); 
-
-        // If the save was post-blast, show the debris
-        if (loadedState.simulationSnapshot && loadedState.simulationSnapshot.fallenDebris) {
-             setFallenDebris(loadedState.simulationSnapshot.fallenDebris);
-        }
-
-        const duration = (performance.now() - startTime) / 1000;
-        showToast(`Simulation loaded successfully in ${duration.toFixed(2)}s!`, "success");
+        restoreGameState(loadedState); // <--- Use shared logic
+        showToast(`File loaded successfully!`, "success");
       } catch (error) {
-        showToast(error.message || "An unknown error occurred during loading.", "error");
+        showToast(error.message, "error");
       } finally {
         setIsProcessing(false);
         setLoadFileInputKey((prev) => prev + 1);
       }
-    },
-    [setGameState, showToast, setGridData, setOriginalGridData, setFileResetKey]
-  );
+    }, [restoreGameState, showToast]);
 
   // ... (Keep existing history logic and handleSaveSimulation/Export) ...
   const recoveryHistory = gameState.recoveryHistory;
@@ -496,31 +499,54 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   };
 
   const handleExportSimulation = () => {
-     // ... (Keep existing implementation) ...
-      if (!gridData) {
+    if (!gridData || !originalGridData) {
       showToast("Cannot export, grid data is not available.", "error");
       return;
     }
+
+    // Capture physics state for replayability
+    const physicsReplayData = typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
+
+    // Build the FULL save object (Same structure as saveManualSimulation)
+    const fullSaveState = {
+      savedAt: new Date().toISOString(),
+      initialGridState: {
+        grid: originalGridData.grid,
+        dimensions: originalGridData.dimensions,
+        metadata: originalGridData.metadata,
+      },
+      simulationSnapshot: {
+        grid: gridData.grid,
+        fallenDebris: fallenDebris,
+      },
+      gameState: {
+        playerName: gameState.playerName,
+        score: gameState.score,
+        blasts: gameState.blasts,
+        blastHistory: gameState.blastHistory,
+        recoveryHistory: gameState.recoveryHistory,
+        canPlaceExplosives: gameState.canPlaceExplosives,
+        materialsRemainedAfterDestroy: gameState.materialsRemainedAfterDestroy,
+        numberOfMaterialsDestroyed: gameState.numberOfMaterialsDestroyed,
+      },
+      physicsReplayData: physicsReplayData ? { ...physicsReplayData } : null,
+    };
+
     const timestamp = new Date().toLocaleTimeString('en-GB').replace(/:/g, '-');
     const datestamp = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
-    const sessionData = {
-      gridDimensions: gridData.dimensions,
-      blastHistory: gameState.blastHistory,
-      recoveryHistory: gameState.recoveryHistory,
-      finalScore: gameState.score,
-      remainingMaterials: gameState.materialsRemainedAfterDestroy,
-      numberOfMaterialsDestroyed: gameState.numberOfMaterialsDestroyed,
-    }
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(sessionData, null, 2));
+    
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullSaveState, null, 2));
     const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href",     dataStr);
-    downloadAnchorNode.setAttribute("download", "simulation_" + datestamp + "_" + timestamp + ".json");
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "simulation_save_" + datestamp + "_" + timestamp + ".json");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
-    showToast("Simulation exported successfully!", "success");
+    
+    showToast("Full simulation saved to file!", "success");
   };
 
+  
   if (!csvData) return <div className="text-center py-8 text-gray-500"><p>Upload a CSV file to visualize the ore grid</p></div>;
   if (isProcessing || !gridData) return <div className="text-center py-8 text-gray-500"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div><p>Processing grid data...</p></div>;
 
@@ -528,6 +554,14 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     <div className="w-full min-h-screen relative">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
+      {/* Add the Modal */}
+        <LoadGameModal 
+            show={showLoadModal}
+            onClose={() => setShowLoadModal(false)}
+            onLoadGame={handleLoadFromStorage}
+            loadFileInputKey={loadFileInputKey}
+            onFileSelect={handleLoadSimulationFile}
+        />
       {/* Leaderboard Modal */}
       <LeaderboardModal 
         show={showLeaderboard} 
@@ -569,9 +603,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             selectedBlast={selectedBlast}
             onSelectDirection={onSelectDirection}
             onSaveSimulation={handleSaveSimulation}
-            onLoadSimulation={handleLoadSimulation}
             loadFileInputKey={loadFileInputKey}
-            onOpenLeaderboard={() => setShowLeaderboard(true)} // <--- CONNECT
+            onOpenLeaderboard={() => setShowLeaderboard(true)}
+            onOpenLoadModal={() => setShowLoadModal(true)} // // <--- CONNECT
           />
         </div>
       </div>
@@ -585,9 +619,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           isBlasting={isBlasting}
           selectedBlast={selectedBlast}
           onSelectDirection={onSelectDirection}
-          onLoadSimulation={handleLoadSimulation}
           loadFileInputKey={loadFileInputKey}
           onOpenLeaderboard={() => setShowLeaderboard(true)} // <--- CONNECT
+          onOpenLoadModal={() => setShowLoadModal(true)}
         />
       </div>
 
@@ -605,7 +639,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         efficiency={lastRecoveryDetail.efficiency}
         recoveryRate={lastBlastRecord.recovery}
         dilutionRate={lastBlastRecord.dilution}
-        onLoad={handleLoadSimulation}
+        onLoad={handleLoadSimulationFile}
         loadFileInputKey={loadFileInputKey}
         onExportSimulation={handleExportSimulation}
       />

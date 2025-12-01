@@ -3,7 +3,7 @@ import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
 import ArrowButton from "./ArrowButton";
 import RockTexture from "./RockTexture";
-import { RotateCcw, Zap, Palette, Move3d, Save, Upload, Trophy} from "lucide-react";
+import { RotateCcw, Zap, Palette, Move3d, Save, Upload, Trophy, FolderOpen} from "lucide-react";
 
 /**
  * Legend component showing ore types and their colors and controls
@@ -16,9 +16,8 @@ const GridLegend = ({
   selectedBlast = null,
   onSelectDirection = null,
   onSaveSimulation,
-  onLoadSimulation, // 
-  loadFileInputKey,
-  onOpenLeaderboard
+  onOpenLeaderboard,
+  onOpenLoadModal 
 }) => {
   const { gameState, pendingDirection, setPendingDirection } =
     useContext(GameContext);
@@ -287,38 +286,33 @@ const GridLegend = ({
             Reset Canvas
           </button>
         </div>
-        <button
-          className="bg-[rgb(112,171,117)] text-white px-3 py-2 rounded hover:bg-[rgba(112,171,117,0.8)] text-base font-semibold w-full mt-3"
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <button
+          className="bg-[rgb(112,171,117)] text-white px-3 py-2 rounded hover:bg-[rgba(112,171,117,0.8)] text-base font-semibold w-full flex items-center justify-center"
           onClick={onSaveSimulation}
           disabled={isBlasting}
-        >
+          >
           <Save className="inline-block w-4 h-4 mr-1" />
           Save
-        </button>
-        <button
-            className="bg-yellow-600 text-white px-3 py-2 rounded hover:bg-yellow-500 text-base font-semibold w-full flex items-center justify-center mt-3"
-            onClick={onOpenLeaderboard} 
-            disabled={isBlasting}
-            >
-            <Trophy className="inline-block w-4 h-4 mr-1" />
-            Scores
-        </button>
+          </button>
+
+          <button
+          className="bg-yellow-600 text-white px-3 py-2 rounded hover:bg-yellow-500 text-base font-semibold w-full flex items-center justify-center"
+          onClick={onOpenLeaderboard}
+          disabled={isBlasting}
+          >
+          <Trophy className="inline-block w-4 h-4 mr-1" />
+          Scores
+          </button>
       </div>
-      <label
-        htmlFor="load-simulation-desktop"
-        className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-600 text-base font-semibold w-full mt-3 flex items-center justify-center cursor-pointer"
+      </div>
+      <button
+          onClick={onOpenLoadModal}
+          className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-600 text-base font-semibold w-full mt-3 flex items-center justify-center cursor-pointer"
       >
-        <Upload className="inline-block w-4 h-4 mr-1" />
+        <FolderOpen className="inline-block w-4 h-4 mr-1" />
         Load Simulation
-        <input
-          id="load-simulation-desktop"
-          key={loadFileInputKey} // Key forces input reset
-          type="file"
-          accept=".json"
-          className="hidden"
-          onChange={onLoadSimulation}
-        />
-      </label>
+      </button>
 
       {/* Desktop: Direction selector always visible */}
       <div className="mt-4 hidden md:block">
