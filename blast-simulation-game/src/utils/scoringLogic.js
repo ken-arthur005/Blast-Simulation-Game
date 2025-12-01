@@ -36,7 +36,7 @@ export default function scoringLogic(totalOres, recoveredOres, dilutedOres, reco
     recoveryRate: Math.round(recoveryRate * 100) / 100,  
     dilutionRate: Math.round(dilutionRate * 100) / 100,
     penaltyMultiplier: Math.round(penaltyMultiplier * 100) / 100,
-    finalScore
+    finalScore: finalScore,
   };
   
   return result;
