@@ -17,7 +17,11 @@ const SimulationPage = () => {
   const { gameState } = useContext(GameContext) || {};
   const playerName = (gameState && gameState.playerName) || "Player";
   const [isMobileView, setIsMobileView] = useState(() => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+    return (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      ) || window.innerWidth < 768
+    );
   });
 
   const showToast = (message, type = "error") => {
@@ -39,7 +43,9 @@ const SimulationPage = () => {
     const loadDefaultCsv = async () => {
       try {
         // Load mobile CSV for mobile devices, otherwise load large CSV
-        const csvFile = isMobileView ? "/sample-ore-mobile.csv" : "/sample-ore-large.csv";
+        const csvFile = isMobileView
+          ? "/sample-ore-mobile.csv"
+          : "/sample-ore-large.csv";
         const res = await fetch(csvFile);
         if (!res.ok) throw new Error("Failed to fetch default CSV file");
         const csvText = await res.text();
@@ -59,14 +65,17 @@ const SimulationPage = () => {
   // Listen for window resize to detect mobile/desktop switch
   useEffect(() => {
     const handleResize = () => {
-      const newIsMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+      const newIsMobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        ) || window.innerWidth < 768;
       if (newIsMobile !== isMobileView) {
         setIsMobileView(newIsMobile);
       }
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [isMobileView]);
 
   return (
@@ -84,9 +93,10 @@ const SimulationPage = () => {
           <h1 className="ui-font text-white text-[20px] md:text-[32px] [-webkit-text-stroke:1px_#E7B32F] md:[-webkit-text-stroke:2px_#E7B32F]">
             ROCK BLASTERZ
           </h1>
-          <p className="hidden md:flex gap-2 text-[#C6D662] text-base">
-            <Gamepad2 className="w-6 h-6" /> Welcome, {playerName}! Design your blast pattern to
-            maximize ore recovery
+          <p className="flex gap-1 md:gap-2 text-[#C6D662] text-[10px] md:text-base items-start md:items-center">
+            <Gamepad2 className="w-3 h-3 md:w-6 md:h-6 flex-shrink-0" />{" "}
+            Welcome, {playerName}! Design your blast pattern to maximize ore
+            recovery
           </p>
         </div>
 
