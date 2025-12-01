@@ -3,7 +3,7 @@ import OreColorMapper from "../utils/oreColorMapper";
 import { GameContext } from "./GameContext";
 import ArrowButton from "./ArrowButton";
 import RockTexture from "./RockTexture";
-import { RotateCcw, Zap, Palette, Move3d, Save, Upload } from "lucide-react";
+import { RotateCcw, Zap, Palette, Move3d, Save, Upload, Trophy, FolderOpen} from "lucide-react";
 
 /**
  * Legend component showing ore types and their colors and controls
@@ -16,8 +16,8 @@ const GridLegend = ({
   selectedBlast = null,
   onSelectDirection = null,
   onSaveSimulation,
-  onLoadSimulation, // <--- ADD THIS PROP
-  loadFileInputKey,
+  onOpenLeaderboard,
+  onOpenLoadModal 
 }) => {
   const { gameState, pendingDirection, setPendingDirection } =
     useContext(GameContext);
@@ -46,25 +46,7 @@ const GridLegend = ({
 
   return (
     <div>
-      {/* <div
-        className={`mt-4 p-4 backdrop-blur-[20px] bg-[rgba(255,255,255,0.2)] rounded-lg ${className}`}
-      >
-        <h3 className="text-lg font-semibold mb-3">Ore Types Legend</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {oreTypes.map((oreType) => (
-            <div key={oreType} className="flex items-center space-x-2">
-              <div
-                className="w-5 h-5 border border-gray-400 rounded shrink-0"
-                style={{ backgroundColor: colorMapping[oreType] }}
-              />
-              <span className="text-sm capitalize truncate ui-font">
-                {oreType}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div> */}
-
+     
       {/* Mobile: Rock Color Guide and Choose Direction in same row */}
       <div className="md:hidden mb-3">
         <div className="flex gap-2">
@@ -238,7 +220,7 @@ const GridLegend = ({
       </div>
 
       {/* Mobile: Action buttons after expandable sections */}
-      <div className="md:hidden mt-3 flex flex-row items-stretch gap-2">
+      <div className="md:hidden mt-3 grid grid-cols-2 gap-2">
         <button
           className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-semibold flex-1"
           onClick={handleTriggerBlast}
@@ -268,6 +250,16 @@ const GridLegend = ({
           <Save className="inline-block w-4 h-4 mr-1" />
           Save
         </button>
+
+        {/* Mobile Leaderboard Button */}
+        <button
+          className="col-span-2 bg-yellow-600 text-white px-3 py-2 rounded hover:bg-yellow-500 text-sm font-semibold flex items-center justify-center"
+          onClick={onOpenLeaderboard}
+          disabled={isBlasting}
+        >
+          <Trophy className="inline-block w-4 h-4 mr-1" />
+          Leaderboard
+        </button>
       </div>
 
       {/* Desktop: Action buttons and direction selector */}
@@ -294,30 +286,33 @@ const GridLegend = ({
             Reset Canvas
           </button>
         </div>
-        <button
-          className="bg-[rgb(112,171,117)] text-white px-3 py-2 rounded hover:bg-[rgba(112,171,117,0.8)] text-base font-semibold w-full mt-3"
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <button
+          className="bg-[rgb(112,171,117)] text-white px-3 py-2 rounded hover:bg-[rgba(112,171,117,0.8)] text-base font-semibold w-full flex items-center justify-center"
           onClick={onSaveSimulation}
           disabled={isBlasting}
-        >
+          >
           <Save className="inline-block w-4 h-4 mr-1" />
           Save
-        </button>
+          </button>
+
+          <button
+          className="bg-yellow-600 text-white px-3 py-2 rounded hover:bg-yellow-500 text-base font-semibold w-full flex items-center justify-center"
+          onClick={onOpenLeaderboard}
+          disabled={isBlasting}
+          >
+          <Trophy className="inline-block w-4 h-4 mr-1" />
+          Scores
+          </button>
       </div>
-      <label
-        htmlFor="load-simulation-desktop"
-        className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-600 text-base font-semibold w-full mt-3 flex items-center justify-center cursor-pointer"
+      </div>
+      <button
+          onClick={onOpenLoadModal}
+          className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-600 text-base font-semibold w-full mt-3 flex items-center justify-center cursor-pointer"
       >
-        <Upload className="inline-block w-4 h-4 mr-1" />
+        <FolderOpen className="inline-block w-4 h-4 mr-1" />
         Load Simulation
-        <input
-          id="load-simulation-desktop"
-          key={loadFileInputKey} // Key forces input reset
-          type="file"
-          accept=".json"
-          className="hidden"
-          onChange={onLoadSimulation}
-        />
-      </label>
+      </button>
 
       {/* Desktop: Direction selector always visible */}
       <div className="mt-4 hidden md:block">
