@@ -42,9 +42,9 @@ const SimulationPage = () => {
   useEffect(() => {
     const loadDefaultCsv = async () => {
       try {
-        // Load mobile CSV only for mobile devices (< 768px), otherwise load large CSV
+        // Load mobile CSV for screens < 600px, desktop CSV for >= 600px (Surface Duo gets desktop)
         const csvFile =
-          window.innerWidth < 768
+          window.innerWidth < 600
             ? "/sample-ore-mobile.csv"
             : "/sample-ore-large.csv";
         const res = await fetch(csvFile);
@@ -80,7 +80,21 @@ const SimulationPage = () => {
   }, [isMobileView]);
 
   return (
-    <div className="w-full h-screen p-2 sm:p-3 md:p-4 lg:p-6 flex flex-col fixed bg3">
+    <div
+      className="w-full h-screen flex flex-col fixed bg3"
+      style={{
+        padding:
+          window.innerWidth >= 1024 && window.innerHeight <= 700
+            ? "8px"
+            : window.innerWidth >= 1024
+            ? "1.5rem"
+            : window.innerWidth >= 768
+            ? "1rem"
+            : window.innerWidth >= 640
+            ? "0.75rem"
+            : "0.5rem",
+      }}
+    >
       {toast && (
         <Toast
           message={toast.message}

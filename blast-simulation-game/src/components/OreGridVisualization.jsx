@@ -265,6 +265,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       (isTablet || isLargeTabletPortrait) &&
       window.innerHeight > window.innerWidth;
     const isSmallPhone = window.innerWidth < 375 || window.innerHeight < 667;
+    const isCompactLandscape =
+      window.innerWidth >= 1024 &&
+      window.innerHeight <= 700 &&
+      window.innerHeight <= window.innerWidth;
 
     // Adjust dimensions based on device type
     const preferredWidth = isSmallPhone
@@ -275,6 +279,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       ? Math.min(window.innerWidth - 64, 700)
       : isTablet
       ? Math.min(window.innerWidth * 0.65, 500)
+      : isCompactLandscape
+      ? Math.min(window.innerWidth * 0.5, 500)
       : 576;
 
     const preferredHeight = isSmallPhone
@@ -285,6 +291,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       ? Math.min(window.innerHeight * 0.55, 650)
       : isTablet
       ? Math.min(window.innerHeight * 0.5, 450)
+      : isCompactLandscape
+      ? Math.min(window.innerHeight * 0.75, 450)
       : 456;
 
     const blockSizeByWidth = Math.floor(preferredWidth / dimensions.width);
@@ -299,6 +307,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       ? 45
       : isTablet
       ? 35
+      : isCompactLandscape
+      ? 8
       : 6;
     const maxBlockSize = isSmallPhone
       ? 40
@@ -308,6 +318,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       ? 70
       : isTablet
       ? 60
+      : isCompactLandscape
+      ? 18
       : 80;
 
     // Clamp block size to prevent stretching
@@ -692,15 +704,13 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         onClose={() => setShowLeaderboard(false)}
       />
 
-      {/* Mobile & Tablet Layout - Stacked (includes large portrait tablets like iPad Pro) */}
+      {/* Mobile & Tablet Layout - Stacked (portrait tablets and phones only) */}
       <div
         className="flex-1 overflow-y-auto pb-4 px-2 sm:px-3 md:px-4"
         style={{
           display:
             window.innerWidth < 1024 ||
-            (window.innerWidth >= 1024 &&
-              window.innerWidth <= 1200 &&
-              window.innerHeight > window.innerWidth)
+            (window.innerWidth < 1400 && window.innerHeight > window.innerWidth)
               ? "flex"
               : "none",
           flexDirection: "column",
@@ -751,22 +761,37 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         </div>
       </div>
 
-      {/* Desktop Layout - Centered with Controls on Right (excludes large portrait tablets) */}
+      {/* Desktop Layout - Centered with Controls on Right (includes landscape tablets) */}
       <div
+        className="overflow-y-auto"
         style={{
           display:
-            window.innerWidth >= 1024 &&
-            !(
-              window.innerWidth >= 1024 &&
-              window.innerWidth <= 1200 &&
-              window.innerHeight > window.innerWidth
-            )
+            (window.innerWidth >= 1024 &&
+              window.innerHeight <= window.innerWidth) ||
+            window.innerWidth >= 1400
               ? "block"
               : "none",
+          paddingTop: window.innerHeight <= 700 ? "0px" : undefined,
+          paddingBottom: window.innerHeight <= 700 ? "4px" : undefined,
+          height: window.innerHeight <= 700 ? "100%" : undefined,
         }}
       >
-        <div className="lg:absolute lg:left-1/2 lg:transform lg:-translate-x-1/2 lg:max-w-[70%] lg:px-0">
-          <h2 className="text-xl font-bold mb-4 text-left text-amber-500">
+        <div
+          className="lg:absolute lg:left-1/2 lg:transform lg:-translate-x-1/2 lg:max-w-[70%] lg:px-0"
+          style={{
+            marginLeft:
+              window.innerHeight <= 700 && window.innerWidth >= 1024
+                ? "-120px"
+                : undefined,
+          }}
+        >
+          <h2
+            className="text-xl font-bold text-left text-amber-500"
+            style={{
+              marginBottom: window.innerHeight <= 700 ? "4px" : "16px",
+              marginTop: window.innerHeight <= 700 ? "0" : undefined,
+            }}
+          >
             2D Ore Grid Visualization
           </h2>
 
@@ -776,7 +801,13 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             canvasSize={canvasSize}
           />
 
-          <div className="flex justify-center mb-4">
+          <div
+            className="flex justify-center"
+            style={{
+              marginBottom: window.innerHeight <= 700 ? "2px" : "16px",
+              marginTop: window.innerHeight <= 700 ? "2px" : undefined,
+            }}
+          >
             <GridCanvas
               gridData={gridData}
               canvasSize={canvasSize}
@@ -792,6 +823,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
               addRecoveryRecordToGameContext={addRecoveryRecord}
               updateScore={updateScore}
               isPreparingReplay={isPreparingReplay}
+              cellGap={
+                window.innerWidth >= 1024 && window.innerHeight <= 700 ? 4 : 8
+              }
             />
           </div>
         </div>

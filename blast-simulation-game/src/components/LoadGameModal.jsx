@@ -15,6 +15,8 @@ const LoadGameModal = ({
 }) => {
   const [activeTab, setActiveTab] = useState("auto"); // 'auto' | 'manual'
   const [saves, setSaves] = useState([]);
+  // Only hide load buttons on large desktop screens (>= 1400px), always show for tablets
+  const isDesktop = window.innerWidth >= 1400;
 
   useEffect(() => {
     if (show) {
@@ -96,7 +98,9 @@ const LoadGameModal = ({
                 </div>
                 <button
                   onClick={() => handleLoadLocal(save)}
-                  className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                  className={`bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-opacity ${
+                    isDesktop ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
+                  }`}
                 >
                   <Play className="w-3 h-3" /> Load
                 </button>
