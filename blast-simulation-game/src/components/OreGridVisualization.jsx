@@ -4,9 +4,10 @@ import React, {
   useCallback,
   useContext,
   useRef,
+  useMemo,
 } from "react";
 import GridDataProcessor from "../utils/gridDataProcessor";
-import printGridDebugInfo from "../utils/printGridDebugInfo";
+
 import GridCanvas from "./GridCanvas";
 import GridLegend from "./GridLegend";
 import GridInfo from "./GridInfo";
@@ -110,9 +111,14 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     setBlastTrigger({ affectedCells, timestamp: Date.now() });
   };
 
+  // OPTIMIZED: Batch direction updates for better performance
   const setBlastDirection = useCallback(
     (x, y, dirKey) => {
       setGameState((prev) => {
+        // Early exit if no change needed
+        const existingBlast = prev.blasts.find((b) => b.x === x && b.y === y);
+        if (existingBlast?.dirKey === dirKey) return prev;
+
         const updatedBlasts = prev.blasts.map((b) => {
           if (b.x === x && b.y === y) return { ...b, dirKey };
           return b;
@@ -248,14 +254,20 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     ]
   );
 
-  // ... (keep calculateOptimalSizing, handleCellClick, useEffect for CSV) ...
+  
+  const deviceInfo = useMemo(() => {
+    const userAgent = navigator.userAgent;
+    const isMobileUA =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        userAgent
+      );
+    return { isMobileUA };
+  }, []);
+
   const calculateOptimalSizing = useCallback((processedGrid) => {
     // ... (Keep existing implementation) ...
     const { dimensions } = processedGrid;
-    const isMobile =
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent
-      ) || window.innerWidth < 768;
+    const isMobile = deviceInfo.isMobileUA || window.innerWidth < 768;
     const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
     const isLargeTabletPortrait =
       window.innerWidth >= 1024 &&
@@ -393,7 +405,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       gameState.canPlaceExplosives,
       setGameState,
       gameState.blastRadius,
-      pendingDirection,
       selectedBlast,
       setPendingDirection,
       showToast,
@@ -436,7 +447,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         } else {
           setGridData(null);
         }
-      } catch (error) {
+      } catch {
         setGridData(null);
       } finally {
         setIsProcessing(false);
@@ -528,7 +539,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     try {
       restoreGameState(saveData);
       showToast("Game loaded from storage!", "success");
-    } catch (e) {
+    } catch {
       showToast("Failed to load save data.", "error");
     }
   };

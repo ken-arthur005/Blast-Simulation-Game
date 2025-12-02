@@ -4,7 +4,7 @@ import {
   getAutoSimulations,
   getManualSimulations,
 } from "../utils/simulationManager";
-import { loadSimulation } from "../utils/loadSimulation"; // Re-use the existing parser logic logic
+// import { loadSimulation } from "../utils/loadSimulation"; // Re-use the existing parser logic - unused
 
 const LoadGameModal = ({
   show,
@@ -99,7 +99,9 @@ const LoadGameModal = ({
                 <button
                   onClick={() => handleLoadLocal(save)}
                   className={`bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-opacity ${
-                    isDesktop ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
+                    isDesktop
+                      ? "opacity-0 group-hover:opacity-100"
+                      : "opacity-100"
                   }`}
                 >
                   <Play className="w-3 h-3" /> Load

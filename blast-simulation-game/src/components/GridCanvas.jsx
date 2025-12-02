@@ -647,6 +647,43 @@ const GridCanvas = ({
     [onBlockClick, getGridCoords]
   ); // Dependency on 'onBlockClick' and 'getGridCoords'
 
+  // Touch Handler for Mobile Devices
+  const handleTouchStart = useCallback(
+    (event) => {
+      // this guard clause disables touches during the animation.
+      if (isBlastRunningRef.current) return;
+
+      if (!onBlockClick || !canvasRef.current) return;
+
+      // Prevent default to avoid mouse event emulation
+      event.preventDefault();
+
+      const touch = event.touches[0];
+      if (!touch) return;
+
+      // Get canvas-relative touch coordinates
+      const rect = canvasRef.current.getBoundingClientRect();
+      const scaleX = canvasRef.current.width / rect.width;
+      const scaleY = canvasRef.current.height / rect.height;
+      const pixelX = (touch.clientX - rect.left) * scaleX;
+      const pixelY = (touch.clientY - rect.top) * scaleY;
+
+      const gridCoords = getGridCoords(pixelX, pixelY);
+
+      if (gridCoords) {
+        onBlockClick(gridCoords.x, gridCoords.y);
+        // Force immediate re-render on mobile after explosive placement
+        requestAnimationFrame(() => {
+          const canvas = canvasRef.current;
+          if (canvas && gridData && gridData.grid) {
+            renderCanvas();
+          }
+        });
+      }
+    },
+    [onBlockClick, getGridCoords, gridData, renderCanvas]
+  );
+
   // Mouse Move Handler (for hover)
   // Helper to compute grid offsets (used for hover overlay drawing)
   const getGridOffsets = useCallback(() => {
@@ -1295,8 +1332,9 @@ const GridCanvas = ({
       ctx.translate(offsetX, offsetY);
 
       // OPTIMIZED: Skip this expensive rendering - affected cells are cached in staticGridCache
-      // Only render for first few milliseconds if really needed
-      if (false && elapsed < 3) {
+      // Disabled for performance optimization with 10k+ blocks
+      /* eslint-disable-next-line no-constant-condition */
+      if (false) {
         affectedCells.forEach((cell) => {
           const block = new OreBlock(
             gridData.grid[cell.y][cell.x],
@@ -1839,8 +1877,10 @@ const GridCanvas = ({
             width: "100%",
             height: "100%",
             borderRadius: "inherit",
+            touchAction: "none", // Prevent default touch behaviors
           }}
           onClick={handleClick}
+          onTouchStart={handleTouchStart}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         />

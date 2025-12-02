@@ -36,30 +36,43 @@ const LeaderboardModal = ({ show, onClose }) => {
     return [...new Set(names)].sort();
   }, [allScores]);
 
-  // Filter Logic
+  // OPTIMIZED: Filter Logic with reduced iterations
   const filteredScores = useMemo(() => {
-    let result = [...allScores];
+    // Early exit if no scores
+    if (allScores.length === 0) return [];
 
-    // 1. Time Filter
     const now = new Date();
-    if (filterTime === "today") {
-      result = result.filter(
-        (s) => new Date(s.timestamp).toDateString() === now.toDateString()
-      );
-    } else if (filterTime === "week") {
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      result = result.filter((s) => new Date(s.timestamp) >= weekAgo);
-    }
+    const nowDateString = filterTime === "today" ? now.toDateString() : null;
+    const weekAgo =
+      filterTime === "week"
+        ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        : null;
 
-    // 2. Name Dropdown Filter
-    if (selectedPlayer !== "all") {
-      result = result.filter(
-        (s) => (s.playerName || "Anonymous") === selectedPlayer
-      );
-    }
+    // OPTIMIZED: Single pass filter + sort instead of multiple filter calls
+    return allScores
+      .filter((s) => {
+        // 1. Time Filter
+        if (
+          filterTime === "today" &&
+          new Date(s.timestamp).toDateString() !== nowDateString
+        ) {
+          return false;
+        }
+        if (filterTime === "week" && new Date(s.timestamp) < weekAgo) {
+          return false;
+        }
 
-    // 3. Sort by Score
-    return result.sort((a, b) => b.score - a.score);
+        // 2. Name Filter
+        if (
+          selectedPlayer !== "all" &&
+          (s.playerName || "Anonymous") !== selectedPlayer
+        ) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => b.score - a.score);
   }, [allScores, filterTime, selectedPlayer]);
 
   const handleReset = () => {

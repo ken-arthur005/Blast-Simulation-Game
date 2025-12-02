@@ -1,6 +1,6 @@
 ﻿import { FaTrophy } from "react-icons/fa";
 import { GameContext } from "../components/GameContext";
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 
 function HomePage() {
@@ -8,9 +8,15 @@ function HomePage() {
   const [error, setError] = useState("");
   const { gameState, setGameState } = useContext(GameContext);
 
-  const handleStartGame = () => {
+  // OPTIMIZED: Memoize validation check
+  const isNameValid = useMemo(
+    () => gameState.playerName && gameState.playerName.trim().length > 0,
+    [gameState.playerName]
+  );
+
+  const handleStartGame = useCallback(() => {
     // Validate name before allowing navigation
-    if (!gameState.playerName || !gameState.playerName.trim()) {
+    if (!isNameValid) {
       setError("Please enter your name to start the game");
       return false;
     }
@@ -18,7 +24,15 @@ function HomePage() {
 
     setTimeout(() => setClicked(false), 300);
     return true;
-  };
+  }, [isNameValid]);
+
+  // OPTIMIZED: Memoize input change handler
+  const handleNameChange = useCallback(
+    (e) => {
+      setGameState({ ...gameState, playerName: e.target.value });
+    },
+    [gameState, setGameState]
+  );
 
   return (
     <div className="bg3 text-center fixed inset-0 flex flex-col justify-center h-screen w-full p-4 sm:p-6 md:p-8 overflow-hidden">
@@ -40,9 +54,7 @@ function HomePage() {
         <div className="w-full max-w-[600px]">
           <input
             type="text"
-            onChange={(e) => {
-              setGameState({ ...gameState, playerName: e.target.value });
-            }}
+            onChange={handleNameChange}
             value={gameState.playerName}
             className="rounded-[10px] backdrop-blur-[12px] bg-[rgba(255,255,255,0.15)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] h-12 sm:h-16 md:h-20 w-full mb-4 sm:mb-6 md:mb-7 text-center text-white text-base sm:text-lg md:text-xl placeholder:text-white/70 outline-none focus:border-white/50 focus:ring-0 transition-all"
             placeholder="name"
@@ -55,7 +67,7 @@ function HomePage() {
         </div>
 
         <div className=" flex justify-center">
-          {gameState.playerName && gameState.playerName.trim() ? (
+          {isNameValid ? (
             <button
               onClick={handleStartGame}
               className="rounded-[10px] backdrop-blur-[12px] bg-[rgb(112,171,117)] border-2 border-[rgba(255,255,255,0.3)] shadow-[0_4px_30px_rgba(0,0,0,0.1)] text-white text-base sm:text-lg md:text-xl font-semibold px-6 py-3 sm:px-8 sm:py-4 hover:bg-[rgba(112,171,117,0.8)] hover:scale-105 transition-all duration-300 w-full max-w-xs sm:max-w-sm"

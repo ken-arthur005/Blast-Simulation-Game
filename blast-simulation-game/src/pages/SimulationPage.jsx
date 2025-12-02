@@ -1,5 +1,5 @@
 import { useCSVReader } from "react-papaparse";
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef } from "react";
 import Toast from "../components/Toast";
 import Papa from "papaparse";
 import { Gamepad2 } from "lucide-react";
@@ -63,20 +63,35 @@ const SimulationPage = () => {
     loadDefaultCsv();
   }, [isMobileView]);
 
-  // Listen for window resize to detect mobile/desktop switch
+  // OPTIMIZED: Debounced resize handler to prevent excessive re-renders
+  const resizeTimeoutRef = useRef(null);
+
   useEffect(() => {
     const handleResize = () => {
-      const newIsMobile =
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-          navigator.userAgent
-        ) || window.innerWidth < 768;
-      if (newIsMobile !== isMobileView) {
-        setIsMobileView(newIsMobile);
+      // Clear existing timeout
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
       }
+
+      // Debounce resize handling (wait 150ms after last resize event)
+      resizeTimeoutRef.current = setTimeout(() => {
+        const newIsMobile =
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent
+          ) || window.innerWidth < 768;
+        if (newIsMobile !== isMobileView) {
+          setIsMobileView(newIsMobile);
+        }
+      }, 150);
     };
 
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+    };
   }, [isMobileView]);
 
   return (
