@@ -41,7 +41,7 @@ export const GameProvider = ({ children }) => {
     setGameState((prevState) => ({
       ...prevState,
       recoveryHistory: [
-        ...prevState.recoveryHistory,
+        ...prevState.recoveryHistory || [],
         {
           totalOres: record.totalOres,
           recoveredCount: record.recoveredCount,
