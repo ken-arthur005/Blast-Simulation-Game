@@ -42,10 +42,11 @@ const SimulationPage = () => {
   useEffect(() => {
     const loadDefaultCsv = async () => {
       try {
-        // Load mobile CSV for mobile devices, otherwise load large CSV
-        const csvFile = isMobileView
-          ? "/sample-ore-mobile.csv"
-          : "/sample-ore-large.csv";
+        // Load mobile CSV only for mobile devices (< 768px), otherwise load large CSV
+        const csvFile =
+          window.innerWidth < 768
+            ? "/sample-ore-mobile.csv"
+            : "/sample-ore-large.csv";
         const res = await fetch(csvFile);
         if (!res.ok) throw new Error("Failed to fetch default CSV file");
         const csvText = await res.text();
@@ -79,7 +80,7 @@ const SimulationPage = () => {
   }, [isMobileView]);
 
   return (
-    <div className="w-full h-screen p-3 md:p-6 flex flex-col fixed bg3">
+    <div className="w-full h-screen p-2 sm:p-3 md:p-4 lg:p-6 flex flex-col fixed bg3">
       {toast && (
         <Toast
           message={toast.message}
@@ -88,19 +89,19 @@ const SimulationPage = () => {
         />
       )}
 
-      <div className="flex flex-row justify-between items-center mb-4 md:mb-8">
+      <div className="flex flex-row justify-between items-center mb-3 sm:mb-4 md:mb-6 lg:mb-8">
         <div className="flex-1">
-          <h1 className="ui-font text-white text-[20px] md:text-[32px] [-webkit-text-stroke:1px_#E7B32F] md:[-webkit-text-stroke:2px_#E7B32F]">
+          <h1 className="ui-font text-white text-[18px] sm:text-[22px] md:text-[28px] lg:text-[32px] [-webkit-text-stroke:1px_#E7B32F] lg:[-webkit-text-stroke:2px_#E7B32F]">
             ROCK BLASTERZ
           </h1>
-          <p className="flex gap-1 md:gap-2 text-[#C6D662] text-[10px] md:text-base items-start md:items-center">
+          <p className="flex gap-1 md:gap-2 text-[#C6D662] text-[9px] sm:text-[10px] md:text-sm lg:text-base items-start md:items-center mr-3 sm:mr-4 lg:mr-0">
             <Gamepad2 className="w-3 h-3 md:w-6 md:h-6 flex-shrink-0" />{" "}
             Welcome, {playerName}! Design your blast pattern to maximize ore
             recovery
           </p>
         </div>
 
-        <div className="flex justify-end gap-2 md:gap-8 items-center">
+        <div className="flex justify-end gap-2 sm:gap-3 md:gap-4 lg:gap-8 items-center">
           <CSVReader
             key={fileKey}
             onUploadAccepted={(results, file) => {
@@ -166,7 +167,7 @@ const SimulationPage = () => {
             {({ getRootProps, acceptedFile }) => (
               <div
                 {...getRootProps()}
-                className={`relative rounded md:rounded-lg p-1 md:p-2 text-center cursor-pointer transition-all duration-200 ease-in-out border-b-2 ${
+                className={`relative rounded md:rounded-lg p-1 sm:p-1.5 md:p-2 text-center cursor-pointer transition-all duration-200 ease-in-out border-b-2 ${
                   acceptedFile
                     ? "border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-[border-pulse_3s_ease-in-out]"
                     : zoneHover
@@ -188,7 +189,7 @@ const SimulationPage = () => {
                 <div>
                   <div className="flex justify-center">
                     <AiOutlineCloudUpload
-                      className={`w-5 h-4 md:w-8 md:h-6 transition-colors duration-200 ${
+                      className={`w-4 h-3 sm:w-5 sm:h-4 md:w-7 md:h-5 lg:w-8 lg:h-6 transition-colors duration-200 ${
                         acceptedFile
                           ? "text-green-500"
                           : zoneHover
@@ -197,7 +198,7 @@ const SimulationPage = () => {
                       }`}
                     />
                     <span>
-                      <p className="text-xs md:text-sm font-medium text-white">
+                      <p className="text-[10px] sm:text-xs md:text-sm font-medium text-white">
                         Import CSV
                       </p>
                     </span>
@@ -207,7 +208,7 @@ const SimulationPage = () => {
             )}
           </CSVReader>
 
-          <div className="p-1 md:p-2 mx-1 md:mx-4 bg-[#C6D662] rounded-full border border-gray-400 w-8 h-8 md:w-12 md:h-12 flex items-center justify-center text-sm md:text-lg font-semibold text-gray-700">
+          <div className="p-1 sm:p-1.5 md:p-2 mx-1 sm:mx-2 md:mx-3 lg:mx-4 bg-[#C6D662] rounded-full border border-gray-400 w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 flex items-center justify-center text-xs sm:text-sm md:text-base lg:text-lg font-semibold text-gray-700">
             <p className="flex flex-row items-center">
               {getInitials(playerName)}
             </p>

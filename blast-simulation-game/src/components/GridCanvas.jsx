@@ -1782,12 +1782,12 @@ const GridCanvas = ({
         style={{
           width: canvasSize.width,
           height: canvasSize.height,
-          borderRadius: "20px",
+          borderRadius: window.innerWidth < 640 ? "12px" : "20px",
           backdropFilter: "blur(12px)",
           background: "rgba(255, 255, 255, 0.15)",
           border: "2px solid rgba(255, 255, 255, 0.3)",
           boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-          padding: "10px",
+          padding: window.innerWidth < 640 ? "6px" : "10px",
           overflow: "hidden", // clip canvas to rounded container so textures can't escape
           boxSizing: "border-box",
         }}

@@ -21,7 +21,7 @@ import Toast from "./Toast";
 import {
   saveManualSimulation,
   saveAutoSimulation,
-  saveHighscore, 
+  saveHighscore,
 } from "../utils/simulationManager";
 import { loadSimulation } from "../utils/loadSimulation";
 import LoadGameModal from "./LoadGameModal";
@@ -46,20 +46,20 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [selectedBlast, setSelectedBlast] = useState(null);
   const csvDataRef = useRef(null);
   const [loadFileInputKey, setLoadFileInputKey] = useState(0);
-  
+
   const nextPlacementDirRef = useRef(
     pendingDirection
       ? { dir: pendingDirection, explicit: true }
       : { dir: null, explicit: false }
   );
-  
+
   const lastPlacedRef = useRef(null);
   const [fallenDebris, setFallenDebris] = useState([]);
   const [showBlastResults, setShowBlastResults] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false); // <--- NEW STATE
   const [toast, setToast] = useState(null);
   const [isPreparingReplay, setIsPreparingReplay] = useState(false);
-  const [showLoadModal, setShowLoadModal] = useState(false)
+  const [showLoadModal, setShowLoadModal] = useState(false);
 
   // ... (keep showToast, handleCloseBlastResults, handleOpenBlastResults) ...
   const showToast = useCallback((message, type = "error") => {
@@ -96,21 +96,22 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
   // ... (keep handleTriggerBlast, setBlastDirection, onSelectDirection) ...
   const handleTriggerBlast = () => {
-     if (isBlasting) return;
-     if (!gameState.blasts || gameState.blasts.length === 0) return;
-     if (!gridData || !gridData.grid) return;
+    if (isBlasting) return;
+    if (!gameState.blasts || gameState.blasts.length === 0) return;
+    if (!gridData || !gridData.grid) return;
 
-     setIsBlasting(true);
-     setGameState((prev) => ({ ...prev, canPlaceExplosives: false }));
+    setIsBlasting(true);
+    setGameState((prev) => ({ ...prev, canPlaceExplosives: false }));
 
-     const affectedCells = calculateAllAffectedCells(
+    const affectedCells = calculateAllAffectedCells(
       gridData.grid,
       gameState.blasts
     );
     setBlastTrigger({ affectedCells, timestamp: Date.now() });
   };
-  
-  const setBlastDirection = useCallback((x, y, dirKey) => {
+
+  const setBlastDirection = useCallback(
+    (x, y, dirKey) => {
       setGameState((prev) => {
         const updatedBlasts = prev.blasts.map((b) => {
           if (b.x === x && b.y === y) return { ...b, dirKey };
@@ -118,9 +119,11 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         });
         return { ...prev, blasts: updatedBlasts };
       });
-    }, [setGameState]);
+    },
+    [setGameState]
+  );
 
-   const onSelectDirection = useCallback(
+  const onSelectDirection = useCallback(
     (dir, opts = {}) => {
       const applyToNext = opts.applyToNext === true;
       if (selectedBlast) {
@@ -147,7 +150,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     },
     [selectedBlast, setBlastDirection, setPendingDirection]
   );
-
 
   // MODIFIED handleBlastComplete
   const handleBlastComplete = useCallback(
@@ -197,7 +199,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
       // --- TRIGGER AUTO-SAVE & LEADERBOARD SAVE ---
       const roundNumber = (gameState.blastHistory?.length || 0) + 1;
-      const physicsReplayData = typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
+      const physicsReplayData =
+        typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
 
       const autoSaveState = {
         savedAt: new Date().toISOString(),
@@ -217,18 +220,21 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         },
         physicsReplayData: physicsReplayData ? { ...physicsReplayData } : null,
       };
-      
+
       saveAutoSimulation(autoSaveState, roundNumber);
 
       // SAVE TO LEADERBOARD
       if (physicsReplayData && physicsReplayData.expectedScore) {
-          saveHighscore({
-              playerName: gameState.playerName || "Miner",
-              score: physicsReplayData.expectedScore,
-              efficiency: ((physicsReplayData.expectedRecoveryRate / 100) * 100).toFixed(1), // Basic efficiency calc
-              recoveryRate: physicsReplayData.expectedRecoveryRate,
-              timestamp: new Date().toISOString()
-          });
+        saveHighscore({
+          playerName: gameState.playerName || "Miner",
+          score: physicsReplayData.expectedScore,
+          efficiency: (
+            (physicsReplayData.expectedRecoveryRate / 100) *
+            100
+          ).toFixed(1), // Basic efficiency calc
+          recoveryRate: physicsReplayData.expectedRecoveryRate,
+          timestamp: new Date().toISOString(),
+        });
       }
     },
     [
@@ -241,37 +247,87 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       fallenDebris,
     ]
   );
-  
+
   // ... (keep calculateOptimalSizing, handleCellClick, useEffect for CSV) ...
   const calculateOptimalSizing = useCallback((processedGrid) => {
     // ... (Keep existing implementation) ...
     const { dimensions } = processedGrid;
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-    const preferredWidth = isMobile ? Math.min(window.innerWidth - 40, 360) : 576;
-    const preferredHeight = isMobile ? Math.min(window.innerHeight * 0.5, 400) : 456;
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      ) || window.innerWidth < 768;
+    const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
+    const isLargeTabletPortrait =
+      window.innerWidth >= 1024 &&
+      window.innerWidth <= 1200 &&
+      window.innerHeight > window.innerWidth;
+    const isTabletPortrait =
+      (isTablet || isLargeTabletPortrait) &&
+      window.innerHeight > window.innerWidth;
+    const isSmallPhone = window.innerWidth < 375 || window.innerHeight < 667;
+
+    // Adjust dimensions based on device type
+    const preferredWidth = isSmallPhone
+      ? Math.min(window.innerWidth - 24, 320)
+      : isMobile
+      ? Math.min(window.innerWidth - 32, 360)
+      : isTabletPortrait
+      ? Math.min(window.innerWidth - 64, 700)
+      : isTablet
+      ? Math.min(window.innerWidth * 0.65, 500)
+      : 576;
+
+    const preferredHeight = isSmallPhone
+      ? Math.min(window.innerHeight * 0.4, 320)
+      : isMobile
+      ? Math.min(window.innerHeight * 0.45, 400)
+      : isTabletPortrait
+      ? Math.min(window.innerHeight * 0.55, 650)
+      : isTablet
+      ? Math.min(window.innerHeight * 0.5, 450)
+      : 456;
+
     const blockSizeByWidth = Math.floor(preferredWidth / dimensions.width);
     const blockSizeByHeight = Math.floor(preferredHeight / dimensions.height);
     let blockSize = Math.min(blockSizeByWidth, blockSizeByHeight);
-    const minBlockSize = isMobile ? 35 : 6;
-    const maxBlockSize = isMobile ? 60 : 80;
 
-    if (blockSize < minBlockSize || blockSize > maxBlockSize) {
-      blockSize = Math.max(minBlockSize, Math.min(maxBlockSize, blockSize));
-      const canvasWidth = Math.min(dimensions.width * blockSize, 800);
-      const canvasHeight = Math.min(dimensions.height * blockSize, 600);
-      setCanvasSize({ width: canvasWidth, height: canvasHeight });
-    } else {
-      const exactWidth = dimensions.width * blockSize;
-      const exactHeight = dimensions.height * blockSize;
-      setCanvasSize({ width: exactWidth, height: exactHeight });
-    }
+    const minBlockSize = isSmallPhone
+      ? 25
+      : isMobile
+      ? 28
+      : isTabletPortrait
+      ? 45
+      : isTablet
+      ? 35
+      : 6;
+    const maxBlockSize = isSmallPhone
+      ? 40
+      : isMobile
+      ? 45
+      : isTabletPortrait
+      ? 70
+      : isTablet
+      ? 60
+      : 80;
+
+    // Clamp block size to prevent stretching
+    blockSize = Math.max(minBlockSize, Math.min(maxBlockSize, blockSize));
+
+    // Always use exact dimensions (no stretching) - use the actual block size
+    const exactWidth = dimensions.width * blockSize;
+    const exactHeight = dimensions.height * blockSize;
+
+    setCanvasSize({ width: exactWidth, height: exactHeight });
     setBlockSize(blockSize);
   }, []);
 
-  const handleCellClick = useCallback((x, y) => {
-    // ... (Keep existing implementation) ...
-    if (!gameState.canPlaceExplosives) {
-        alert("Please import a new CSV file or refresh the page to continue placing explosives.");
+  const handleCellClick = useCallback(
+    (x, y) => {
+      // ... (Keep existing implementation) ...
+      if (!gameState.canPlaceExplosives) {
+        alert(
+          "Please import a new CSV file or refresh the page to continue placing explosives."
+        );
         return;
       }
 
@@ -291,13 +347,17 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         x,
         y,
         radius: gameState.blastRadius,
-        dirKey: nextPlacementDirRef.current && nextPlacementDirRef.current.explicit
+        dirKey:
+          nextPlacementDirRef.current && nextPlacementDirRef.current.explicit
             ? nextPlacementDirRef.current.dir
             : null,
       };
 
       if (gameState.blasts.length >= 5) {
-        showToast(`Maximum number of explosives that can be placed is 5`, "error");
+        showToast(
+          `Maximum number of explosives that can be placed is 5`,
+          "error"
+        );
         return;
       }
 
@@ -308,13 +368,27 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       setSelectedBlast({ x, y });
       lastPlacedRef.current = { x, y, t: Date.now() };
 
-      if (!nextPlacementDirRef.current || !nextPlacementDirRef.current.explicit) {
+      if (
+        !nextPlacementDirRef.current ||
+        !nextPlacementDirRef.current.explicit
+      ) {
         nextPlacementDirRef.current = { dir: null, explicit: false };
         if (setPendingDirection) setPendingDirection(null);
       }
-  }, [gameState.blasts, gameState.canPlaceExplosives, setGameState, gameState.blastRadius, pendingDirection, selectedBlast, setPendingDirection, showToast]);
+    },
+    [
+      gameState.blasts,
+      gameState.canPlaceExplosives,
+      setGameState,
+      gameState.blastRadius,
+      pendingDirection,
+      selectedBlast,
+      setPendingDirection,
+      showToast,
+    ]
+  );
 
-   useEffect(() => {
+  useEffect(() => {
     if (csvData && csvData !== csvDataRef.current) {
       csvDataRef.current = csvData;
       setBlastTrigger(null);
@@ -325,10 +399,13 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       try {
         const processedGrid = GridDataProcessor.processCSVToGrid(csvData);
 
-        if (processedGrid && GridDataProcessor.validateGridData(processedGrid)) {
+        if (
+          processedGrid &&
+          GridDataProcessor.validateGridData(processedGrid)
+        ) {
           setGridData(processedGrid);
           calculateOptimalSizing(processedGrid);
-          
+
           setOriginalGridData(
             structuredClone
               ? structuredClone(processedGrid)
@@ -355,7 +432,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }
   }, [csvData, onGridProcessed, calculateOptimalSizing, setGameState]);
 
-
   const handleCanvasReset = () => {
     if (!originalGridData) return;
     const restoredGrid = structuredClone
@@ -379,21 +455,28 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     setFileResetKey((prevKey) => prevKey + 1);
   };
 
-  const restoreGameState = useCallback((loadedState) => {
-    // 1. Grid restoration
-    setGridData({
+  const restoreGameState = useCallback(
+    (loadedState) => {
+      // 1. Grid restoration
+      setGridData({
         grid: loadedState.currentGrid || loadedState.simulationSnapshot?.grid,
-        dimensions: loadedState.gridDimensions || loadedState.initialGridState?.dimensions,
-        metadata: loadedState.gridMetadata || loadedState.initialGridState?.metadata,
-    });
-    setOriginalGridData({
+        dimensions:
+          loadedState.gridDimensions ||
+          loadedState.initialGridState?.dimensions,
+        metadata:
+          loadedState.gridMetadata || loadedState.initialGridState?.metadata,
+      });
+      setOriginalGridData({
         grid: loadedState.originalGrid || loadedState.initialGridState?.grid,
-        dimensions: loadedState.gridDimensions || loadedState.initialGridState?.dimensions,
-        metadata: loadedState.gridMetadata || loadedState.initialGridState?.metadata,
-    });
+        dimensions:
+          loadedState.gridDimensions ||
+          loadedState.initialGridState?.dimensions,
+        metadata:
+          loadedState.gridMetadata || loadedState.initialGridState?.metadata,
+      });
 
-    // 2. Context restoration
-    setGameState((prev) => ({
+      // 2. Context restoration
+      setGameState((prev) => ({
         ...prev,
         playerName: loadedState.gameState.playerName,
         score: loadedState.gameState.score,
@@ -402,39 +485,47 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         blastHistory: loadedState.gameState.blastHistory || prev.blastHistory,
         canPlaceExplosives: loadedState.gameState.canPlaceExplosives,
         grid: loadedState.currentGrid || loadedState.simulationSnapshot?.grid,
-        materialsRemainedAfterDestroy: loadedState.gameState.materialsRemainedAfterDestroy || 0,
-        numberOfMaterialsDestroyed: loadedState.gameState.numberOfMaterialsDestroyed || 0,
-    }));
+        materialsRemainedAfterDestroy:
+          loadedState.gameState.materialsRemainedAfterDestroy || 0,
+        numberOfMaterialsDestroyed:
+          loadedState.gameState.numberOfMaterialsDestroyed || 0,
+      }));
 
-    // 3. Physics Replay Restoration
-    if (loadedState.physicsReplayData && typeof window !== 'undefined') {
+      // 3. Physics Replay Restoration
+      if (loadedState.physicsReplayData && typeof window !== "undefined") {
         console.log("Restoring physics replay data...");
         window.lastBlastPhysicsState = loadedState.physicsReplayData;
-    } else {
+      } else {
         window.lastBlastPhysicsState = null;
-    }
+      }
 
-    // 4. Visuals
-    setSelectedBlast(loadedState.selectedBlast || null);
-    setFileResetKey((prev) => prev + 1); 
-    if (loadedState.simulationSnapshot && loadedState.simulationSnapshot.fallenDebris) {
-            setFallenDebris(loadedState.simulationSnapshot.fallenDebris);
-    }
-  }, [setGameState, setGridData, setOriginalGridData, setFileResetKey]);
+      // 4. Visuals
+      setSelectedBlast(loadedState.selectedBlast || null);
+      setFileResetKey((prev) => prev + 1);
+      if (
+        loadedState.simulationSnapshot &&
+        loadedState.simulationSnapshot.fallenDebris
+      ) {
+        setFallenDebris(loadedState.simulationSnapshot.fallenDebris);
+      }
+    },
+    [setGameState, setGridData, setOriginalGridData, setFileResetKey]
+  );
 
   const handleLoadFromStorage = (saveData) => {
     try {
-        restoreGameState(saveData);
-        showToast("Game loaded from storage!", "success");
+      restoreGameState(saveData);
+      showToast("Game loaded from storage!", "success");
     } catch (e) {
-        showToast("Failed to load save data.", "error");
+      showToast("Failed to load save data.", "error");
     }
   };
 
   // ----------------------------------------------------------------------
   // MODIFIED LOAD SIMULATION HANDLER
   // ----------------------------------------------------------------------
-  const handleLoadSimulationFile = useCallback(async (e) => {
+  const handleLoadSimulationFile = useCallback(
+    async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       setIsProcessing(true);
@@ -448,14 +539,22 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         setIsProcessing(false);
         setLoadFileInputKey((prev) => prev + 1);
       }
-    }, [restoreGameState, showToast]);
+    },
+    [restoreGameState, showToast]
+  );
 
   // ... (Keep existing history logic and handleSaveSimulation/Export) ...
   const recoveryHistory = gameState.recoveryHistory;
   const blastHistory = gameState.blastHistory;
-  const lastRecoveryDetail = recoveryHistory?.length > 0 ? recoveryHistory[recoveryHistory.length - 1] : { recoveredCount: 0, efficiency: 0 };
-  const lastBlastRecord = blastHistory?.length > 0 ? blastHistory[blastHistory.length - 1] : { recovery: 0, dilution: 0, score: 0 };
-  
+  const lastRecoveryDetail =
+    recoveryHistory?.length > 0
+      ? recoveryHistory[recoveryHistory.length - 1]
+      : { recoveredCount: 0, efficiency: 0 };
+  const lastBlastRecord =
+    blastHistory?.length > 0
+      ? blastHistory[blastHistory.length - 1]
+      : { recovery: 0, dilution: 0, score: 0 };
+
   const handleSaveSimulation = () => {
     if (isBlasting) {
       showToast("Cannot save while a blast is in progress.", "error");
@@ -466,7 +565,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       return;
     }
 
-    const physicsReplayData = typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
+    const physicsReplayData =
+      typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
 
     const simulationState = {
       savedAt: new Date().toISOString(),
@@ -481,7 +581,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       },
       gameState: {
         playerName: gameState.playerName,
-        blasts: gameState.blasts, 
+        blasts: gameState.blasts,
         blastHistory: gameState.blastHistory,
         canPlaceExplosives: gameState.canPlaceExplosives,
         materialsRemainedAfterDestroy: gameState.materialsRemainedAfterDestroy,
@@ -505,7 +605,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }
 
     // Capture physics state for replayability
-    const physicsReplayData = typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
+    const physicsReplayData =
+      typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
 
     // Build the FULL save object (Same structure as saveManualSimulation)
     const fullSaveState = {
@@ -532,50 +633,90 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       physicsReplayData: physicsReplayData ? { ...physicsReplayData } : null,
     };
 
-    const timestamp = new Date().toLocaleTimeString('en-GB').replace(/:/g, '-');
-    const datestamp = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
-    
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullSaveState, null, 2));
-    const downloadAnchorNode = document.createElement('a');
+    const timestamp = new Date().toLocaleTimeString("en-GB").replace(/:/g, "-");
+    const datestamp = new Date()
+      .toLocaleDateString("en-GB")
+      .replace(/\//g, "-");
+
+    const dataStr =
+      "data:text/json;charset=utf-8," +
+      encodeURIComponent(JSON.stringify(fullSaveState, null, 2));
+    const downloadAnchorNode = document.createElement("a");
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "simulation_save_" + datestamp + "_" + timestamp + ".json");
+    downloadAnchorNode.setAttribute(
+      "download",
+      "simulation_save_" + datestamp + "_" + timestamp + ".json"
+    );
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
-    
+
     showToast("Full simulation saved to file!", "success");
   };
 
-  
-  if (!csvData) return <div className="text-center py-8 text-gray-500"><p>Upload a CSV file to visualize the ore grid</p></div>;
-  if (isProcessing || !gridData) return <div className="text-center py-8 text-gray-500"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div><p>Processing grid data...</p></div>;
+  if (!csvData)
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <p>Upload a CSV file to visualize the ore grid</p>
+      </div>
+    );
+  if (isProcessing || !gridData)
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+        <p>Processing grid data...</p>
+      </div>
+    );
 
   return (
-    <div className="w-full min-h-screen relative">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      
-      {/* Add the Modal */}
-        <LoadGameModal 
-            show={showLoadModal}
-            onClose={() => setShowLoadModal(false)}
-            onLoadGame={handleLoadFromStorage}
-            loadFileInputKey={loadFileInputKey}
-            onFileSelect={handleLoadSimulationFile}
+    <div className="w-full h-full flex flex-col overflow-hidden relative">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
+      )}
+
+      {/* Add the Modal */}
+      <LoadGameModal
+        show={showLoadModal}
+        onClose={() => setShowLoadModal(false)}
+        onLoadGame={handleLoadFromStorage}
+        loadFileInputKey={loadFileInputKey}
+        onFileSelect={handleLoadSimulationFile}
+      />
       {/* Leaderboard Modal */}
-      <LeaderboardModal 
-        show={showLeaderboard} 
-        onClose={() => setShowLeaderboard(false)} 
+      <LeaderboardModal
+        show={showLeaderboard}
+        onClose={() => setShowLeaderboard(false)}
       />
 
-      <div className="md:absolute md:left-1/2 md:transform md:-translate-x-1/2 md:max-w-[70%]  px-2 md:px-0">
-        <h2 className="text-base md:text-xl font-bold mb-2 md:mb-4  md:text-left text-amber-500">
+      {/* Mobile & Tablet Layout - Stacked (includes large portrait tablets like iPad Pro) */}
+      <div
+        className="flex-1 overflow-y-auto pb-4 px-2 sm:px-3 md:px-4"
+        style={{
+          display:
+            window.innerWidth < 1024 ||
+            (window.innerWidth >= 1024 &&
+              window.innerWidth <= 1200 &&
+              window.innerHeight > window.innerWidth)
+              ? "flex"
+              : "none",
+          flexDirection: "column",
+        }}
+      >
+        <h2 className="text-sm sm:text-base md:text-lg font-bold mb-2 sm:mb-3 md:mb-4 text-center text-amber-500">
           2D Ore Grid Visualization
         </h2>
 
-        <GridInfo gridData={gridData} blockSize={blockSize} canvasSize={canvasSize} />
+        <GridInfo
+          gridData={gridData}
+          blockSize={blockSize}
+          canvasSize={canvasSize}
+        />
 
-        <div className="flex justify-center">
+        <div className="flex justify-center mb-3 sm:mb-4 md:mb-6">
           <GridCanvas
             gridData={gridData}
             canvasSize={canvasSize}
@@ -594,7 +735,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           />
         </div>
 
-        <div className="md:hidden mt-4">
+        <div className="mt-4 sm:mt-5 md:mt-8 mb-6">
           <GridLegend
             oreTypes={gridData.metadata.oreTypes}
             onTriggerBlast={handleTriggerBlast}
@@ -605,24 +746,70 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             onSaveSimulation={handleSaveSimulation}
             loadFileInputKey={loadFileInputKey}
             onOpenLeaderboard={() => setShowLeaderboard(true)}
-            onOpenLoadModal={() => setShowLoadModal(true)} // // <--- CONNECT
+            onOpenLoadModal={() => setShowLoadModal(true)}
           />
         </div>
       </div>
 
-      <div className="hidden md:block absolute top-8 right-4 w-66 z-50">
-        <GridLegend
-          oreTypes={gridData.metadata.oreTypes}
-          onTriggerBlast={handleTriggerBlast}
-          resetCanvas={handleCanvasReset}
-          onSaveSimulation={handleSaveSimulation}
-          isBlasting={isBlasting}
-          selectedBlast={selectedBlast}
-          onSelectDirection={onSelectDirection}
-          loadFileInputKey={loadFileInputKey}
-          onOpenLeaderboard={() => setShowLeaderboard(true)} // <--- CONNECT
-          onOpenLoadModal={() => setShowLoadModal(true)}
-        />
+      {/* Desktop Layout - Centered with Controls on Right (excludes large portrait tablets) */}
+      <div
+        style={{
+          display:
+            window.innerWidth >= 1024 &&
+            !(
+              window.innerWidth >= 1024 &&
+              window.innerWidth <= 1200 &&
+              window.innerHeight > window.innerWidth
+            )
+              ? "block"
+              : "none",
+        }}
+      >
+        <div className="lg:absolute lg:left-1/2 lg:transform lg:-translate-x-1/2 lg:max-w-[70%] lg:px-0">
+          <h2 className="text-xl font-bold mb-4 text-left text-amber-500">
+            2D Ore Grid Visualization
+          </h2>
+
+          <GridInfo
+            gridData={gridData}
+            blockSize={blockSize}
+            canvasSize={canvasSize}
+          />
+
+          <div className="flex justify-center mb-4">
+            <GridCanvas
+              gridData={gridData}
+              canvasSize={canvasSize}
+              blockSize={blockSize}
+              blasts={gameState.blasts}
+              selectedBlast={selectedBlast}
+              onBlockClick={handleCellClick}
+              blastTrigger={blastTrigger}
+              onBlastComplete={handleBlastComplete}
+              onDebrisSettled={setFallenDebris}
+              fallenDebris={fallenDebris}
+              fileResetKey={fileResetKey}
+              addRecoveryRecordToGameContext={addRecoveryRecord}
+              updateScore={updateScore}
+              isPreparingReplay={isPreparingReplay}
+            />
+          </div>
+        </div>
+
+        <div className="lg:absolute lg:top-8 lg:right-4 lg:w-66 lg:z-50">
+          <GridLegend
+            oreTypes={gridData.metadata.oreTypes}
+            onTriggerBlast={handleTriggerBlast}
+            resetCanvas={handleCanvasReset}
+            onSaveSimulation={handleSaveSimulation}
+            isBlasting={isBlasting}
+            selectedBlast={selectedBlast}
+            onSelectDirection={onSelectDirection}
+            loadFileInputKey={loadFileInputKey}
+            onOpenLeaderboard={() => setShowLeaderboard(true)}
+            onOpenLoadModal={() => setShowLoadModal(true)}
+          />
+        </div>
       </div>
 
       <BlastResults
