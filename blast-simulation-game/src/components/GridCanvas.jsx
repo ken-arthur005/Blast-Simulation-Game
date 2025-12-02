@@ -499,19 +499,19 @@ const GridCanvas = ({
     if (!isPreparingReplay) return;
 
     console.log("🔄 Preparing for replay - clearing all visual state...");
-    
+
     // Clear destroyed cells to show all blocks
     setDestroyedCells([]);
     setBlastCompleted(false);
-    
+
     // Clear all gray caches so original colors show
     blocksRef.current.forEach((block) => {
       block.grayCachedCanvas = null;
     });
-    
+
     // Force render cache rebuild
     gridRenderCacheRef.current = null;
-    
+
     // Trigger a re-render
     renderCanvas();
   }, [isPreparingReplay, renderCanvas]);
@@ -647,6 +647,43 @@ const GridCanvas = ({
     [onBlockClick, getGridCoords]
   ); // Dependency on 'onBlockClick' and 'getGridCoords'
 
+  // Touch Handler for Mobile Devices
+  const handleTouchStart = useCallback(
+    (event) => {
+      // this guard clause disables touches during the animation.
+      if (isBlastRunningRef.current) return;
+
+      if (!onBlockClick || !canvasRef.current) return;
+
+      // Prevent default to avoid mouse event emulation
+      event.preventDefault();
+
+      const touch = event.touches[0];
+      if (!touch) return;
+
+      // Get canvas-relative touch coordinates
+      const rect = canvasRef.current.getBoundingClientRect();
+      const scaleX = canvasRef.current.width / rect.width;
+      const scaleY = canvasRef.current.height / rect.height;
+      const pixelX = (touch.clientX - rect.left) * scaleX;
+      const pixelY = (touch.clientY - rect.top) * scaleY;
+
+      const gridCoords = getGridCoords(pixelX, pixelY);
+
+      if (gridCoords) {
+        onBlockClick(gridCoords.x, gridCoords.y);
+        // Force immediate re-render on mobile after explosive placement
+        requestAnimationFrame(() => {
+          const canvas = canvasRef.current;
+          if (canvas && gridData && gridData.grid) {
+            renderCanvas();
+          }
+        });
+      }
+    },
+    [onBlockClick, getGridCoords, gridData, renderCanvas]
+  );
+
   // Mouse Move Handler (for hover)
   // Helper to compute grid offsets (used for hover overlay drawing)
   const getGridOffsets = useCallback(() => {
@@ -699,7 +736,7 @@ const GridCanvas = ({
 
   // Throttle timestamp for hover - limit to 60fps max (16ms)
   const lastHoverTimeRef = useRef(0);
-  
+
   const handleMouseMove = useCallback(
     (event) => {
       // this guard clause disables the entire hover effect during the animation.
@@ -854,12 +891,12 @@ const GridCanvas = ({
       // Clear destroyed cells to show all original ore colors
       setDestroyedCells([]);
       setBlastCompleted(false); // Reset blast completed flag
-      
+
       // Clear gray caches so original colors show
       blocksRef.current.forEach((block) => {
         block.grayCachedCanvas = null;
       });
-      
+
       gridRenderCacheRef.current = null; // Force cache rebuild with original colors
     }
     console.debug("GridCanvas: blastTrigger received", {
@@ -1102,7 +1139,9 @@ const GridCanvas = ({
 
       // Skip score calculation and updates during replay
       if (isReplayMode) {
-        console.log("🎬 Skipping score calculation for replay (colors applied)");
+        console.log(
+          "🎬 Skipping score calculation for replay (colors applied)"
+        );
         return;
       }
 
@@ -1293,8 +1332,9 @@ const GridCanvas = ({
       ctx.translate(offsetX, offsetY);
 
       // OPTIMIZED: Skip this expensive rendering - affected cells are cached in staticGridCache
-      // Only render for first few milliseconds if really needed
-      if (false && elapsed < 3) {
+      // Disabled for performance optimization with 10k+ blocks
+      /* eslint-disable-next-line no-constant-condition */
+      if (false) {
         affectedCells.forEach((cell) => {
           const block = new OreBlock(
             gridData.grid[cell.y][cell.x],
@@ -1357,169 +1397,169 @@ const GridCanvas = ({
       // RENDER SHOCKWAVES 🔥
       // OPTIMIZED: Skip shockwave rendering entirely if all effects are faded
       if (elapsed < shockwaveDuration + 1000) {
-      blastCenters.forEach((center, i) => {
-        const shockwave = shockwaves[i];
+        blastCenters.forEach((center, i) => {
+          const shockwave = shockwaves[i];
 
-        // Update shockwave properties
-        shockwave.radius = shockwaveProgress * blockSize * 3; // Reduced from 4 to 3 block radius
-        shockwave.opacity = Math.max(0, 1 - shockwaveProgress);
-        shockwave.flashOpacity = Math.max(0, 1 - flashProgress * 2);
+          // Update shockwave properties
+          shockwave.radius = shockwaveProgress * blockSize * 3; // Reduced from 4 to 3 block radius
+          shockwave.opacity = Math.max(0, 1 - shockwaveProgress);
+          shockwave.flashOpacity = Math.max(0, 1 - flashProgress * 2);
 
-        // FIRE/EXPLOSION PARTICLES 🔥💥
-        if (elapsed < 600) {
-          // Fire particles last ~0.6s (visual window)
-          const particleProgress = Math.min(elapsed / 600, 1);
-          // Optimized particle count for 10k+ blocks - reduced from 6 to 4 for better performance
-          const numParticles = 4;
+          // FIRE/EXPLOSION PARTICLES 🔥💥
+          if (elapsed < 600) {
+            // Fire particles last ~0.6s (visual window)
+            const particleProgress = Math.min(elapsed / 600, 1);
+            // Optimized particle count for 10k+ blocks - reduced from 6 to 4 for better performance
+            const numParticles = 4;
 
-          for (let p = 0; p < numParticles; p++) {
-            const angle =
-              (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + p * 0.2;
-            const distance =
-              particleProgress *
-              blockSize *
-              3.5 *
-              (1 + Math.sin(elapsed * 0.02 + p) * 0.3);
-            const particleX = center.x + Math.cos(angle) * distance;
-            const particleY =
-              center.y +
-              Math.sin(angle) * distance -
-              particleProgress * blockSize * 0.5; // Rise up
+            for (let p = 0; p < numParticles; p++) {
+              const angle =
+                (p / numParticles) * Math.PI * 2 + elapsed * 0.01 + p * 0.2;
+              const distance =
+                particleProgress *
+                blockSize *
+                3.5 *
+                (1 + Math.sin(elapsed * 0.02 + p) * 0.3);
+              const particleX = center.x + Math.cos(angle) * distance;
+              const particleY =
+                center.y +
+                Math.sin(angle) * distance -
+                particleProgress * blockSize * 0.5; // Rise up
 
-            // Particle size shrinks over time
-            const particleSize =
-              blockSize * 0.25 * (1 - particleProgress * 0.7);
+              // Particle size shrinks over time
+              const particleSize =
+                blockSize * 0.25 * (1 - particleProgress * 0.7);
 
-            // Color shifts from white -> yellow -> orange -> red -> fade
-            let particleColor;
-            if (particleProgress < 0.2) {
-              particleColor = "#ffffff";
-            } else if (particleProgress < 0.4) {
-              particleColor = "#ffff00";
-            } else if (particleProgress < 0.6) {
-              particleColor = "#ff8800";
-            } else {
-              particleColor = "#ff3300";
+              // Color shifts from white -> yellow -> orange -> red -> fade
+              let particleColor;
+              if (particleProgress < 0.2) {
+                particleColor = "#ffffff";
+              } else if (particleProgress < 0.4) {
+                particleColor = "#ffff00";
+              } else if (particleProgress < 0.6) {
+                particleColor = "#ff8800";
+              } else {
+                particleColor = "#ff3300";
+              }
+
+              ctx.save();
+              ctx.globalAlpha = (1 - particleProgress) * 0.8;
+
+              // Draw flame particle with glow
+              const particleGradient = ctx.createRadialGradient(
+                particleX,
+                particleY,
+                0,
+                particleX,
+                particleY,
+                particleSize
+              );
+              particleGradient.addColorStop(0, particleColor);
+              particleGradient.addColorStop(1, "rgba(255, 0, 0, 0)");
+
+              ctx.fillStyle = particleGradient;
+              ctx.beginPath();
+              ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
             }
+          }
 
+          // SMOKE PUFFS 💨
+          if (elapsed > 200 && elapsed < 1000) {
+            // Smoke appears after initial flash; keep duration short to reduce work
+            const smokeProgress = Math.min((elapsed - 200) / 800, 1);
+            const numPuffs = 2; // Optimized for 10k+ blocks - reduced from 3 to 2 for better performance
+
+            for (let s = 0; s < numPuffs; s++) {
+              const angle =
+                (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + s * 0.5;
+              const distance = smokeProgress * blockSize * 1.8;
+              const puffX = center.x + Math.cos(angle) * distance;
+              const puffY =
+                center.y +
+                Math.sin(angle) * distance -
+                smokeProgress * blockSize * 1.5; // Rise up more
+              const puffSize = blockSize * 0.6 * (1 + smokeProgress * 0.5);
+
+              ctx.save();
+              ctx.globalAlpha = (1 - smokeProgress) * 0.75;
+
+              // Gray smoke
+              const smokeGradient = ctx.createRadialGradient(
+                puffX,
+                puffY,
+                0,
+                puffX,
+                puffY,
+                puffSize
+              );
+              smokeGradient.addColorStop(0, "#bbbbbb");
+              smokeGradient.addColorStop(1, "rgba(80, 80, 80, 0)");
+
+              ctx.fillStyle = smokeGradient;
+              ctx.beginPath();
+              ctx.arc(puffX, puffY, puffSize, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            }
+          }
+
+          // Draw initial flash
+          if (shockwave.flashOpacity > 0) {
             ctx.save();
-            ctx.globalAlpha = (1 - particleProgress) * 0.8;
-
-            // Draw flame particle with glow
-            const particleGradient = ctx.createRadialGradient(
-              particleX,
-              particleY,
+            ctx.globalAlpha = shockwave.flashOpacity;
+            const gradient = ctx.createRadialGradient(
+              center.x,
+              center.y,
               0,
-              particleX,
-              particleY,
-              particleSize
+              center.x,
+              center.y,
+              blockSize * 2.5
             );
-            particleGradient.addColorStop(0, particleColor);
-            particleGradient.addColorStop(1, "rgba(255, 0, 0, 0)");
-
-            ctx.fillStyle = particleGradient;
+            gradient.addColorStop(0, "#ffffff");
+            gradient.addColorStop(0.3, "#ffff00");
+            gradient.addColorStop(1, "rgba(255, 200, 0, 0)");
+            ctx.fillStyle = gradient;
             ctx.beginPath();
-            ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+            ctx.arc(center.x, center.y, blockSize * 2.5, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
           }
-        }
 
-        // SMOKE PUFFS 💨
-        if (elapsed > 200 && elapsed < 1000) {
-          // Smoke appears after initial flash; keep duration short to reduce work
-          const smokeProgress = Math.min((elapsed - 200) / 800, 1);
-          const numPuffs = 2; // Optimized for 10k+ blocks - reduced from 3 to 2 for better performance
-
-          for (let s = 0; s < numPuffs; s++) {
-            const angle =
-              (s / numPuffs) * Math.PI * 2 + elapsed * 0.005 + s * 0.5;
-            const distance = smokeProgress * blockSize * 1.8;
-            const puffX = center.x + Math.cos(angle) * distance;
-            const puffY =
-              center.y +
-              Math.sin(angle) * distance -
-              smokeProgress * blockSize * 1.5; // Rise up more
-            const puffSize = blockSize * 0.6 * (1 + smokeProgress * 0.5);
-
+          // Draw expanding shockwave rings
+          if (shockwave.opacity > 0 && shockwave.radius > 0) {
+            // Outer ring (red)
             ctx.save();
-            ctx.globalAlpha = (1 - smokeProgress) * 0.75;
-
-            // Gray smoke
-            const smokeGradient = ctx.createRadialGradient(
-              puffX,
-              puffY,
-              0,
-              puffX,
-              puffY,
-              puffSize
-            );
-            smokeGradient.addColorStop(0, "#bbbbbb");
-            smokeGradient.addColorStop(1, "rgba(80, 80, 80, 0)");
-
-            ctx.fillStyle = smokeGradient;
+            ctx.globalAlpha = shockwave.opacity * 0.8;
+            ctx.strokeStyle = "#ff0000";
+            ctx.lineWidth = 10;
             ctx.beginPath();
-            ctx.arc(puffX, puffY, puffSize, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.arc(center.x, center.y, shockwave.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            // Middle ring (orange)
+            ctx.save();
+            ctx.globalAlpha = shockwave.opacity * 0.1;
+            ctx.strokeStyle = "#ff6600";
+            ctx.lineWidth = 7;
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, shockwave.radius * 0.7, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            // Inner ring (yellow-white)
+            ctx.save();
+            ctx.globalAlpha = shockwave.opacity;
+            ctx.strokeStyle = "#ffff00";
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, shockwave.radius * 0.4, 0, Math.PI * 2);
+            ctx.stroke();
             ctx.restore();
           }
-        }
-
-        // Draw initial flash
-        if (shockwave.flashOpacity > 0) {
-          ctx.save();
-          ctx.globalAlpha = shockwave.flashOpacity;
-          const gradient = ctx.createRadialGradient(
-            center.x,
-            center.y,
-            0,
-            center.x,
-            center.y,
-            blockSize * 2.5
-          );
-          gradient.addColorStop(0, "#ffffff");
-          gradient.addColorStop(0.3, "#ffff00");
-          gradient.addColorStop(1, "rgba(255, 200, 0, 0)");
-          ctx.fillStyle = gradient;
-          ctx.beginPath();
-          ctx.arc(center.x, center.y, blockSize * 2.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-
-        // Draw expanding shockwave rings
-        if (shockwave.opacity > 0 && shockwave.radius > 0) {
-          // Outer ring (red)
-          ctx.save();
-          ctx.globalAlpha = shockwave.opacity * 0.8;
-          ctx.strokeStyle = "#ff0000";
-          ctx.lineWidth = 10;
-          ctx.beginPath();
-          ctx.arc(center.x, center.y, shockwave.radius, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.restore();
-
-          // Middle ring (orange)
-          ctx.save();
-          ctx.globalAlpha = shockwave.opacity * 0.1;
-          ctx.strokeStyle = "#ff6600";
-          ctx.lineWidth = 7;
-          ctx.beginPath();
-          ctx.arc(center.x, center.y, shockwave.radius * 0.7, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.restore();
-
-          // Inner ring (yellow-white)
-          ctx.save();
-          ctx.globalAlpha = shockwave.opacity;
-          ctx.strokeStyle = "#ffff00";
-          ctx.lineWidth = 5;
-          ctx.beginPath();
-          ctx.arc(center.x, center.y, shockwave.radius * 0.4, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.restore();
-        }
-      });
+        });
       } // End shockwave early exit optimization
 
       // Render physics bodies (affected cells as debris) with motion trails 🔥
@@ -1532,7 +1572,7 @@ const GridCanvas = ({
       const minY = -cullMargin;
       const maxY = canvasHeight + cullMargin;
       const opacity = Math.max(0, 1 - progress * 0.8);
-      
+
       animStates.forEach((state) => {
         const body = state.body;
         // Use GSAP position during animation phase, physics position after
@@ -1545,7 +1585,12 @@ const GridCanvas = ({
         };
 
         // OPTIMIZED: Skip rendering debris that's completely off-screen
-        if (animPos.x < minX || animPos.x > maxX || animPos.y < minY || animPos.y > maxY) {
+        if (
+          animPos.x < minX ||
+          animPos.x > maxX ||
+          animPos.y < minY ||
+          animPos.y > maxY
+        ) {
           return; // Cull off-screen debris
         }
 
@@ -1808,12 +1853,17 @@ const GridCanvas = ({
         style={{
           width: canvasSize.width,
           height: canvasSize.height,
-          borderRadius: "20px",
+          borderRadius: window.innerWidth < 640 ? "12px" : "20px",
           backdropFilter: "blur(12px)",
           background: "rgba(255, 255, 255, 0.15)",
           border: "2px solid rgba(255, 255, 255, 0.3)",
           boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-          padding: "10px",
+          padding:
+            window.innerWidth >= 1024 && window.innerHeight <= 700
+              ? "4px"
+              : window.innerWidth < 640
+              ? "6px"
+              : "10px",
           overflow: "hidden", // clip canvas to rounded container so textures can't escape
           boxSizing: "border-box",
         }}
@@ -1827,8 +1877,10 @@ const GridCanvas = ({
             width: "100%",
             height: "100%",
             borderRadius: "inherit",
+            touchAction: "none", // Prevent default touch behaviors
           }}
           onClick={handleClick}
+          onTouchStart={handleTouchStart}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         />

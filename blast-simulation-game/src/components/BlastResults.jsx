@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from "react";
+import { useContext, useState, useEffect, useMemo } from "react";
 import { GameContext } from "./GameContext";
 
 import {
@@ -17,7 +17,6 @@ import {
 const BlastResult = ({
   show,
   onClose,
-  onSave,
   onReplay,
   score,
   recoveryRate,
@@ -30,9 +29,9 @@ const BlastResult = ({
   efficiency,
   onExportSimulation,
 }) => {
-  const { gameState } = useContext(GameContext);
+  useContext(GameContext); // Keep context for future use
   const [isReplayAvailable, setIsReplayAvailable] = useState(false);
-  const [replayState, setReplayState] = useState({
+  const [replayState] = useState({
     isReplaying: false,
     isPaused: false,
     currentFrame: 0,
@@ -58,10 +57,19 @@ const BlastResult = ({
     }
   };
 
-  const isOptimal = recoveryRate >= 70 && dilutionRate <= 10;
-  const tipMessage = isOptimal
-    ? "Excellent mining technique! Targeting different ore combinations may increase your total yield."
-    : `Try to increase recovery (currently ${recoveryRate}%) and reduce dilution (currently ${dilutionRate}%) by adjusting the blast direction.`;
+  // OPTIMIZED: Memoize expensive calculations
+  const isOptimal = useMemo(
+    () => recoveryRate >= 70 && dilutionRate <= 10,
+    [recoveryRate, dilutionRate]
+  );
+  const tipMessage = useMemo(
+    () =>
+      isOptimal
+        ? "Excellent mining technique! Targeting different ore combinations may increase your total yield."
+        : `Try to increase recovery (currently ${recoveryRate}%) and reduce dilution (currently ${dilutionRate}%) by adjusting the blast direction.`,
+    [isOptimal, recoveryRate, dilutionRate]
+  );
+
   if (!show) {
     return null;
   }
