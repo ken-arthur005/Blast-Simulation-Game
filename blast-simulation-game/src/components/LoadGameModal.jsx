@@ -60,6 +60,21 @@ const LoadGameModal = ({
     }
   };
 
+  const handleClearHistory = () => {
+    let success = false;
+
+    if (activeTab === "auto") {
+      success = clearAutoSimulations();
+    } else {
+      success = clearManualSimulations();
+    }
+
+    if (success) {
+      setSaves([]); // Clear the list visually immediately
+      setShowConfirmClear(false);
+    }
+  };
+
   if (!show) return null;
 
   return (
