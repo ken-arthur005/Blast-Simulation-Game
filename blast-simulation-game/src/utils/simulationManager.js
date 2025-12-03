@@ -33,6 +33,26 @@ export const getManualSimulations = () => getSaves(MANUAL_SAVE_KEY);
 export const getAutoSimulations = () => getSaves(AUTO_SAVE_KEY);
 export const getLeaderboardScores = () => getSaves(LEADERBOARD_KEY);
 
+export const clearManualSimulations = () => {
+  try {
+    localStorage.removeItem(MANUAL_SAVE_KEY);
+    return true;
+  } catch (error) {
+    console.error("Failed to clear manual saves:", error);
+    return false;
+  }
+};
+
+export const clearAutoSimulations = () => {
+  try {
+    localStorage.removeItem(AUTO_SAVE_KEY);
+    return true;
+  } catch (error) {
+    console.error("Failed to clear auto saves:", error);
+    return false;
+  }
+};
+
 export const saveManualSimulation = (simulationState) => {
   if (!simulationState) return false;
   try {
