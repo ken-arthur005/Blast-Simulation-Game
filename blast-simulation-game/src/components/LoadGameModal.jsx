@@ -3,6 +3,8 @@ import { X, HardDrive, Clock, FileUp, Play } from "lucide-react";
 import {
   getAutoSimulations,
   getManualSimulations,
+  clearAutoSimulations,
+  clearManualSimulations,
 } from "../utils/simulationManager";
 // import { loadSimulation } from "../utils/loadSimulation"; // Re-use the existing parser logic - unused
 
