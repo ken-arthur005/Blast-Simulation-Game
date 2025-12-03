@@ -18,6 +18,11 @@ const LoadGameModal = ({
   // Only hide load buttons on large desktop screens (>= 1400px), always show for tablets
   const isDesktop = window.innerWidth >= 1400;
 
+  // Track current screen category
+  const [isCurrentScreenSmall, setIsCurrentScreenSmall] = useState(
+    window.innerWidth < 600
+  );
+
   useEffect(() => {
     if (show) {
       const data =
