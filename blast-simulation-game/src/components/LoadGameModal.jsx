@@ -37,6 +37,14 @@ const LoadGameModal = ({
     if (show) {
       const data =
         activeTab === "auto" ? getAutoSimulations() : getManualSimulations();
+
+      // Filter logic
+      const filteredData = (rawData || []).filter((save) => {
+        // If save.isSmallScreen is undefined (old save), assume it's Large Screen (false)
+        const saveWasSmall = !!save.isSmallScreen;
+        return saveWasSmall === isCurrentScreenSmall;
+      });
+
       setSaves(data || []);
     }
   }, [show, activeTab]);
