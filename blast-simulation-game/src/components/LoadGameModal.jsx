@@ -23,6 +23,16 @@ const LoadGameModal = ({
     window.innerWidth < 600
   );
 
+  // Update screen state on resize to ensure filtering is dynamic if user rotates device
+  useEffect(() => {
+    const handleResize = () => {
+      setIsCurrentScreenSmall(window.innerWidth < 600);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   useEffect(() => {
     if (show) {
       const data =
