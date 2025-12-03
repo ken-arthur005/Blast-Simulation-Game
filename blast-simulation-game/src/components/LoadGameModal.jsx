@@ -35,7 +35,7 @@ const LoadGameModal = ({
 
   useEffect(() => {
     if (show) {
-      const data =
+      const rawData =
         activeTab === "auto" ? getAutoSimulations() : getManualSimulations();
 
       // Filter logic
