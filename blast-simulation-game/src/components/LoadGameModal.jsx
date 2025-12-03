@@ -51,7 +51,7 @@ const LoadGameModal = ({
 
       setSaves(filteredData);
     }
-  }, [show, activeTab]);
+  }, [show, activeTab, isCurrentScreenSmall]);
 
   const handleLoadLocal = (saveData) => {
     if (onLoadGame) {
