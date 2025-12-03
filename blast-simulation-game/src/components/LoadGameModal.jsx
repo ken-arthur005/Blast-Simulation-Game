@@ -45,7 +45,7 @@ const LoadGameModal = ({
         return saveWasSmall === isCurrentScreenSmall;
       });
 
-      setSaves(data || []);
+      setSaves(filteredData);
     }
   }, [show, activeTab]);
 
