@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, HardDrive, Clock, FileUp, Play } from "lucide-react";
+import { X, HardDrive, Clock, FileUp, Play, Trash2 } from "lucide-react";
 import {
   getAutoSimulations,
   getManualSimulations,
@@ -80,6 +80,7 @@ const LoadGameModal = ({
   return (
     <div className="fixed inset-0 h-full bg-black/60 backdrop-blur-sm flex justify-center items-center z-[1000] p-4 animate-fadeIn">
       <div className="bg-gray-900 border border-white/20 text-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
+        {/* Header */}
         <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <HardDrive className="w-5 h-5 text-blue-400" />
@@ -153,8 +154,39 @@ const LoadGameModal = ({
           )}
         </div>
 
-        {/* File Upload Footer */}
-        <div className="p-4 border-t border-white/10 bg-black/30">
+        {/* Footer Area: Clear History & Import */}
+        <div className="p-4 border-t border-white/10 bg-black/30 flex flex-col gap-3">
+          {/* NEW: Clear History Section (Only shows if saves exist) */}
+          {saves.length > 0 && (
+            <div className="flex justify-end items-center border-b border-white/5 pb-3">
+              {!showConfirmClear ? (
+                <button
+                  onClick={() => setShowConfirmClear(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all text-xs font-medium"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Clear History
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 animate-fadeIn">
+                  <span className="text-xs text-red-400 mr-1">Delete all?</span>
+                  <button
+                    onClick={handleClearHistory}
+                    className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={() => setShowConfirmClear(false)}
+                    className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-xs"
+                  >
+                    No
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Import Button */}
           <label className="flex items-center justify-center gap-2 w-full bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg cursor-pointer transition-colors border border-white/10 border-dashed">
             <FileUp className="w-4 h-4" />
             <span className="text-sm font-medium">Import from JSON File</span>
