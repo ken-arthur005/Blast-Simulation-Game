@@ -45,6 +45,7 @@ export const saveManualSimulation = (simulationState) => {
       id: `save_manual_${Date.now()}`,
       tag: "Manual Save",
       timestamp: new Date().toISOString(),
+      isSmallScreen,
       ...simulationState,
     };
     const updatedSaves = [newSave, ...manualSaves].slice(0, MAX_MANUAL_SAVES);
@@ -59,10 +60,15 @@ export const saveAutoSimulation = (simulationState, roundNumber) => {
   if (!simulationState) return false;
   try {
     const autoSaves = getAutoSimulations();
+
+    // Detect screen size at time of save
+    const isSmallScreen = window.innerWidth < 600;
+
     const newSave = {
       id: `save_auto_${Date.now()}`,
       tag: `Auto-Save (Round ${roundNumber})`,
       timestamp: new Date().toISOString(),
+      isSmallScreen,
       ...simulationState,
     };
     const updatedSaves = [newSave, ...autoSaves].slice(0, MAX_AUTO_SAVES);
@@ -81,7 +87,7 @@ export const saveHighscore = (scoreEntry) => {
       timestamp: new Date().toISOString(),
       ...scoreEntry,
     };
-    
+
     // Sort descending by score
     const updatedScores = [...currentScores, newEntry]
       .sort((a, b) => b.score - a.score)
