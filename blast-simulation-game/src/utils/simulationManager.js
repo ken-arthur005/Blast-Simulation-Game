@@ -37,6 +37,10 @@ export const saveManualSimulation = (simulationState) => {
   if (!simulationState) return false;
   try {
     const manualSaves = getManualSimulations();
+
+    // Detect screen size at time of save
+    const isSmallScreen = window.innerWidth < 600;
+
     const newSave = {
       id: `save_manual_${Date.now()}`,
       tag: "Manual Save",
