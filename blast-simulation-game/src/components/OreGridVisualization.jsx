@@ -8,7 +8,8 @@ import React, {
 } from "react";
 import GridDataProcessor from "../utils/gridDataProcessor";
 import useSoundManager from "../utils/useSoundManager";
-import { Volume2, VolumeX, Undo2, FileBarChart2 } from "lucide-react";
+// ADDED: HelpCircle icon
+import { Volume2, VolumeX, Undo2, FileBarChart2, HelpCircle } from "lucide-react";
 import GridCanvas from "./GridCanvas";
 import GridLegend from "./GridLegend";
 import GridInfo from "./GridInfo";
@@ -19,6 +20,8 @@ import {
 } from "../utils/blastCalculator";
 import BlastResults from "./BlastResults";
 import LeaderboardModal from "./Leaderboard.jsx";
+// ADDED: Import OnboardingModal
+import OnboardingModal from "./OnboardingModal"; 
 import Toast from "./Toast";
 import {
   saveManualSimulation,
@@ -64,21 +67,31 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const [isPreparingReplay, setIsPreparingReplay] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   
+  // ADDED: Onboarding State
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  
   // Audio & Visual State
   const { isMuted, toggleMute, playSound } = useSoundManager();
   const [showFlash, setShowFlash] = useState(false);
 
-  // 2. Helper Functions (Defined FIRST so they can be used below)
+  // 2. Helper Functions
   
   const showToast = useCallback((message, type = "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 5000);
   }, []);
 
-  // 3. Core Action Handlers (Must be defined BEFORE the useEffect)
+  // ADDED: Check onboarding status on mount
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem("rockBlasterz_onboarding_seen");
+    if (!hasSeenOnboarding) {
+      // Small delay to let the UI load first
+      setTimeout(() => setShowOnboarding(true), 1000);
+    }
+  }, []);
 
-  // --- Reset Handler ---
-  // Wrapped in useCallback to prevent re-renders in the keyboard effect
+  // 3. Core Action Handlers
+
   const handleCanvasReset = useCallback(() => {
     if (!originalGridData) return;
     const restoredGrid = structuredClone
@@ -102,18 +115,15 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     setFileResetKey((prevKey) => prevKey + 1);
   }, [originalGridData, setGameState]);
 
-  // --- Blast Trigger Handler ---
   const handleTriggerBlast = useCallback(() => {
     if (isBlasting) return;
     if (!gameState.blasts || gameState.blasts.length === 0) return;
     if (!gridData || !gridData.grid) return;
 
-    // 1. Audio & Visuals
     playSound("boom");
     setShowFlash(true);
     setTimeout(() => setShowFlash(false), 150);
 
-    // 2. Game Logic
     setIsBlasting(true);
     setGameState((prev) => ({ ...prev, canPlaceExplosives: false }));
 
@@ -124,13 +134,12 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     setBlastTrigger({ affectedCells, timestamp: Date.now() });
   }, [isBlasting, gameState.blasts, gridData, playSound, setGameState]);
 
-  // --- Undo Handler ---
   const handleUndoBlast = useCallback(() => {
     if (isBlasting) return;
 
     setGameState((prev) => {
       if (prev.blasts.length === 0) return prev;
-      const newBlasts = prev.blasts.slice(0, -1); // Remove last item
+      const newBlasts = prev.blasts.slice(0, -1); 
       return { ...prev, blasts: newBlasts };
     });
 
@@ -139,15 +148,14 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     showToast("Last placement undone", "info");
   }, [isBlasting, setGameState, playSound, showToast]);
 
-  // 4. Keyboard Shortcuts Effect (Now placed AFTER the handlers are defined)
+  // 4. Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ignore if typing in an input
       if (e.target.tagName === 'INPUT') return;
 
       switch(e.code) {
         case 'Space':
-          e.preventDefault(); // Prevent scrolling
+          e.preventDefault(); 
           handleTriggerBlast();
           break;
         case 'KeyR':
@@ -157,9 +165,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           setShowBlastResults(false);
           setShowLeaderboard(false);
           setSelectedBlast(null);
+          setShowOnboarding(false); // Close onboarding on Escape
           break;
         case 'KeyZ':
-          if (e.ctrlKey || e.metaKey) { // Ctrl+Z or Cmd+Z
+          if (e.ctrlKey || e.metaKey) { 
             handleUndoBlast();
           }
           break;
@@ -172,7 +181,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTriggerBlast, handleCanvasReset, handleUndoBlast]);
 
-  // 5. Other Handlers & Effects
+  // 5. Other Handlers
 
   const handleCloseBlastResults = () => setShowBlastResults(false);
   const handleOpenBlastResults = () => setShowBlastResults(true);
@@ -408,7 +417,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       }
 
       playSound("click");
-      // Note: We don't call handleCellClick(x, y) recursively here; logic is inline below:
 
       const existing = gameState.blasts.find(
         (blast) => blast.x === x && blast.y === y
@@ -553,7 +561,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         loadedState.simulationSnapshot.fallenDebris
       ) {
         setFallenDebris(loadedState.simulationSnapshot.fallenDebris);
-        // Force results modal open if loading a completed game
         if (loadedState.simulationSnapshot.fallenDebris.length > 0) {
             setShowBlastResults(true);
         }
@@ -712,7 +719,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       </div>
     );
   
-  // Calculate if we should show the results button
   const canViewResults = fallenDebris && fallenDebris.length > 0;
 
   return (
@@ -737,6 +743,12 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       <LeaderboardModal
         show={showLeaderboard}
         onClose={() => setShowLeaderboard(false)}
+      />
+      
+      {/* ADDED: Onboarding Modal */}
+      <OnboardingModal 
+        show={showOnboarding} 
+        onClose={() => setShowOnboarding(false)} 
       />
 
       {/* Mobile & Tablet Layout */}
@@ -777,7 +789,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             addRecoveryRecordToGameContext={addRecoveryRecord}
             updateScore={updateScore}
             isPreparingReplay={isPreparingReplay}
-            // PASS THE PROP HERE
             initialBlastCompleted={fallenDebris && fallenDebris.length > 0}
           />
         </div>
@@ -862,7 +873,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
               addRecoveryRecordToGameContext={addRecoveryRecord}
               updateScore={updateScore}
               isPreparingReplay={isPreparingReplay}
-              // PASS THE PROP HERE TOO
               initialBlastCompleted={fallenDebris && fallenDebris.length > 0}
               cellGap={
                 window.innerWidth >= 1024 && window.innerHeight <= 700 ? 4 : 8
@@ -903,6 +913,15 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             title="Undo Last Placement (Ctrl+Z)"
           >
             <Undo2 size={20} />
+          </button>
+
+          {/* ADDED: Help Button to reopen onboarding */}
+          <button 
+            onClick={() => setShowOnboarding(true)}
+            className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-all border border-white/10"
+            title="Show Guide"
+          >
+            <HelpCircle size={20} />
           </button>
         </div>
       </div>
