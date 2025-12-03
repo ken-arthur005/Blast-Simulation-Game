@@ -25,6 +25,8 @@ const LoadGameModal = ({
     window.innerWidth < 600
   );
 
+  const [showConfirmClear, setShowConfirmClear] = useState(false); // state for clearing save confirmation
+
   // Update screen state on resize to ensure filtering is dynamic if user rotates device
   useEffect(() => {
     const handleResize = () => {
