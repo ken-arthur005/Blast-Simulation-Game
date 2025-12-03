@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useCSVReader } from "react-papaparse";
 import React, { useEffect, useState, useContext, useRef } from "react";
 import Toast from "../components/Toast";
@@ -16,6 +17,7 @@ const SimulationPage = () => {
   const [validatedData, setValidatedData] = useState(null);
   const { gameState } = useContext(GameContext) || {};
   const playerName = (gameState && gameState.playerName) || "Player";
+  const navigate = useNavigate();
   const [isMobileView, setIsMobileView] = useState(() => {
     return (
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
@@ -23,6 +25,14 @@ const SimulationPage = () => {
       ) || window.innerWidth < 768
     );
   });
+
+  useEffect(() => {
+    // If gameState is missing or playerName is empty string/null/undefined
+    if (!gameState || !gameState.playerName || gameState.playerName.trim() === "") {
+      // Redirect to Home Page
+      navigate("/"); 
+    }
+  }, [gameState, navigate]);
 
   const showToast = (message, type = "error") => {
     setToast({ message, type });
