@@ -375,8 +375,9 @@ export const applyBlastForce = (
     "down-left": { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
   };
 
-  const biasMultiplier = 15.0; 
-  const impulseMultiplier = 2.5; 
+  // REDUCED multipliers to prevent bodies from flying off-screen
+  const biasMultiplier = 4.0; // Reduced from 15.0
+  const impulseMultiplier = 1.2; // Reduced from 2.5
   const maxForcePerCall = 0.25; 
 
   // Large datasets (many affected bodies) need gentler forces to prevent explosion
@@ -470,7 +471,7 @@ export const applyBlastForce = (
         });
 
         // Apply initial velocity directly in the direction to ensure immediate visible movement
-        const velocityBoost = 3.5; // Boost factor to make direction visible before gravity takes over
+        const velocityBoost = 1.5; // Reduced from 3.5 to prevent bodies flying off-screen
         Body.setVelocity(body, {
           x: body.velocity.x + bias.x * velocityBoost,
           y: body.velocity.y + bias.y * velocityBoost,

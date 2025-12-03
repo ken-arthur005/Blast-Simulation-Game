@@ -12,10 +12,6 @@ import { gsap } from "gsap";
 import OreValueMapper from "../utils/oreValueMapper";
 import scoringLogic from "../utils/scoringLogic";
 import GridTooltip from "./GridTooltip";
-import {
-  capturePhysicsTrajectories,
-  animateBlastWithGSAP,
-} from "../utils/animationHelpers";
 
 import { drawRockTexture, drawRoundedRect } from "../utils/canvasUtils";
 
@@ -69,9 +65,7 @@ const GridCanvas = ({
   const cellSpacing = cellGap; // spacing between cells in pixels
   const innerBlockSize = Math.max(4, blockSize - cellSpacing); // ensure a minimum inner size
 
-  // Store current animation timeline for cleanup
-  const animationTimelineRef = useRef(null);
-  const animationStatesRef = useRef(null);
+  // Removed GSAP animation refs - using pure physics rendering
 
   // Helper: Create a cached canvas of static (non-affected) cells for fast rendering during blast
   const createStaticGridCache = useCallback(
@@ -1030,73 +1024,19 @@ const GridCanvas = ({
       isReplayMode && replayData ? replayData.physicsState : null
     );
 
-    console.log("📊 Capturing physics trajectories...");
+    console.log("✅ Pure physics rendering - no trajectory capture needed");
 
-    // Use stored trajectories in replay mode, otherwise capture new ones
-    let trajectories;
-    if (isReplayMode && replayData?.trajectories) {
-      // Reconstruct trajectories by linking keyframes back to bodies
-      trajectories = replayData.trajectories.map((t) => {
-        const body = bodies.find(
-          (b) =>
-            b.gridX === t.body.gridX &&
-            b.gridY === t.body.gridY &&
-            b.oreType === t.body.oreType
-        );
-        return {
-          body: body || t.body, // Use actual body or fallback to stored data
-          keyframes: t.keyframes,
-        };
-      });
-      console.log(
-        `🎬 Using ${trajectories.length} stored trajectories for replay`
-      );
-    } else {
-      trajectories = capturePhysicsTrajectories(bodies, engine, 120);
-      console.log(`✅ Captured ${trajectories.length} new trajectories`);
-
-      // Store physics state for future replay (only for new blasts)
-      // Note: score will be added later after it's calculated
-      // Strip out circular references from trajectories for storage
-      if (typeof window !== "undefined") {
-        const cleanTrajectories = trajectories.map((t) => ({
-          body: {
-            id: t.body.id,
-            gridX: t.body.gridX,
-            gridY: t.body.gridY,
-            oreType: t.body.oreType,
-          },
-          keyframes: t.keyframes.map((kf) => ({
-            x: kf.x,
-            y: kf.y,
-            angle: kf.angle,
-            frame: kf.frame,
-          })),
-        }));
-
-        window.lastBlastPhysicsState = {
-          initialPositions,
-          physicsState,
-          trajectories: cleanTrajectories,
-          affectedCells,
-          blastCenters,
-          timestamp: Date.now(),
-          expectedScore: null, // Will be set after score calculation
-        };
-      }
+    // Store physics state for future replay (only for new blasts)
+    if (!isReplayMode && typeof window !== "undefined") {
+      window.lastBlastPhysicsState = {
+        initialPositions,
+        physicsState,
+        affectedCells,
+        blastCenters,
+        timestamp: Date.now(),
+        expectedScore: null, // Will be set after score calculation
+      };
     }
-
-    // Step 6: Reset bodies to original positions for animation
-    bodies.forEach((body) => {
-      const startPos = trajectories.find((t) => t.body.id === body.id)
-        ?.keyframes[0];
-      if (startPos) {
-        Body.setPosition(body, { x: startPos.x, y: startPos.y });
-        Body.setAngle(body, 0);
-        Body.setVelocity(body, { x: 0, y: 0 });
-        Body.setAngularVelocity(body, 0);
-      }
-    });
     // OPTIMIZED: Reduced from 6s to 4.5s to match faster animation (meets 5s requirement)
     const scoringTimeout = setTimeout(() => {
       const recoveryY = canvas.height * 0.8;
@@ -1232,45 +1172,12 @@ const GridCanvas = ({
       }, 500); // 500ms delay to show all original colors before blast starts
     }
 
-    console.log(" Starting GSAP animation...");
-    const animationDuration = 2.5; // seconds
-    const { timeline, animStates } = animateBlastWithGSAP(
-      trajectories,
-      animationDuration
-    );
-
-    animationTimelineRef.current = timeline;
-    animationStatesRef.current = animStates;
-
-    // After GSAP animation ends, keep syncing animatedPosition with physics positions
-    let physicsSyncTicker = null;
-    timeline.eventCallback("onComplete", () => {
-      console.log(
-        "GSAP animation complete - switching to physics-driven rendering"
-      );
-
-      // Create a ticker function that updates animatedPosition from physics
-      physicsSyncTicker = () => {
-        animStates.forEach((state) => {
-          // Sync visual position with physics position
-          state.body.animatedPosition = {
-            x: state.body.position.x,
-            y: state.body.position.y,
-            angle: state.body.angle,
-            velocityX: state.body.velocity.x,
-            velocityY: state.body.velocity.y,
-          };
-        });
-      };
-
-      // Add ticker to GSAP's global ticker (runs every frame)
-      gsap.ticker.add(physicsSyncTicker);
-    });
+    console.log("🚀 Starting pure physics simulation...");
 
     const startTime = performance.now();
 
     // OPTIMIZED: Reduced from 9s to 7s for faster blast completion (meets 5s requirement with margin)
-    const duration = 7000;
+    const duration = 10000;
     const shockwaveDuration = 350;
     const flashDuration = 100;
     let animationFrame;
@@ -1282,7 +1189,6 @@ const GridCanvas = ({
           cancelAnimationFrame(animationFrame);
         }
         // Runner.stop(runner);
-        timeline.kill();
         cleanupPhysicsEngine(engine, null);
         isBlastRunningRef.current = false; // Reset flag
         return;
@@ -1293,26 +1199,11 @@ const GridCanvas = ({
       const shockwaveProgress = Math.min(elapsed / shockwaveDuration, 1);
       const flashProgress = Math.min(elapsed / flashDuration, 1);
 
-      // OPTIMIZED: Use adaptive physics update - 30fps after GSAP phase for better performance
-      const physicsTimestep = elapsed < 3000 ? 1000 / 60 : 1000 / 30;
+      // Pure physics simulation at 60fps for smooth rendering
+      const physicsTimestep = 1000 / 60;
       Engine.update(engine, physicsTimestep);
 
-      // During GSAP animation phase (first 3s): sync physics bodies to GSAP positions
-      if (elapsed < 3000) {
-        animStates.forEach((state) => {
-          const animPos = state.body.animatedPosition;
-          if (animPos) {
-            // Override physics positions with GSAP animated positions
-            Body.setPosition(state.body, { x: animPos.x, y: animPos.y });
-            Body.setAngle(state.body, animPos.angle);
-            //  Apply some velocity for momentum carry-over
-            Body.setVelocity(state.body, {
-              x: state.animVelocityX * 0.5,
-              y: state.animVelocityY * 0.5,
-            });
-          }
-        });
-      }
+      // ✅ Pure physics rendering - directional forces maintained throughout animation
 
       // OPTIMIZED: Batch canvas operations for better performance
       ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
@@ -1566,37 +1457,32 @@ const GridCanvas = ({
       // OPTIMIZED: Add viewport culling and pre-compute shared values
       const canvasWidth = canvasSize.width;
       const canvasHeight = canvasSize.height;
-      const cullMargin = blockSize * 2; // Allow some margin for partially visible blocks
+      const cullMargin = 500; // Increased from blockSize * 2 to prevent culling directional blasts
       const minX = -cullMargin;
       const maxX = canvasWidth + cullMargin;
       const minY = -cullMargin;
       const maxY = canvasHeight + cullMargin;
       const opacity = Math.max(0, 1 - progress * 0.8);
 
-      animStates.forEach((state) => {
-        const body = state.body;
-        // Use GSAP position during animation phase, physics position after
-        const animPos = body.animatedPosition || {
-          x: body.position.x, // ← Fallback to actual physics position
-          y: body.position.y,
-          angle: body.angle,
-          velocityX: body.velocity.x,
-          velocityY: body.velocity.y,
-        };
+      bodies.forEach((body) => {
+        // ✅ Pure physics rendering - use body position/angle directly
+        const visualX = body.position.x;
+        const visualY = body.position.y;
+        const visualAngle = body.angle;
+        const velocityX = body.velocity.x;
+        const velocityY = body.velocity.y;
 
         // OPTIMIZED: Skip rendering debris that's completely off-screen
         if (
-          animPos.x < minX ||
-          animPos.x > maxX ||
-          animPos.y < minY ||
-          animPos.y > maxY
+          visualX < minX ||
+          visualX > maxX ||
+          visualY < minY ||
+          visualY > maxY
         ) {
           return; // Cull off-screen debris
         }
 
         // Draw motion trail - skip for very slow moving debris to save draw calls
-        const velocityX = animPos.velocityX || 0;
-        const velocityY = animPos.velocityY || 0;
         const velocityMag = Math.hypot(velocityX, velocityY);
 
         // Only draw trail if velocity is significant (optimization for 10k+ blocks)
@@ -1608,15 +1494,15 @@ const GridCanvas = ({
           ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(body.position.x, body.position.y);
-          ctx.lineTo(animPos.x - velocityX * 2, animPos.y - velocityY * 2);
+          ctx.lineTo(visualX - velocityX * 2, visualY - velocityY * 2);
           ctx.stroke();
           ctx.restore();
         }
 
-        // Draw debris block
+        // Draw debris block at blended visual position
         ctx.save();
-        ctx.translate(animPos.x, animPos.y);
-        ctx.rotate(body.angle);
+        ctx.translate(visualX, visualY);
+        ctx.rotate(visualAngle);
 
         // OPTIMIZED: Use pre-computed debris dimensions
         const dW = innerBlockSize * 0.8;
@@ -1658,18 +1544,9 @@ const GridCanvas = ({
         }
 
         // Stop physics simulation and cleanup
-        timeline.kill();
-
-        if (physicsSyncTicker) {
-          gsap.ticker.remove(physicsSyncTicker);
-          physicsSyncTicker = null;
-        }
-
         cleanupPhysicsEngine(engine, null);
         staticGridCacheRef.current = null;
         staticGridCacheParamsRef.current = null;
-        animationTimelineRef.current = null;
-        animationStatesRef.current = null;
 
         // Clear cache immediately when animation completes to prevent next blast interference
         staticGridCacheRef.current = null;
@@ -1796,11 +1673,6 @@ const GridCanvas = ({
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
         }
-        if (timeline) timeline.kill();
-
-        if (physicsSyncTicker) {
-          gsap.ticker.remove(physicsSyncTicker);
-        }
       }
 
       // Clear the scoring timeout
@@ -1816,8 +1688,6 @@ const GridCanvas = ({
       bodiesRef.current = [];
       staticGridCacheRef.current = null;
       staticGridCacheParamsRef.current = null;
-      animationTimelineRef.current = null;
-      animationStatesRef.current = null;
     };
   }, [
     blastTrigger,
