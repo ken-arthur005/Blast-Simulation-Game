@@ -32,6 +32,7 @@ const GridCanvas = ({
   addRecoveryRecordToGameContext,
   updateScore,
   isPreparingReplay = false,
+  initialBlastCompleted = false, // <--- NEW PROP
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -59,7 +60,7 @@ const GridCanvas = ({
   // Merged offscreen cache for batch drawing the entire grid
   const gridRenderCacheRef = useRef(null);
 
-  const [blastCompleted, setBlastCompleted] = useState(false);
+  const [blastCompleted, setBlastCompleted] = useState(initialBlastCompleted);
   const isBlastRunningRef = useRef(false);
 
   const cellSpacing = cellGap; // spacing between cells in pixels
@@ -250,15 +251,21 @@ const GridCanvas = ({
     if (gridData && gridData.grid) {
       blocksRef.current = createBlocks();
       setDestroyedCells([]);
-      onDebrisSettled([]); // Clear fallen debris on reset
-      setBlastCompleted(false); // Reset blast state
-      // Clear gray caches
-      // blocksRef.current.forEach((b) => (b.grayCachedCanvas = null));
+      
+      // FIX: Only clear debris if we are NOT loading a completed blast
+      if (!initialBlastCompleted) {
+        onDebrisSettled([]); 
+        setBlastCompleted(false);
+      } else {
+        setBlastCompleted(true);
+        // We rely on the passed 'fallenDebris' prop to render
+      }
+      
       console.log(
         "Grid reset: blocks reinitialized and destroyed cells cleared"
       );
     }
-  }, [fileResetKey]);
+  }, [fileResetKey, initialBlastCompleted]); // Added initialBlastCompleted to deps
 
   // Create gray caches when blast completes
   useEffect(() => {
@@ -1040,7 +1047,7 @@ const GridCanvas = ({
     // OPTIMIZED: Reduced from 6s to 4.5s to match faster animation (meets 5s requirement)
     const scoringTimeout = setTimeout(() => {
       const recoveryY = canvas.height * 0.8;
-      const neighborRadius = 50; // Pixels to check for mixing
+      // const neighborRadius = 50; // REMOVED FOR SCORING FIX
       const highValueThreshold = 50; // From oreValueMapper
 
       // Apply colors to bodies (needed for both normal blast and replay)
@@ -1049,26 +1056,19 @@ const GridCanvas = ({
         let isDiluted = false;
 
         if (body.position.y > recoveryY) {
-          // In recovery zone: check for mixing
-          const neighbors = bodies.filter((other) => {
-            if (other === body) return false;
-            const dist = Math.hypot(
-              body.position.x - other.position.x,
-              body.position.y - other.position.y
-            );
-            return dist <= neighborRadius;
-          });
-          const lowValueNeighbors = neighbors.filter(
-            (n) => OreValueMapper.getValue(n.oreType) < highValueThreshold
-          ).length;
-
-          if (value >= highValueThreshold && lowValueNeighbors >= 1) {
-            isDiluted = true; // High-value mixed with low-value
-          } else if (value < highValueThreshold) {
-            isDiluted = true; // Low-value is always diluted
+          // Inside Recovery Zone
+          if (value < highValueThreshold) {
+            // Waste is always diluted/bad if it enters recovery zone
+            isDiluted = true;
+          } else {
+            // High Value ore is considered Recovered (Green)
+            // We NO LONGER mark it red just because it touches waste.
+            // The waste itself generates the dilution count.
+            isDiluted = false;
           }
         } else {
-          isDiluted = true; // Outside zone
+          // Outside Recovery Zone
+          isDiluted = true; // Lost ore
         }
 
         body.render.fillStyle = isDiluted ? "#FF0000" : "#00FF00";
@@ -1562,7 +1562,7 @@ const GridCanvas = ({
         // Apply recovery colors immediately before creating snapshot
         // This ensures debris colors are captured correctly
         const recoveryY = canvas.height * 0.8;
-        const neighborRadius = 50;
+        // const neighborRadius = 50; // REMOVED FOR SCORING FIX
         const highValueThreshold = 50;
 
         bodies.forEach((body) => {
@@ -1570,25 +1570,19 @@ const GridCanvas = ({
           let isDiluted = false;
 
           if (body.position.y > recoveryY) {
-            const neighbors = bodies.filter((other) => {
-              if (other === body) return false;
-              const dist = Math.hypot(
-                body.position.x - other.position.x,
-                body.position.y - other.position.y
-              );
-              return dist <= neighborRadius;
-            });
-            const lowValueNeighbors = neighbors.filter(
-              (n) => OreValueMapper.getValue(n.oreType) < highValueThreshold
-            ).length;
-
-            if (value >= highValueThreshold && lowValueNeighbors >= 1) {
+            // Inside Recovery Zone
+            if (value < highValueThreshold) {
+              // Waste is always diluted/bad if it enters recovery zone
               isDiluted = true;
-            } else if (value < highValueThreshold) {
-              isDiluted = true;
+            } else {
+              // High Value ore is considered Recovered (Green)
+              // We NO LONGER mark it red just because it touches waste.
+              // The waste itself generates the dilution count.
+              isDiluted = false;
             }
           } else {
-            isDiluted = true;
+            // Outside Recovery Zone
+            isDiluted = true; // Lost ore
           }
 
           body.render.fillStyle = isDiluted ? "#FF0000" : "#00FF00";
