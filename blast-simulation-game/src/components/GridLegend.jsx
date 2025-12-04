@@ -142,8 +142,8 @@ const GridLegend = ({
                 <div className="mb-1.5 sm:mb-2">
                   <div className="text-[10px] sm:text-xs text-white font-semibold mb-1">
                     {selectedBlast
-                      ? `桃 Selected: (${selectedBlast.x}, ${selectedBlast.y})`
-                      : "庁 Tap an explosive first"}
+                      ? `Selected: (${selectedBlast.x}, ${selectedBlast.y})`
+                      : "Tap an explosive first"}
                   </div>
                   <div className="text-[10px] sm:text-xs text-white/70">
                     {selectedBlast
@@ -456,12 +456,12 @@ const GridLegend = ({
                 <div className="mb-3 p-2 bg-white/10 rounded-lg">
                   <div className="text-xs md:text-sm text-white font-semibold mb-1">
                     {selectedBlast
-                      ? `桃 Selected: (${selectedBlast.x}, ${
+                      ? `Selected: (${selectedBlast.x}, ${
                           selectedBlast.y
-                        }) 窶Direction: ${
+                        }) Direction: ${
                           selectedDir === "(none)" ? "None" : selectedDir
                         }`
-                      : "庁 Tap an explosive to select it"}
+                      : "Tap an explosive to select it"}
                   </div>
                   <div className="text-xs text-white/80">
                     {selectedBlast
@@ -486,7 +486,7 @@ const GridLegend = ({
 
                 <div className="mb-2">
                   <div className="text-xs md:text-sm text-white/90 mb-2 font-semibold text-center md:text-left">
-                    識 Choose Blast Direction:
+                    Choose Blast Direction:
                   </div>
                   <div className="grid grid-cols-4 gap-2 md:flex md:flex-wrap md:gap-2">
                     <ArrowButton
@@ -574,7 +574,7 @@ const GridLegend = ({
               </>
             ) : (
               <div className="mb-2 text-center text-xs md:text-sm text-white/70 p-3 bg-white/5 rounded-lg">
-                張 Tap on the grid to place your first explosive!
+                 Tap on the grid to place your first explosive!
                 <div className="text-xs mt-1 text-white/50">
                   After placing, you can select and set blast directions
                 </div>
