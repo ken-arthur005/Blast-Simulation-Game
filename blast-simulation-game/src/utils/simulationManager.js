@@ -79,11 +79,13 @@ export const saveManualSimulation = (simulationState) => {
 export const saveAutoSimulation = (simulationState, roundNumber) => {
   if (!simulationState) return false;
   try {
-    const autoSaves = getAutoSimulations();
+    // Get existing saves
+    let autoSaves = getAutoSimulations();
 
     // Detect screen size at time of save
     const isSmallScreen = window.innerWidth < 600;
 
+    // Create the new save object
     const newSave = {
       id: `save_auto_${Date.now()}`,
       tag: `Auto-Save (Round ${roundNumber})`,
@@ -91,10 +93,48 @@ export const saveAutoSimulation = (simulationState, roundNumber) => {
       isSmallScreen,
       ...simulationState,
     };
+
+    // 2. CHECK FOR DUPLICATE/UPDATE SCENARIO
+    if (autoSaves.length > 0) {
+      const lastSave = autoSaves[0]; // Get the most recent save
+
+      // Extract Round Number from the tag string "Auto-Save (Round X)"
+      const lastRoundMatch = lastSave.tag.match(/Round (\d+)/);
+      const lastRoundNumber = lastRoundMatch
+        ? parseInt(lastRoundMatch[1], 10)
+        : -1;
+
+      // Check Time Difference (seconds)
+      const lastSaveTime = new Date(lastSave.timestamp).getTime();
+      const currentTime = new Date().getTime();
+      const timeDiffInSeconds = (currentTime - lastSaveTime) / 1000;
+
+      // CONDITION:
+      // Same Round Number AND saved less than 15 seconds ago?
+      // -> It's the same event firing twice. Overwrite the old one.
+      if (lastRoundNumber === roundNumber && timeDiffInSeconds < 15) {
+        console.log(
+          `♻️ Replacing duplicate Auto-Save for Round ${roundNumber}. (Diff: ${timeDiffInSeconds.toFixed(
+            2
+          )}s)`
+        );
+
+        // Replace the first element with the new data
+        autoSaves[0] = newSave;
+
+        writeSaves(AUTO_SAVE_KEY, autoSaves);
+        return true;
+      }
+    }
+
+    // 3. NORMAL SCENARIO (New Round or Long Time Gap)
+    // Prepend the new save and limit array size
     const updatedSaves = [newSave, ...autoSaves].slice(0, MAX_AUTO_SAVES);
+
     writeSaves(AUTO_SAVE_KEY, updatedSaves);
     return true;
   } catch (error) {
+    console.error("Save failed", error);
     return false;
   }
 };
