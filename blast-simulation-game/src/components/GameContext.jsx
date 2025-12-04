@@ -37,33 +37,64 @@ export const GameProvider = ({ children }) => {
   }, []);
 
   const addRecoveryRecord = useCallback((record) => {
-    // window.alert(`record.recoveredCount: ${record.recoveredCount}`); // This can be removed now.
-    setGameState((prevState) => ({
-      ...prevState,
-      recoveryHistory: [
-        ...prevState.recoveryHistory || [],
-        {
-          totalOres: record.totalOres,
-          recoveredCount: record.recoveredCount,
-          dilutedCount: record.dilutedCount,
-          efficiency: record.efficiency,
-          timestamp: new Date(),
-        },
-      ],
+    setGameState((prevState) => {
+      const now = new Date();
+      const history = prevState.blastHistory || [];
+      const lastEntry = history[history.length - 1];
 
-      blastHistory: [
-        ...prevState.blastHistory,
-        {
-          round: prevState.blastHistory.length + 1, // Auto-increment round number
-          recovery: record.recoveryRate,
-          dilution: record.dilutionRate,
-          score: record.finalScore,
-          timestamp: new Date(),
-        },
-      ],
-      
-    }));
+      // Calculate time difference if a previous entry exists
+      let isDuplicate = false;
+      if (lastEntry) {
+        const lastTime = new Date(lastEntry.timestamp).getTime();
+        const currentTime = now.getTime();
+        const diffInSeconds = (currentTime - lastTime) / 1000;
 
+        // If the last entry was added less than 15 seconds ago, treat this as an update
+        // to the same round (fixing the Double Save/Double State bug)
+        if (diffInSeconds < 15) {
+          isDuplicate = true;
+        }
+      }
+
+      // Create the new entry object
+      const newEntry = {
+        round: isDuplicate ? lastEntry.round : history.length + 1, // Keep same round if duplicate
+        recovery: record.recoveryRate,
+        dilution: record.dilutionRate,
+        score: record.finalScore,
+        timestamp: now,
+      };
+
+      let newBlastHistory;
+
+      if (isDuplicate) {
+        // REPLACE the last entry with the updated data
+        newBlastHistory = [...history];
+        newBlastHistory[newBlastHistory.length - 1] = newEntry;
+        console.log(
+          `♻️ GameContext: Updating existing Round ${newEntry.round} (Duplicate prevented)`
+        );
+      } else {
+        // ADD a new entry
+        newBlastHistory = [...history, newEntry];
+        console.log(`✅ GameContext: Added new Round ${newEntry.round}`);
+      }
+
+      return {
+        ...prevState,
+        recoveryHistory: [
+          ...(prevState.recoveryHistory || []),
+          {
+            totalOres: record.totalOres,
+            recoveredCount: record.recoveredCount,
+            dilutedCount: record.dilutedCount,
+            efficiency: record.efficiency,
+            timestamp: now,
+          },
+        ],
+        blastHistory: newBlastHistory,
+      };
+    });
   }, []);
 
   const updateScore = useCallback((newScore) => {
