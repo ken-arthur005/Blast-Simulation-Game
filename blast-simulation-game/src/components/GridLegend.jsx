@@ -12,6 +12,7 @@ import {
   Upload,
   Trophy,
   FolderOpen,
+  FileBarChart2, // ADDED ICON
 } from "lucide-react";
 
 /**
@@ -27,6 +28,8 @@ const GridLegend = ({
   onSaveSimulation,
   onOpenLeaderboard,
   onOpenLoadModal,
+  canViewResults, // NEW PROP
+  onOpenBlastResults, // NEW PROP
 }) => {
   const { gameState, pendingDirection, setPendingDirection } =
     useContext(GameContext);
@@ -139,8 +142,8 @@ const GridLegend = ({
                 <div className="mb-1.5 sm:mb-2">
                   <div className="text-[10px] sm:text-xs text-white font-semibold mb-1">
                     {selectedBlast
-                      ? `📍 Selected: (${selectedBlast.x}, ${selectedBlast.y})`
-                      : "💡 Tap an explosive first"}
+                      ? `Selected: (${selectedBlast.x}, ${selectedBlast.y})`
+                      : "Tap an explosive first"}
                   </div>
                   <div className="text-[10px] sm:text-xs text-white/70">
                     {selectedBlast
@@ -298,6 +301,17 @@ const GridLegend = ({
             <Trophy className="inline-block w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-0.5 sm:mr-1 flex-shrink-0" />
             <span>Leaderboard</span>
           </button>
+
+          {/* ADDED: View Results (Mobile) */}
+          {canViewResults && (
+            <button
+              className="bg-purple-600 text-white px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 md:py-2.5 rounded hover:bg-purple-700 text-[10px] sm:text-sm md:text-base font-semibold w-full h-full flex items-center justify-center col-span-2 animate-fadeIn"
+              onClick={onOpenBlastResults}
+            >
+              <FileBarChart2 className="inline-block w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-0.5 sm:mr-1 flex-shrink-0" />
+              <span>View Results & Replay</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -415,6 +429,25 @@ const GridLegend = ({
             />
             Load Simulation
           </button>
+          
+          {/* ADDED: View Results Button (Desktop) - Only visible if canViewResults is true */}
+          {canViewResults && (
+            <button
+              onClick={onOpenBlastResults}
+              className={`flex bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold w-full items-center justify-center cursor-pointer animate-fadeIn shadow-lg ${
+                isCompact
+                  ? "px-2 py-1.5 text-sm mt-2"
+                  : "px-3 py-2 text-base mt-3"
+              }`}
+            >
+              <FileBarChart2
+                className={`inline-block mr-1 ${
+                  isCompact ? "w-3 h-3" : "w-4 h-4"
+                }`}
+              />
+              View Results & Replay
+            </button>
+          )}
 
           {/* Desktop: Direction selector always visible */}
           <div className={isCompact ? "mt-2" : "mt-4"}>
@@ -423,12 +456,12 @@ const GridLegend = ({
                 <div className="mb-3 p-2 bg-white/10 rounded-lg">
                   <div className="text-xs md:text-sm text-white font-semibold mb-1">
                     {selectedBlast
-                      ? `📍 Selected: (${selectedBlast.x}, ${
+                      ? `Selected: (${selectedBlast.x}, ${
                           selectedBlast.y
-                        }) — Direction: ${
+                        }) Direction: ${
                           selectedDir === "(none)" ? "None" : selectedDir
                         }`
-                      : "💡 Tap an explosive to select it"}
+                      : "Tap an explosive to select it"}
                   </div>
                   <div className="text-xs text-white/80">
                     {selectedBlast
@@ -453,7 +486,7 @@ const GridLegend = ({
 
                 <div className="mb-2">
                   <div className="text-xs md:text-sm text-white/90 mb-2 font-semibold text-center md:text-left">
-                    🎯 Choose Blast Direction:
+                    Choose Blast Direction:
                   </div>
                   <div className="grid grid-cols-4 gap-2 md:flex md:flex-wrap md:gap-2">
                     <ArrowButton
@@ -541,7 +574,7 @@ const GridLegend = ({
               </>
             ) : (
               <div className="mb-2 text-center text-xs md:text-sm text-white/70 p-3 bg-white/5 rounded-lg">
-                💣 Tap on the grid to place your first explosive!
+                 Tap on the grid to place your first explosive!
                 <div className="text-xs mt-1 text-white/50">
                   After placing, you can select and set blast directions
                 </div>

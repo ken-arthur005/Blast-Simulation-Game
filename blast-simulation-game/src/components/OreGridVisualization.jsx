@@ -7,7 +7,9 @@ import React, {
   useMemo,
 } from "react";
 import GridDataProcessor from "../utils/gridDataProcessor";
-
+import useSoundManager from "../utils/useSoundManager";
+// ADDED: HelpCircle icon
+import { Volume2, VolumeX, Undo2, FileBarChart2, HelpCircle } from "lucide-react";
 import GridCanvas from "./GridCanvas";
 import GridLegend from "./GridLegend";
 import GridInfo from "./GridInfo";
@@ -17,7 +19,9 @@ import {
   applyBlastToGrid,
 } from "../utils/blastCalculator";
 import BlastResults from "./BlastResults";
-import LeaderboardModal from "./Leaderboard.jsx"; // <--- NEW IMPORT
+import LeaderboardModal from "./Leaderboard.jsx";
+// ADDED: Import OnboardingModal
+import OnboardingModal from "./OnboardingModal"; 
 import Toast from "./Toast";
 import {
   saveManualSimulation,
@@ -28,6 +32,7 @@ import { loadSimulation } from "../utils/loadSimulation";
 import LoadGameModal from "./LoadGameModal";
 
 const OreGridVisualization = ({ csvData, onGridProcessed }) => {
+  // 1. Hooks & State
   const { addRecoveryRecord, updateScore } = useContext(GameContext);
   const [gridData, setGridData] = useState(null);
   const [originalGridData, setOriginalGridData] = useState(null);
@@ -57,32 +62,139 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   const lastPlacedRef = useRef(null);
   const [fallenDebris, setFallenDebris] = useState([]);
   const [showBlastResults, setShowBlastResults] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(false); // <--- NEW STATE
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [toast, setToast] = useState(null);
   const [isPreparingReplay, setIsPreparingReplay] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
+  
+  // ADDED: Onboarding State
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // Audio & Visual State
+  const { isMuted, toggleMute, playSound } = useSoundManager();
+  const [showFlash, setShowFlash] = useState(false);
 
-  // ... (keep showToast, handleCloseBlastResults, handleOpenBlastResults) ...
+  // 2. Helper Functions
+  
   const showToast = useCallback((message, type = "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 5000);
   }, []);
 
+  // ADDED: Check onboarding status on mount
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem("rockBlasterz_onboarding_seen");
+    if (!hasSeenOnboarding) {
+      // Small delay to let the UI load first
+      setTimeout(() => setShowOnboarding(true), 1000);
+    }
+  }, []);
+
+  // 3. Core Action Handlers
+
+  const handleCanvasReset = useCallback(() => {
+    if (!originalGridData) return;
+    const restoredGrid = structuredClone
+      ? structuredClone(originalGridData)
+      : JSON.parse(JSON.stringify(originalGridData));
+
+    setGridData(restoredGrid);
+    setGameState((prev) => ({
+      ...prev,
+      grid: restoredGrid.grid,
+      blasts: [],
+      canPlaceExplosives: true,
+      materialsRemainedAfterDestroy: 0,
+      numberOfMaterialsDestroyed: 0,
+    }));
+    setSelectedBlast(null);
+    if (nextPlacementDirRef.current) nextPlacementDirRef.current = null;
+    setFallenDebris([]);
+    setBlastTrigger(null);
+    setShowBlastResults(false);
+    setFileResetKey((prevKey) => prevKey + 1);
+  }, [originalGridData, setGameState]);
+
+  const handleTriggerBlast = useCallback(() => {
+    if (isBlasting) return;
+    if (!gameState.blasts || gameState.blasts.length === 0) return;
+    if (!gridData || !gridData.grid) return;
+
+    playSound("boom");
+    setShowFlash(true);
+    setTimeout(() => setShowFlash(false), 150);
+
+    setIsBlasting(true);
+    setGameState((prev) => ({ ...prev, canPlaceExplosives: false }));
+
+    const affectedCells = calculateAllAffectedCells(
+      gridData.grid,
+      gameState.blasts
+    );
+    setBlastTrigger({ affectedCells, timestamp: Date.now() });
+  }, [isBlasting, gameState.blasts, gridData, playSound, setGameState]);
+
+  const handleUndoBlast = useCallback(() => {
+    if (isBlasting) return;
+
+    setGameState((prev) => {
+      if (prev.blasts.length === 0) return prev;
+      const newBlasts = prev.blasts.slice(0, -1); 
+      return { ...prev, blasts: newBlasts };
+    });
+
+    setSelectedBlast(null);
+    playSound("click");
+    showToast("Last placement undone", "info");
+  }, [isBlasting, setGameState, playSound, showToast]);
+
+  // 4. Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT') return;
+
+      switch(e.code) {
+        case 'Space':
+          e.preventDefault(); 
+          handleTriggerBlast();
+          break;
+        case 'KeyR':
+          handleCanvasReset();
+          break;
+        case 'Escape':
+          setShowBlastResults(false);
+          setShowLeaderboard(false);
+          setSelectedBlast(null);
+          setShowOnboarding(false); // Close onboarding on Escape
+          break;
+        case 'KeyZ':
+          if (e.ctrlKey || e.metaKey) { 
+            handleUndoBlast();
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleTriggerBlast, handleCanvasReset, handleUndoBlast]);
+
+  // 5. Other Handlers
+
   const handleCloseBlastResults = () => setShowBlastResults(false);
   const handleOpenBlastResults = () => setShowBlastResults(true);
 
-  // ... (keep handleReplayBlast) ...
   const handleReplayBlast = useCallback(() => {
     if (typeof window === "undefined" || !window.lastBlastPhysicsState) {
       showToast("No replay data available.", "error");
       return;
     }
-
     console.log("🎬 Starting blast replay...");
     setShowBlastResults(false);
     setIsPreparingReplay(true);
     setFallenDebris([]);
-
     setTimeout(() => {
       setIsPreparingReplay(false);
       setBlastTrigger({
@@ -95,30 +207,11 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }, 800);
   }, [showToast]);
 
-  // ... (keep handleTriggerBlast, setBlastDirection, onSelectDirection) ...
-  const handleTriggerBlast = () => {
-    if (isBlasting) return;
-    if (!gameState.blasts || gameState.blasts.length === 0) return;
-    if (!gridData || !gridData.grid) return;
-
-    setIsBlasting(true);
-    setGameState((prev) => ({ ...prev, canPlaceExplosives: false }));
-
-    const affectedCells = calculateAllAffectedCells(
-      gridData.grid,
-      gameState.blasts
-    );
-    setBlastTrigger({ affectedCells, timestamp: Date.now() });
-  };
-
-  // OPTIMIZED: Batch direction updates for better performance
   const setBlastDirection = useCallback(
     (x, y, dirKey) => {
       setGameState((prev) => {
-        // Early exit if no change needed
         const existingBlast = prev.blasts.find((b) => b.x === x && b.y === y);
         if (existingBlast?.dirKey === dirKey) return prev;
-
         const updatedBlasts = prev.blasts.map((b) => {
           if (b.x === x && b.y === y) return { ...b, dirKey };
           return b;
@@ -157,7 +250,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     [selectedBlast, setBlastDirection, setPendingDirection]
   );
 
-  // MODIFIED handleBlastComplete
   const handleBlastComplete = useCallback(
     (isReplayCompletion = false) => {
       if (isReplayCompletion) {
@@ -199,11 +291,10 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       clearBlasts();
       setSelectedBlast(null);
       if (setPendingDirection) setPendingDirection(null);
-      if (nextPlacementDirRef) nextPlacementDirRef.current = null;
+      if (nextPlacementDirRef.current) nextPlacementDirRef.current = null;
 
       handleOpenBlastResults();
 
-      // --- TRIGGER AUTO-SAVE & LEADERBOARD SAVE ---
       const roundNumber = (gameState.blastHistory?.length || 0) + 1;
       const physicsReplayData =
         typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
@@ -229,15 +320,14 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
 
       saveAutoSimulation(autoSaveState, roundNumber);
 
-      // SAVE TO LEADERBOARD
-      if (physicsReplayData && physicsReplayData.expectedScore) {
+      if (physicsReplayData && typeof physicsReplayData.expectedScore === 'number') {
         saveHighscore({
           playerName: gameState.playerName || "Miner",
           score: physicsReplayData.expectedScore,
           efficiency: (
             (physicsReplayData.expectedRecoveryRate / 100) *
             100
-          ).toFixed(1), // Basic efficiency calc
+          ).toFixed(1), 
           recoveryRate: physicsReplayData.expectedRecoveryRate,
           timestamp: new Date().toISOString(),
         });
@@ -254,7 +344,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     ]
   );
 
-  
   const deviceInfo = useMemo(() => {
     const userAgent = navigator.userAgent;
     const isMobileUA =
@@ -265,7 +354,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
   }, []);
 
   const calculateOptimalSizing = useCallback((processedGrid) => {
-    // ... (Keep existing implementation) ...
     const { dimensions } = processedGrid;
     const isMobile = deviceInfo.isMobileUA || window.innerWidth < 768;
     const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
@@ -282,7 +370,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       window.innerHeight <= 700 &&
       window.innerHeight <= window.innerWidth;
 
-    // Adjust dimensions based on device type
     const preferredWidth = isSmallPhone
       ? Math.min(window.innerWidth - 24, 320)
       : isMobile
@@ -311,49 +398,25 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     const blockSizeByHeight = Math.floor(preferredHeight / dimensions.height);
     let blockSize = Math.min(blockSizeByWidth, blockSizeByHeight);
 
-    const minBlockSize = isSmallPhone
-      ? 25
-      : isMobile
-      ? 28
-      : isTabletPortrait
-      ? 45
-      : isTablet
-      ? 35
-      : isCompactLandscape
-      ? 8
-      : 6;
-    const maxBlockSize = isSmallPhone
-      ? 40
-      : isMobile
-      ? 45
-      : isTabletPortrait
-      ? 70
-      : isTablet
-      ? 60
-      : isCompactLandscape
-      ? 18
-      : 80;
+    const minBlockSize = isSmallPhone ? 25 : isMobile ? 28 : isTabletPortrait ? 45 : isTablet ? 35 : isCompactLandscape ? 8 : 6;
+    const maxBlockSize = isSmallPhone ? 40 : isMobile ? 45 : isTabletPortrait ? 70 : isTablet ? 60 : isCompactLandscape ? 18 : 80;
 
-    // Clamp block size to prevent stretching
     blockSize = Math.max(minBlockSize, Math.min(maxBlockSize, blockSize));
-
-    // Always use exact dimensions (no stretching) - use the actual block size
     const exactWidth = dimensions.width * blockSize;
     const exactHeight = dimensions.height * blockSize;
 
     setCanvasSize({ width: exactWidth, height: exactHeight });
     setBlockSize(blockSize);
-  }, []);
+  }, [deviceInfo.isMobileUA]);
 
   const handleCellClick = useCallback(
     (x, y) => {
-      // ... (Keep existing implementation) ...
       if (!gameState.canPlaceExplosives) {
-        alert(
-          "Please import a new CSV file or refresh the page to continue placing explosives."
-        );
+        alert("Please import a new CSV file or refresh the page to continue placing explosives.");
         return;
       }
+
+      playSound("click");
 
       const existing = gameState.blasts.find(
         (blast) => blast.x === x && blast.y === y
@@ -378,10 +441,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       };
 
       if (gameState.blasts.length >= 5) {
-        showToast(
-          `Maximum number of explosives that can be placed is 5`,
-          "error"
-        );
+        showToast(`Maximum number of explosives that can be placed is 5`, "error");
         return;
       }
 
@@ -392,10 +452,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       setSelectedBlast({ x, y });
       lastPlacedRef.current = { x, y, t: Date.now() };
 
-      if (
-        !nextPlacementDirRef.current ||
-        !nextPlacementDirRef.current.explicit
-      ) {
+      if (!nextPlacementDirRef.current || !nextPlacementDirRef.current.explicit) {
         nextPlacementDirRef.current = { dir: null, explicit: false };
         if (setPendingDirection) setPendingDirection(null);
       }
@@ -408,6 +465,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       selectedBlast,
       setPendingDirection,
       showToast,
+      playSound
     ]
   );
 
@@ -455,32 +513,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }
   }, [csvData, onGridProcessed, calculateOptimalSizing, setGameState]);
 
-  const handleCanvasReset = () => {
-    if (!originalGridData) return;
-    const restoredGrid = structuredClone
-      ? structuredClone(originalGridData)
-      : JSON.parse(JSON.stringify(originalGridData));
-
-    setGridData(restoredGrid);
-    setGameState((prev) => ({
-      ...prev,
-      grid: restoredGrid.grid,
-      blasts: [],
-      canPlaceExplosives: true,
-      materialsRemainedAfterDestroy: 0,
-      numberOfMaterialsDestroyed: 0,
-    }));
-    setSelectedBlast(null);
-    if (nextPlacementDirRef) nextPlacementDirRef.current = null;
-    setFallenDebris([]);
-    setBlastTrigger(null);
-    setShowBlastResults(false);
-    setFileResetKey((prevKey) => prevKey + 1);
-  };
-
   const restoreGameState = useCallback(
     (loadedState) => {
-      // 1. Grid restoration
       setGridData({
         grid: loadedState.currentGrid || loadedState.simulationSnapshot?.grid,
         dimensions:
@@ -498,7 +532,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           loadedState.gridMetadata || loadedState.initialGridState?.metadata,
       });
 
-      // 2. Context restoration
       setGameState((prev) => ({
         ...prev,
         playerName: loadedState.gameState.playerName,
@@ -514,7 +547,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           loadedState.gameState.numberOfMaterialsDestroyed || 0,
       }));
 
-      // 3. Physics Replay Restoration
       if (loadedState.physicsReplayData && typeof window !== "undefined") {
         console.log("Restoring physics replay data...");
         window.lastBlastPhysicsState = loadedState.physicsReplayData;
@@ -522,7 +554,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         window.lastBlastPhysicsState = null;
       }
 
-      // 4. Visuals
       setSelectedBlast(loadedState.selectedBlast || null);
       setFileResetKey((prev) => prev + 1);
       if (
@@ -530,6 +561,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         loadedState.simulationSnapshot.fallenDebris
       ) {
         setFallenDebris(loadedState.simulationSnapshot.fallenDebris);
+        if (loadedState.simulationSnapshot.fallenDebris.length > 0) {
+            setShowBlastResults(true);
+        }
       }
     },
     [setGameState, setGridData, setOriginalGridData, setFileResetKey]
@@ -544,9 +578,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     }
   };
 
-  // ----------------------------------------------------------------------
-  // MODIFIED LOAD SIMULATION HANDLER
-  // ----------------------------------------------------------------------
   const handleLoadSimulationFile = useCallback(
     async (e) => {
       const file = e.target.files[0];
@@ -554,7 +585,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       setIsProcessing(true);
       try {
         const loadedState = await loadSimulation(file);
-        restoreGameState(loadedState); // <--- Use shared logic
+        restoreGameState(loadedState);
         showToast(`File loaded successfully!`, "success");
       } catch (error) {
         showToast(error.message, "error");
@@ -566,7 +597,6 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
     [restoreGameState, showToast]
   );
 
-  // ... (Keep existing history logic and handleSaveSimulation/Export) ...
   const recoveryHistory = gameState.recoveryHistory;
   const blastHistory = gameState.blastHistory;
   const lastRecoveryDetail =
@@ -627,11 +657,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
       return;
     }
 
-    // Capture physics state for replayability
     const physicsReplayData =
       typeof window !== "undefined" ? window.lastBlastPhysicsState : null;
 
-    // Build the FULL save object (Same structure as saveManualSimulation)
     const fullSaveState = {
       savedAt: new Date().toISOString(),
       initialGridState: {
@@ -690,6 +718,8 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         <p>Processing grid data...</p>
       </div>
     );
+  
+  const canViewResults = fallenDebris && fallenDebris.length > 0;
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden relative">
@@ -700,8 +730,9 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
           onClose={() => setToast(null)}
         />
       )}
-
-      {/* Add the Modal */}
+      <div 
+        className={`fixed inset-0 bg-white z-[9999] pointer-events-none transition-opacity duration-300 ${showFlash ? 'opacity-80' : 'opacity-0'}`}
+      />
       <LoadGameModal
         show={showLoadModal}
         onClose={() => setShowLoadModal(false)}
@@ -709,13 +740,18 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
         loadFileInputKey={loadFileInputKey}
         onFileSelect={handleLoadSimulationFile}
       />
-      {/* Leaderboard Modal */}
       <LeaderboardModal
         show={showLeaderboard}
         onClose={() => setShowLeaderboard(false)}
       />
+      
+      {/* ADDED: Onboarding Modal */}
+      <OnboardingModal 
+        show={showOnboarding} 
+        onClose={() => setShowOnboarding(false)} 
+      />
 
-      {/* Mobile & Tablet Layout - Stacked (portrait tablets and phones only) */}
+      {/* Mobile & Tablet Layout */}
       <div
         className="flex-1 overflow-y-auto pb-4 px-2 sm:px-3 md:px-4"
         style={{
@@ -753,6 +789,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             addRecoveryRecordToGameContext={addRecoveryRecord}
             updateScore={updateScore}
             isPreparingReplay={isPreparingReplay}
+            initialBlastCompleted={fallenDebris && fallenDebris.length > 0}
           />
         </div>
 
@@ -768,11 +805,13 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             loadFileInputKey={loadFileInputKey}
             onOpenLeaderboard={() => setShowLeaderboard(true)}
             onOpenLoadModal={() => setShowLoadModal(true)}
+            canViewResults={canViewResults}
+            onOpenBlastResults={() => setShowBlastResults(true)}
           />
         </div>
       </div>
 
-      {/* Desktop Layout - Centered with Controls on Right (includes landscape tablets) */}
+      {/* Desktop Layout */}
       <div
         className="overflow-y-auto"
         style={{
@@ -834,6 +873,7 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
               addRecoveryRecordToGameContext={addRecoveryRecord}
               updateScore={updateScore}
               isPreparingReplay={isPreparingReplay}
+              initialBlastCompleted={fallenDebris && fallenDebris.length > 0}
               cellGap={
                 window.innerWidth >= 1024 && window.innerHeight <= 700 ? 4 : 8
               }
@@ -853,7 +893,36 @@ const OreGridVisualization = ({ csvData, onGridProcessed }) => {
             loadFileInputKey={loadFileInputKey}
             onOpenLeaderboard={() => setShowLeaderboard(true)}
             onOpenLoadModal={() => setShowLoadModal(true)}
+            canViewResults={canViewResults}
+            onOpenBlastResults={() => setShowBlastResults(true)}
           />
+        </div>
+        <div className="absolute top-4 left-4 z-50 flex gap-2">
+          <button 
+            onClick={toggleMute}
+            className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-all border border-white/10"
+            title={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+          </button>
+          
+          <button 
+            onClick={handleUndoBlast}
+            disabled={isBlasting || gameState.blasts.length === 0}
+            className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-all border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Undo Last Placement (Ctrl+Z)"
+          >
+            <Undo2 size={20} />
+          </button>
+
+          {/* ADDED: Help Button to reopen onboarding */}
+          <button 
+            onClick={() => setShowOnboarding(true)}
+            className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-all border border-white/10"
+            title="Show Guide"
+          >
+            <HelpCircle size={20} />
+          </button>
         </div>
       </div>
 

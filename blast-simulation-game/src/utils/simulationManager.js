@@ -142,6 +142,25 @@ export const saveAutoSimulation = (simulationState, roundNumber) => {
 export const saveHighscore = (scoreEntry) => {
   try {
     const currentScores = getLeaderboardScores();
+    
+    // --- NEW DUPLICATE PREVENTION LOGIC ---
+    // Check if the most recent score (within the last 2 seconds) 
+    // matches the current player and score.
+    const isDuplicate = currentScores.some(existing => {
+        const timeDiff = Math.abs(new Date(existing.timestamp) - new Date(scoreEntry.timestamp));
+        return (
+            existing.playerName === scoreEntry.playerName &&
+            existing.score === scoreEntry.score &&
+            timeDiff < 2000 // Only block if it happened less than 2 seconds ago
+        );
+    });
+
+    if (isDuplicate) {
+        console.warn("Duplicate score detected. Skipping save.");
+        return false;
+    }
+    // ---------------------------------------
+
     const newEntry = {
       id: `score_${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -156,6 +175,7 @@ export const saveHighscore = (scoreEntry) => {
     writeSaves(LEADERBOARD_KEY, updatedScores);
     return true;
   } catch (error) {
+    console.error("Failed to save highscore:", error);
     return false;
   }
 };
