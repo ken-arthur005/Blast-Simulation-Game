@@ -154,21 +154,39 @@ const LoadGameModal = ({
           )}
         </div>
 
-        {/* Footer Area: Clear History & Import */}
-        <div className="p-4 border-t border-white/10 bg-black/30 flex flex-col gap-3">
-          {/* NEW: Clear History Section (Only shows if saves exist) */}
+        {/* Footer Area: Import & Clear History on ONE line */}
+        <div className="p-4 border-t border-white/10 bg-black/30 flex items-center gap-3">
+          
+          {/* Import Button - Takes available width */}
+          <label className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg cursor-pointer transition-colors border border-white/10 border-dashed">
+            <FileUp className="w-4 h-4" />
+            <span className="text-sm font-medium">Import JSON</span>
+            <input
+              key={loadFileInputKey}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => {
+                onFileSelect(e);
+                onClose();
+              }}
+            />
+          </label>
+
+          {/* Clear History - Sits to the right if saves exist */}
           {saves.length > 0 && (
-            <div className="flex justify-end items-center border-b border-white/5 pb-3">
+            <div className="flex-shrink-0">
               {!showConfirmClear ? (
                 <button
                   onClick={() => setShowConfirmClear(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all text-xs font-medium"
+                  className="flex items-center gap-1.5 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all text-xs font-medium border border-transparent hover:border-red-500/20"
+                  title="Clear all saves in this category"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Clear History
+                  <Trash2 className="w-4 h-4" />
                 </button>
               ) : (
-                <div className="flex items-center gap-2 animate-fadeIn">
-                  <span className="text-xs text-red-400 mr-1">Delete all?</span>
+                <div className="flex items-center gap-2 animate-fadeIn bg-black/40 rounded-lg p-1 border border-red-500/30">
+                  <span className="text-xs text-red-400 pl-1">Delete All?</span>
                   <button
                     onClick={handleClearHistory}
                     className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold"
@@ -185,22 +203,6 @@ const LoadGameModal = ({
               )}
             </div>
           )}
-
-          {/* Import Button */}
-          <label className="flex items-center justify-center gap-2 w-full bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg cursor-pointer transition-colors border border-white/10 border-dashed">
-            <FileUp className="w-4 h-4" />
-            <span className="text-sm font-medium">Import from JSON File</span>
-            <input
-              key={loadFileInputKey}
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={(e) => {
-                onFileSelect(e);
-                onClose();
-              }}
-            />
-          </label>
         </div>
       </div>
     </div>
